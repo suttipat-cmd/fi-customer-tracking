@@ -1,13 +1,37 @@
 # FI Customer Tracking Web App
 
-> **Current version:** `0.6.1-interface-polish`  
-> **Base version:** `0.6.0-thai-customer-workflow`  
-> **Current status:** Frontend interface-polish release prepared. Database schema, RLS, RPC and customer/report business workflows are unchanged. This release improves the team-report modal, aligns the report filters, compacts action columns, removes visible version text and fixes the browser-tab title. This release has not yet been runtime-tested against the real Supabase project.  
+> **Current version:** `0.7.0-system-settings`  
+> **Base version:** `0.6.1-interface-polish`  
+> **Current status:** Full-release package prepared with Frontend changes plus Migration `005_system_settings_media_master_data`. The release adds public branding media, profile avatars, external website links and configurable master data. SQL and Frontend have been statically validated but have not yet been runtime-tested against the real Supabase project.  
 
 > **Runtime stack:** GitHub Pages + Plain HTML/CSS/JavaScript + Supabase Auth/PostgreSQL  
 > **Application repository:** `fi-customer-tracking`
 
 ## Changelog
+
+### 0.7.0-system-settings
+
+- เปลี่ยนพื้นที่ด้านซ้ายของหน้าเข้าสู่ระบบเป็นภาพสี่เหลี่ยมจัตุรัส 1:1 ที่ผู้ดูแลระบบอัปโหลดได้
+- เพิ่มการตั้งค่าไอคอนแท็บเบราว์เซอร์จาก Supabase Storage
+- ตัดข้อความช่วยเหลือหน้าเข้าสู่ระบบที่ไม่จำเป็นออก
+- เพิ่มรูปโปรไฟล์: ผู้ใช้งานและผู้จัดการแก้ของตนเองได้ ผู้ดูแลระบบแก้ให้ทุกบัญชีได้
+- เพิ่มเมนูลิงก์เว็บไซต์ภายนอก พร้อมชื่อ URL ลำดับ และสถานะใช้งาน
+- เพิ่มเมนูข้อมูลตัวเลือกกลาง 8 กลุ่ม:
+  - โมดูล
+  - ฟังก์ชัน
+  - ขั้นตอนเริ่มใช้งาน
+  - สถานะการนำเข้าข้อมูล
+  - ระดับความสนใจ
+  - ประเภทกิจกรรม
+  - วิธีจ่ายพนักงานขับรถ
+  - รูปแบบจัดการค่าใช้จ่ายเที่ยว
+- รายการตัวเลือกที่เลิกใช้ใช้การปิดใช้งานแทนการลบ
+- เพิ่ม Public Storage Bucket `app-public-media` สำหรับภาพหน้าเข้าสู่ระบบและไอคอนแท็บ พร้อม Private Storage Bucket `app-profile-media` สำหรับรูปโปรไฟล์
+- เพิ่มตาราง `app_settings`, `external_links`, `master_options`
+- เพิ่ม `profiles.avatar_path` และ `sort_order` ใน `modules`/`features`
+- เปลี่ยนค่าควบคุม Customer/Activity จาก Fixed CHECK เป็น Master Validation Trigger
+- เพิ่ม RPC `update_my_avatar_path` และ `admin_update_profile_avatar`
+- อัปเดต Cache Busting และ Internal Version Stamp เป็น `0.7.0-system-settings`
 
 ### 0.6.1-interface-polish
 
@@ -141,12 +165,17 @@
 6. ให้ผู้จัดการรับทราบหรือส่งรายงานกลับให้แก้ไข
 7. ใช้ Supabase Auth, Grants, RLS, Trigger และ RPC เป็นชั้นควบคุมความปลอดภัย
 8. แสดงวันที่เป็น `DD/MM/YYYY` และเวลาเป็น `DD/MM/YYYY HH:mm` ตาม Timezone `Asia/Bangkok`
+9. จัดการภาพหน้าเข้าสู่ระบบ ไอคอนแท็บ และรูปโปรไฟล์ผ่าน Supabase Storage
+10. แสดงลิงก์เว็บไซต์ภายนอกในเมนูสำหรับผู้ใช้งานทุกคน
+11. ให้ผู้ดูแลระบบจัดการข้อมูลตัวเลือกกลางและปิดใช้งานค่าที่เลิกใช้ได้
 
 ```mermaid
 flowchart LR
     WEB[GitHub Pages Web App] --> AUTH[Supabase Auth]
     WEB --> API[Supabase Data API]
+    WEB --> STORAGE[Supabase Storage]
     API --> DB[(PostgreSQL)]
+    STORAGE --> STORAGE_RLS[Storage RLS]
     DB --> RLS[RLS Policies]
     DB --> AUDIT[Audit Triggers]
     DB --> RPC[Workflow RPC]
@@ -183,6 +212,9 @@ SQL เป็น Deployment Artifacts สำหรับรันผ่าน Su
 004_profile_preferences.sql
 004_profile_preferences_verify.sql
 004_profile_preferences_rollback.sql
+005_system_settings_media_master_data.sql
+005_system_settings_media_master_data_verify.sql
+005_system_settings_media_master_data_rollback.sql
 ```
 
 > ข้อจำกัด: หากไม่เก็บ SQL ใน Repository จะไม่มี Database Migration History ใน Git จึงต้องเก็บไฟล์ SQL ชุดที่ใช้จริงไว้ในพื้นที่สำรองที่ควบคุม Version ได้
@@ -197,6 +229,8 @@ SQL เป็น Deployment Artifacts สำหรับรันผ่าน Su
 - ไม่มีหน้า Restore และไม่เห็นลูกค้าที่ถูกลบ
 - ไม่มีหน้า Customer Audit Log ใน Frontend; Trigger Audit ยังทำงานในฐานข้อมูล
 - สร้าง ดู และแก้รายงานประจำวันของตัวเองตามสถานะที่อนุญาต
+- เปลี่ยนหรือลบรูปโปรไฟล์ของตนเองได้
+- เปิดลิงก์เว็บไซต์ภายนอกที่เปิดใช้งาน
 - ดูรายงานของผู้อื่นไม่ได้
 
 ### `manager`
@@ -206,6 +240,8 @@ SQL เป็น Deployment Artifacts สำหรับรันผ่าน Su
 - ไม่มีหน้า Restore และไม่เห็นลูกค้าที่ถูกลบ
 - ดูรายงานประจำวันของผู้ใช้งานทุกคน
 - รับทราบหรือส่งรายงานกลับพร้อมเหตุผล
+- เปลี่ยนหรือลบรูปโปรไฟล์ของตนเองได้
+- เปิดลิงก์เว็บไซต์ภายนอกที่เปิดใช้งาน
 - แก้เนื้อหารายงานแทนผู้ใช้งานไม่ได้
 
 ### `admin`
@@ -214,7 +250,10 @@ SQL เป็น Deployment Artifacts สำหรับรันผ่าน Su
 - Frontend ไม่มี Restore UI และไม่แสดงลูกค้าที่ถูกลบ
 - ดูรายงานทั้งหมดและรับทราบหรือส่งกลับ
 - เปลี่ยน Role และ Active Status ของบัญชีอื่นผ่าน RPC
-- จัดการ Master Modules และ Features
+- จัดการข้อมูลตัวเลือกกลางทั้ง 8 กลุ่ม
+- จัดการภาพหน้าเข้าสู่ระบบและไอคอนแท็บเบราว์เซอร์
+- จัดการลิงก์เว็บไซต์ภายนอก
+- เปลี่ยนรูปโปรไฟล์ให้ทุกบัญชีได้
 - เปลี่ยน Role หรือปิดบัญชีตัวเองผ่าน RPC ไม่ได้
 
 ### Permission Matrix
@@ -233,7 +272,11 @@ SQL เป็น Deployment Artifacts สำหรับรันผ่าน Su
 | แก้ Report Items | No | No | Own and unlocked |
 | รับทราบ/ส่งกลับ Report | Yes | Yes | No |
 | จัดการ Role | Yes | No | No |
-| จัดการ Module/Feature Master | Yes | No | No |
+| เปลี่ยนรูปโปรไฟล์ตนเอง | Yes | Yes | Yes |
+| เปลี่ยนรูปโปรไฟล์ผู้อื่น | Yes | No | No |
+| จัดการภาพระบบและไอคอนแท็บ | Yes | No | No |
+| จัดการลิงก์เว็บไซต์ภายนอก | Yes | No | No |
+| จัดการข้อมูลตัวเลือกกลาง | Yes | No | No |
 
 ## 4. Customer Rules
 
@@ -310,6 +353,11 @@ erDiagram
     CUSTOMERS ||--o{ CUSTOMER_AUDIT_LOGS : audited
 
     PROFILES ||--o{ DAILY_REPORTS : writes
+    PROFILES ||--o{ EXTERNAL_LINKS : manages
+    PROFILES ||--o{ MASTER_OPTIONS : manages
+    MASTER_OPTIONS }o--o{ CUSTOMERS : validates
+    APP_SETTINGS ||--o| STORAGE_MEDIA : references
+    PROFILES ||--o| STORAGE_MEDIA : avatar
     DAILY_REPORTS ||--o{ DAILY_REPORT_ITEMS : contains
     CUSTOMERS ||--o{ DAILY_REPORT_ITEMS : referenced
     DAILY_REPORTS ||--o{ DAILY_REPORT_EVENTS : tracks
@@ -331,6 +379,7 @@ Purpose: Application profile linked one-to-one with `auth.users`.
 | `is_active` | `boolean` | No | `true` |
 | `theme_mode` | `text` | No | `light`; `light`, `dark`, `system` |
 | `theme_accent` | `text` | No | `#2f68e6`; HEX `#RRGGBB` |
+| `avatar_path` | `text` | Yes | Storage path under `avatars/<profile_id>/` |
 | `created_at` | `timestamptz` | No | Current timestamp |
 | `updated_at` | `timestamptz` | No | Current timestamp |
 
@@ -381,10 +430,11 @@ Length rules:
 
 Controlled values:
 
-- `account_status`: `active`, `inactive`
-- `onboarding_stage`: `to_do`, `pending_data`, `onboarding`, `training_completed`, `go_live`
-- `import_status`: `waiting`, `in_process`, `done`
-- `engagement_level`: `interest`, `neutral`, `null`
+- `account_status`: ค่าควบคุมระบบ `active`, `inactive`
+- `onboarding_stage`: อ้างอิง `master_options.group_key = 'onboarding_stage'`
+- `import_status`: อ้างอิง `master_options.group_key = 'import_status'`
+- `engagement_level`: อ้างอิง `master_options.group_key = 'engagement_level'` หรือ `null`
+- Database Trigger ตรวจว่าค่าที่บันทึกมีอยู่ใน Master แม้รายการนั้นจะถูกปิดใช้งานแล้ว เพื่อรักษาข้อมูลย้อนหลัง
 
 Indexes:
 
@@ -448,6 +498,7 @@ Master data:
 | `code` | `text` | No | Unique, lowercase code |
 | `name` | `text` | No | Non-blank |
 | `is_active` | `boolean` | No | `true` |
+| `sort_order` | `integer` | No | `0`, range 0–9999 |
 | `created_at` | `timestamptz` | No | |
 | `updated_at` | `timestamptz` | No | |
 
@@ -502,7 +553,7 @@ One-to-one with Customer.
 | `created_at/by` | timestamp/uuid | No | |
 | `updated_at/by` | timestamp/uuid | No | |
 
-สองช่องยังเป็น Free Text เพราะข้อมูลจริงมีหลายรูปแบบและ Business Rule ยังไม่เสถียร โดยแต่ละช่องยาวได้ไม่เกิน 5,000 ตัวอักษร
+สองช่องเก็บ `option_value` จาก `master_options` กลุ่ม `driver_payment_method` และ `trip_expense_management` ตามลำดับ ค่าเดิมจากระบบก่อนหน้าได้รับการ Seed เป็น Master เพื่อรักษาความเข้ากันได้ และแต่ละช่องยาวได้ไม่เกิน 5,000 ตัวอักษร
 
 ### 7.10 `customer_activities`
 
@@ -512,7 +563,7 @@ Human-readable Customer Timeline.
 |---|---|---:|---|
 | `id` | `uuid` | No | PK |
 | `customer_id` | `uuid` | No | FK |
-| `activity_type` | `text` | No | `note`, `call`, `meeting`, `follow_up`, `system` |
+| `activity_type` | `text` | No | อ้างอิง `master_options` กลุ่ม `activity_type` ผ่าน Trigger |
 | `detail` | `text` | No | Non-blank |
 | `activity_date` | `date` | No | Current date in `Asia/Bangkok` |
 | `created_at/by` | timestamp/uuid | No | |
@@ -621,7 +672,106 @@ Events:
 - `acknowledged`
 - `revision_requested`
 
-### 7.15 `app_private.schema_migrations`
+### 7.15 `app_settings`
+
+Singleton system settings row readable before Login.
+
+| Column | Type | Nullable | Rule |
+|---|---|---:|---|
+| `id` | `smallint` | No | PK, must equal `1` |
+| `login_image_path` | `text` | Yes | Storage path under `branding/login/` |
+| `favicon_path` | `text` | Yes | Storage path under `branding/favicon/` |
+| `updated_at` | `timestamptz` | No | Updated by Trigger |
+| `updated_by` | `uuid` | Yes | FK → `profiles.id` |
+
+- `anon` และ `authenticated` อ่านได้ เพื่อให้หน้า Login โหลดภาพก่อนมี Session
+- เฉพาะผู้ดูแลระบบแก้ไขได้
+- ไม่มี Insert/Delete ผ่าน Frontend
+
+### 7.16 `external_links`
+
+ลิงก์เว็บไซต์ภายนอกที่แสดงใน Sidebar.
+
+| Column | Type | Nullable | Rule |
+|---|---|---:|---|
+| `id` | `uuid` | No | PK |
+| `display_name` | `text` | No | 1–120 ตัวอักษร, unique แบบไม่สนตัวพิมพ์ |
+| `url` | `text` | No | 8–2,048 ตัวอักษร, ต้องเป็น `http://` หรือ `https://` |
+| `sort_order` | `integer` | No | 0–9999 |
+| `is_active` | `boolean` | No | `true` |
+| `created_at/by` | timestamp/uuid | No | Actor metadata |
+| `updated_at/by` | timestamp/uuid | No | Actor metadata |
+
+- Active User อ่านเฉพาะรายการเปิดใช้งาน
+- Admin อ่านทั้งหมดและทำ Insert/Update/Delete ได้
+- Frontend เปิดลิงก์ด้วยแท็บใหม่และ `rel="noopener noreferrer"`
+
+### 7.17 `master_options`
+
+ตัวเลือกกลางสำหรับค่าที่เดิมเป็น Fixed Check หรือ Free Text.
+
+| Column | Type | Nullable | Rule |
+|---|---|---:|---|
+| `id` | `uuid` | No | PK |
+| `group_key` | `text` | No | หนึ่งใน 6 กลุ่มของตารางนี้ |
+| `option_value` | `text` | No | ค่าที่บันทึกจริง |
+| `display_name` | `text` | No | ชื่อภาษาไทยที่แสดง |
+| `sort_order` | `integer` | No | 0–9999 |
+| `is_active` | `boolean` | No | `true` |
+| `created_at/by` | timestamp/uuid | No | Actor metadata |
+| `updated_at/by` | timestamp/uuid | No | Actor metadata |
+
+กลุ่มในตาราง:
+
+- `onboarding_stage`
+- `import_status`
+- `engagement_level`
+- `activity_type`
+- `driver_payment_method`
+- `trip_expense_management`
+
+`modules` และ `features` ยังคงใช้ตารางเดิม รวมเป็น 8 กลุ่มที่ผู้ดูแลระบบจัดการผ่านหน้าเดียวกัน
+
+กฎ:
+
+- Unique ตาม `group_key` + Hash ของ `lower(option_value)`
+- Active User อ่านรายการเปิดใช้งาน; Admin อ่านทั้งหมด
+- Admin เพิ่มและแก้ไขได้
+- Frontend ไม่มี Hard Delete ใช้ `is_active = false`
+- Trigger ตรวจค่าที่บันทึกใน `customers`, `customer_activities`, `customer_operations`
+
+### 7.18 Supabase Storage
+
+#### `app-public-media`
+
+Public Bucket สำหรับไฟล์ Branding ที่ต้องแสดงก่อน Login.
+
+```text
+branding/login/<uuid>.<ext>
+branding/favicon/<uuid>.<ext>
+```
+
+- ผู้ที่มี URL สามารถอ่านไฟล์ได้
+- Upload/Update/Delete: Admin เท่านั้น
+- จำกัดไฟล์สูงสุด 5 MB
+- รองรับ PNG, JPEG, WebP และ ICO ตามประเภทการใช้งาน
+
+#### `app-profile-media`
+
+Private Bucket สำหรับรูปโปรไฟล์.
+
+```text
+avatars/<profile_id>/<uuid>.<ext>
+```
+
+- อ่านได้เฉพาะ Active User ผ่าน Signed URL อายุ 1 ชั่วโมง
+- Upload/Update/Delete: เจ้าของบัญชีหรือ Admin
+- จำกัดไฟล์สูงสุด 3 MB
+- รองรับ PNG, JPEG และ WebP
+
+Frontend จำกัด Login image 5 MB, Avatar 3 MB และ Favicon 1 MB โดย Login image กับ Avatar ต้องเป็นภาพ 1:1
+
+### 7.19 `app_private.schema_migrations`
 
 Private migration registry. ไม่เปิดผ่าน Data API
 
@@ -631,11 +781,12 @@ Current applied versions after successful installation:
 001_initial_schema
 003_frontend_support
 004_profile_preferences
+005_system_settings_media_master_data
 ```
 
 ## 8. RLS Design
 
-RLS เปิดบน Public Application Tables ทั้ง 14 ตาราง
+RLS เปิดบน Public Application Tables ทั้ง 17 ตาราง และ Storage Policies บน `storage.objects`
 
 Private helper functions:
 
@@ -646,11 +797,18 @@ Private helper functions:
 - `app_private.can_edit_customer(uuid)`
 - `app_private.can_read_daily_report(uuid)`
 - `app_private.can_edit_daily_report(uuid)`
+- `app_private.master_option_exists(text, text)`
+- Master validation/timestamp Trigger Functions สำหรับ Migration 005
 
 หลักการ:
 
-- `anon` ไม่มี Table Privilege
+- `anon` มีเฉพาะ `SELECT` บน `app_settings` เพื่อโหลด Branding ก่อน Login
 - `authenticated` ได้เฉพาะ Grants ที่จำเป็น
+- `app_settings`: Public Select, Admin Update
+- `external_links`: Active User อ่านรายการเปิดใช้งาน, Admin อ่าน/เขียนทั้งหมด
+- `master_options`: Active User อ่านรายการเปิดใช้งาน, Admin อ่าน/เขียนทั้งหมด
+- `storage.objects`: Branding เขียนโดย Admin; Avatar เขียนโดยเจ้าของหรือ Admin
+- Public Bucket ทำให้ไฟล์อ่านได้ด้วย URL แม้ยังไม่ Login
 - RLS ตรวจ Active Profile, Role, Ownership และ Lock Status
 - Security Definer Functions กำหนด `search_path`
 - Trigger/RPC ที่มีสิทธิ์สูงตรวจ Actor และ Business Rule ภายใน Function
@@ -670,6 +828,8 @@ Private helper functions:
 | `save_customer_owners(uuid, uuid[], uuid)` | Any active role | Replace owners and primary owner atomically |
 | `save_customer_contact(uuid, uuid, text, text, text, text, text, boolean, boolean)` | Any active role | Insert/update contact and primary contact atomically |
 | `update_my_profile_preferences(text, text)` | Current active user | Save own Theme mode and accent color |
+| `update_my_avatar_path(text)` | Current active user | Set or clear own avatar path |
+| `admin_update_profile_avatar(uuid, text)` | Admin | Set or clear avatar path for any profile |
 
 Frontend ต้องเรียก Workflow และ Aggregate Save ผ่าน RPC เหล่านี้ ไม่อัปเดต Workflow Columns โดยตรง
 
@@ -726,6 +886,21 @@ const SUPABASE_PUBLISHABLE_KEY = "YOUR_PUBLISHABLE_KEY";
 
 ความปลอดภัยของข้อมูลไม่ได้พึ่งการซ่อน Publishable Key แต่พึ่ง Grants, RLS, Trigger และ RPC
 
+Supabase Storage ที่ต้องมี:
+
+```text
+Bucket: app-public-media
+Access model: Public
+Maximum file size: 5 MB
+Allowed MIME: image/png, image/jpeg, image/webp, image/x-icon, image/vnd.microsoft.icon
+
+Bucket: app-profile-media
+Access model: Private
+Maximum file size: 3 MB
+Allowed MIME: image/png, image/jpeg, image/webp
+```
+
+ห้ามใช้ `service_role` ใน Browser เพื่ออัปโหลดไฟล์ การเขียนไฟล์ต้องผ่าน Storage RLS ของผู้ใช้งานที่ Login อยู่
 
 ### Frontend Community Dependencies
 
@@ -827,6 +1002,32 @@ Migration นี้ไม่เพิ่ม Client Update Policy บน `profile
 
 ลบ RPC และ Theme Columns เท่านั้น ค่า Theme ที่ผู้ใช้บันทึกจะหาย แต่ Auth User, Role และข้อมูลธุรกิจยังคงอยู่
 
+### `005_system_settings_media_master_data.sql`
+
+เพิ่ม:
+
+- `profiles.avatar_path`
+- `modules.sort_order` และ `features.sort_order`
+- ตาราง `app_settings`, `external_links`, `master_options`
+- Public Storage Bucket `app-public-media` สำหรับ Branding
+- Private Storage Bucket `app-profile-media` สำหรับ Avatar
+- Storage RLS แยกตามประเภทไฟล์และเจ้าของบัญชี
+- Master Validation Trigger บน Customer, Activity และ Operations
+- RPC `update_my_avatar_path` และ `admin_update_profile_avatar`
+- Seed ค่าควบคุมเดิม และ Seed ค่า Operations เดิมเป็น Master
+- เปลี่ยน Fixed CHECK ของ Onboarding, Import, Engagement และ Activity เป็น Master Validation
+
+### `005_system_settings_media_master_data_verify.sql`
+
+ตรวจ Migration Registry, Columns, Tables, RLS, Policies, Triggers, RPC, Seed Options และ Storage Bucket
+
+### `005_system_settings_media_master_data_rollback.sql`
+
+- ปฏิเสธ Rollback หากข้อมูลใช้ค่า Master ใหม่ที่ Fixed CHECK เดิมไม่รองรับ
+- ลบ Tables, RPC, Triggers, Policies และ Columns ของ Migration 005
+- คืน Fixed CHECK เดิม
+- ไม่ลบไฟล์ Storage อัตโนมัติ แต่เปลี่ยนทั้งสอง Bucket เป็น Private; Bucket ว่างจะถูกลบ
+
 ## 13. Installation Order
 
 ### Before Running SQL
@@ -837,6 +1038,7 @@ Migration นี้ไม่เพิ่ม Client Update Policy บน `profile
 - ยังไม่นำข้อมูลลูกค้าจริงเข้า
 - Export/Backup หาก Project มีข้อมูลเดิม
 - ตรวจว่าไม่มีตารางชื่อซ้ำกับ Schema นี้
+- ตรวจว่ามีอย่างน้อย 1 แถวใน `profiles`; Migration 005 ใช้บัญชีดังกล่าวเป็นผู้สร้าง Seed Master เริ่มต้น
 
 ### Apply Migration
 
@@ -847,20 +1049,24 @@ Migration นี้ไม่เพิ่ม Client Update Policy บน `profile
 5. Run ทั้งไฟล์ครั้งเดียว
 6. รัน `003_frontend_support.sql`
 7. รัน `004_profile_preferences.sql`
-8. หากมี Error Transaction จะ Rollback
-9. อย่ารัน Migration เดิมซ้ำหลังสำเร็จ เพราะ Migration Guard จะปฏิเสธ
+8. รัน `005_system_settings_media_master_data.sql`
+9. หากมี Error Transaction จะ Rollback
+10. ตรวจว่า Bucket `app-public-media` เป็น Public และ `app-profile-media` เป็น Private
+11. อย่ารัน Migration เก่าแบบสุ่ม; Migration 005 ออกแบบให้ Re-run ได้เท่าที่ปลอดภัย
 
 ### Verify
 
 1. รัน `001_initial_schema_verify.sql`
 2. รัน `003_frontend_support_verify.sql`
 3. รัน `004_profile_preferences_verify.sql`
-4. ตรวจ Public Tables ครบ 14 ตาราง
-5. ตรวจ RLS เป็น `true` ทุกตาราง
-6. ตรวจ `anon` ไม่มี Table Privilege
-7. ตรวจ Public RPC ครบตาม Section 9
-8. เปิด Database → Advisors
-9. Rerun Security Advisor และ Performance Advisor
+4. รัน `005_system_settings_media_master_data_verify.sql`
+5. ตรวจ Public Tables ของระบบครบ 17 ตาราง
+6. ตรวจ RLS เป็น `true` ทุก Application Table
+7. ตรวจ `anon` อ่านได้เฉพาะ `app_settings`
+8. ตรวจ Storage Policies ของ `app-public-media` และ `app-profile-media` ครบ
+9. ตรวจ Public RPC ครบตาม Section 9
+10. เปิด Database → Advisors
+11. Rerun Security Advisor และ Performance Advisor
 
 ### Bootstrap Roles
 
@@ -947,7 +1153,7 @@ Migration policy:
 
 ### Security
 
-- Role `anon` อ่านตารางไม่ได้
+- Role `anon` อ่านได้เฉพาะ `app_settings`; ตารางธุรกิจอื่นอ่านไม่ได้
 - Frontend เขียน Audit/Event Log ไม่ได้
 - Frontend Hard Delete Customer ไม่ได้
 - Security Advisor ไม่มี Error สำคัญ
@@ -962,6 +1168,14 @@ Migration policy:
 - Inactive User ถูกปฏิเสธ
 - Navigation ตรงกับ Role และเปิด Profile จาก Topbar ได้
 - Theme `light`, `dark`, `system` ทำงานและบันทึกข้าม Session
+- ผู้ใช้งานและผู้จัดการเปลี่ยน/ลบรูปโปรไฟล์ตนเองได้
+- ผู้ดูแลระบบเปลี่ยน/ลบรูปโปรไฟล์ทุกบัญชีได้
+- รูปที่ไม่ใช่ 1:1, MIME ไม่รองรับ หรือเกินขนาดถูกปฏิเสธ
+- ภาพหน้า Login และ Favicon โหลดได้ก่อน Login
+- ผู้ใช้ทั่วไปอัปโหลด Branding ไม่ได้จาก Storage API
+- External Links แสดงเฉพาะรายการเปิดใช้งาน เปิดแท็บใหม่ และ URL ไม่ปลอดภัยถูกปฏิเสธ
+- Master Data ทั้ง 8 กลุ่มเพิ่ม แก้ไข จัดลำดับ และปิดใช้งานได้
+- ค่าที่ปิดใช้งานไม่แสดงในฟอร์มใหม่ แต่ข้อมูลเก่ายังแสดงชื่อได้
 - Required Marker, Focus Border และ Focus Ring เปลี่ยนตาม Accent Color
 - Customer List ใช้ AG Grid: Sort, Filter, Resize, Pin และ Pagination
 - External Filters และ Advanced Filters แบบหุบ/ขยายทำงานร่วมกัน
@@ -1009,7 +1223,11 @@ Migration policy:
 - Customer Edit Page รวม Core, Owners, Contacts, Modules, Features, Operations และ Timeline
 - Customer Edit ใช้ปุ่ม Save หลักหนึ่งปุ่มและ Sequential Save
 - Customer Soft Delete จาก List/Detail โดยไม่มี Restore UI
-- User Profile และ Theme Settings
+- User Profile, Avatar และ Theme Settings
+- Admin System Branding Settings สำหรับ Login Image/Favicon
+- Admin External Website Links
+- Admin Master Data Settings 8 กลุ่ม
+- External Website Links ใน Sidebar ของผู้ใช้งานทุก Role
 - User Daily Report
 - Manager Report Review/Acknowledge/Revision ด้วย AG Grid Community และ Excel
 - Print A4
@@ -1036,8 +1254,9 @@ Migration policy:
 - Browser Tab Title: `ระบบติดตามลูกค้า` คงที่ทุก Route
 - Responsive breakpoint หลัก: 1,180px, 820px และ 480px
 
-Release `0.6.1` ไม่เพิ่ม Database Migration และไม่เปลี่ยน Daily Report Workflow
+Release `0.7.0` ใช้ Migration `005_system_settings_media_master_data` และไม่เปลี่ยน Daily Report Workflow
 Customer Delete ใน Frontend ใช้ `archive_customer` เดิมเป็น Soft Delete แบบไม่มี Restore UI
+ไฟล์ภาพไม่เก็บใน Repository แต่เก็บใน Public Storage Bucket และบันทึกเฉพาะ Path ในฐานข้อมูล
 
 ### Frontend Configuration
 
@@ -1083,8 +1302,8 @@ http://localhost:8080
 `index.html` โหลดไฟล์ด้วย:
 
 ```text
-style.css?v=0.6.1-interface-polish
-script.js?v=0.6.1-interface-polish
+style.css?v=0.7.0-system-settings
+script.js?v=0.7.0-system-settings
 ```
 
 เมื่อ Release ใหม่ต้องอัปเดต Version ใน:
@@ -1097,14 +1316,26 @@ script.js?v=0.6.1-interface-polish
 
 ### Frontend Rollback
 
-หาก v0.6.1 มีปัญหาหลัง Deploy:
+หาก v0.7.0 มีปัญหาหลัง Deploy:
 
-1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.6.0
+1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.6.1
 2. Push กลับไปที่ `main`
-3. รอ GitHub Pages Deploy
-4. Hard Refresh และตรวจหน้ารายงานของทีม ตารางลูกค้า และชื่อ Tab Browser
-5. ไม่ต้อง Rollback Database เพราะ v0.6.1 ไม่มี Migration ใหม่
-6. ลูกค้าที่ถูกกด `ลบ` ใน v0.6.0 จะยังมี `is_archived = true`; Frontend v0.5.1 อาจแสดงผ่านตัวกรอง Archive ตาม Behavior รุ่นเดิม
+3. รอ GitHub Pages Deploy และ Hard Refresh
+4. ทดสอบ Login, Customer, Daily Report และ Team Report
+5. Frontend v0.6.1 จะเพิกเฉยต่อ Tables/Columns ใหม่ จึง Rollback Frontend ก่อนได้
+6. เมื่อต้องการย้อน Database ให้ตรวจ Compatibility Guard แล้วรัน `005_system_settings_media_master_data_rollback.sql`
+7. Rollback SQL ไม่ลบไฟล์ Storage อัตโนมัติ และจะเปลี่ยน Bucket เป็น Private
+8. สำรองไฟล์ Branding/Avatar ก่อนลบ Bucket หรือ Objects ด้วยตนเอง
+
+### System Settings Migration Rollback
+
+รันหลัง Rollback Frontend:
+
+```text
+005_system_settings_media_master_data_rollback.sql
+```
+
+Rollback จะหยุดทันทีหาก Customer หรือ Activity ใช้ค่า Master ใหม่ที่ Constraints เดิมไม่รองรับ เพื่อป้องกันข้อมูลเสียหาย
 
 ### Profile Theme Migration Rollback
 
@@ -1165,7 +1396,7 @@ Full Database Rollback จะลบ Application Tables และข้อมู�
 
 ## 18. Known Limitations
 
-- Frontend v0.6.0 ต้องทดสอบกับ Supabase Project จริงหลัง Deploy
+- Frontend v0.7.0 และ Migration 005 ต้องทดสอบกับ Supabase Project จริงหลัง Deploy
 - AG Grid, AG Charts และ SheetJS โหลดผ่าน CDN จึงต้องมี Internet Access และ CSP ต้องอนุญาต `cdn.jsdelivr.net`
 - หาก AG CDN ล้มเหลว หน้าที่ใช้ Grid/Chart จะแสดง Error State แต่ไม่มีตารางสำรอง
 - Excel Export ส่งออกเฉพาะข้อมูลที่โหลดเข้า Browser และผ่านสิทธิ์/ตัวกรองปัจจุบัน
@@ -1176,7 +1407,10 @@ Full Database Rollback จะลบ Application Tables และข้อมู�
 - Manager Page โหลด Report ย้อนหลัง 60 วันจากฐานข้อมูล แต่หน้าจอกรองตามวันที่ที่เลือกและไม่มี Checkbox แสดงทั้งหมด
 - การสร้าง/เชิญ Auth User ต้องทำผ่าน Supabase Dashboard เพราะ Browser ห้ามใช้ Admin Secret API
 - Audit Log ยังอ่านได้ตาม Database Permission เดิม แต่ Frontend ไม่ Query และไม่แสดงผล
-- Module/Feature Master Changes และ Profile Role Changes ยังไม่มี Dedicated Admin Audit Log
+- Master Data, Branding, External Link และ Profile Role Changes ยังไม่มี Dedicated Immutable Audit Log; ตารางใหม่เก็บ Actor/Timestamp เท่านั้น
 - SQL ไม่อยู่ใน 4 Runtime Files ตามโครงสร้าง Repo จึงต้องเก็บ Migration Artifacts แยกอย่างมี Version
-- Driver Payment Method และ Trip Expense Management ยังเป็น Free Text
+- Driver Payment Method และ Trip Expense Management ใช้ Master Options แล้ว แต่ค่าเดิมที่ยาวอาจแสดงชื่อแบบตัดเหลือ 200 ตัวอักษรในหน้าจัดการ Master
+- Public Bucket หมายความว่าผู้ที่ทราบ URL ของรูปสามารถเปิดดูได้ จึงห้ามอัปโหลดข้อมูลลับหรือเอกสารส่วนบุคคล
+- Frontend ตรวจขนาด MIME และอัตราส่วน แต่ยังไม่มีการบีบอัด/ครอปรูปอัตโนมัติ
+- การลบไฟล์เก่าเป็น Best-effort; หาก Storage Delete ล้มเหลวอาจมีไฟล์ที่ไม่ถูกอ้างอิงและต้องทำความสะอาดโดยผู้ดูแลระบบ
 - Email Notification และ Calendar/Scheduler ยังไม่อยู่ใน Scope รุ่นนี้
