@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.5.0-ag-experience";
+  const APP_VERSION = "0.5.1-ag-loading-hotfix";
 
   // Public browser configuration only. Never place a database password,
   // secret key, or service_role key in this file.
@@ -561,17 +561,40 @@
     state.ui.profileDrafts.clear();
   }
 
+  function renderComponentError(container, title, message, retry = false) {
+    if (!container) return;
+    container.removeAttribute("aria-busy");
+    container.dataset.componentState = "error";
+    container.innerHTML = `
+      <div class="dependency-error" role="alert">
+        <strong>${h(title)}</strong>
+        <span>${h(message)}</span>
+        ${retry ? '<button class="btn btn-secondary btn-small" data-action="refresh-route">ลองใหม่</button>' : ""}
+      </div>`;
+  }
+
   function createCommunityGrid(container, gridOptions, key) {
     if (!container) return null;
     if (!window.agGrid?.createGrid) {
-      container.innerHTML = `
-        <div class="dependency-error" role="alert">
-          <strong>โหลด AG Grid Community ไม่สำเร็จ</strong>
-          <span>กรุณาตรวจสอบอินเทอร์เน็ตหรือ Content Security Policy แล้วลองใหม่</span>
-          <button class="btn btn-secondary btn-small" data-action="refresh-route">ลองใหม่</button>
-        </div>`;
+      renderComponentError(
+        container,
+        "โหลด AG Grid Community ไม่สำเร็จ",
+        "กรุณาตรวจสอบอินเทอร์เน็ตหรือ Content Security Policy แล้วลองใหม่",
+        true
+      );
       return null;
     }
+
+    const {
+      onGridReady: userOnGridReady,
+      onFirstDataRendered: userOnFirstDataRendered,
+      ...customOptions
+    } = gridOptions || {};
+
+    const markReady = () => {
+      container.removeAttribute("aria-busy");
+      container.dataset.componentState = "ready";
+    };
 
     const options = {
       defaultColDef: {
@@ -612,45 +635,102 @@
         blank: "ว่าง",
         notBlank: "ไม่ว่าง"
       },
-      ...gridOptions
+      ...customOptions,
+      onGridReady: (event) => {
+        markReady();
+        userOnGridReady?.(event);
+      },
+      onFirstDataRendered: (event) => {
+        markReady();
+        userOnFirstDataRendered?.(event);
+      }
     };
 
-    const api = window.agGrid.createGrid(container, options);
-    state.grids[key] = api;
-    return api;
+    try {
+      // AG Grid appends its own DOM. Remove the temporary spinner first,
+      // otherwise the placeholder remains visible behind the completed grid.
+      container.replaceChildren();
+      container.setAttribute("aria-busy", "true");
+      container.dataset.componentState = "loading";
+
+      const api = window.agGrid.createGrid(container, options);
+      state.grids[key] = api;
+
+      // createGrid is synchronous, while the first paint is deferred.
+      // This fallback prevents aria-busy from becoming stale if an AG event
+      // is skipped because the route changes during initialization.
+      window.requestAnimationFrame(() => {
+        if (state.grids[key] === api && container.isConnected) markReady();
+      });
+      return api;
+    } catch (error) {
+      state.grids[key] = null;
+      console.error("AG Grid initialization failed", error);
+      renderComponentError(
+        container,
+        "สร้างตารางไม่สำเร็จ",
+        normalizeError(error),
+        true
+      );
+      return null;
+    }
   }
 
   function createCommunityChart(container, options) {
     if (!container) return null;
     if (!window.agCharts?.AgCharts?.create) {
-      container.innerHTML = `
-        <div class="dependency-error" role="alert">
-          <strong>โหลด AG Charts Community ไม่สำเร็จ</strong>
-          <span>กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่</span>
-        </div>`;
+      renderComponentError(
+        container,
+        "โหลด AG Charts Community ไม่สำเร็จ",
+        "กรุณาตรวจสอบอินเทอร์เน็ตหรือ Content Security Policy แล้วลองใหม่"
+      );
       return null;
     }
-    const palette = chartPalette();
-    const chart = window.agCharts.AgCharts.create({
-      container,
-      autoSize: true,
-      background: { fill: getCssVar("--surface", "#ffffff") },
-      theme: {
-        baseTheme: resolvedThemeMode() === "dark" ? "ag-default-dark" : "ag-default",
-        palette: {
-          fills: palette,
-          strokes: palette
+
+    try {
+      // AG Charts also appends a canvas to the supplied container.
+      // Clear the temporary loading node before creating the chart.
+      container.replaceChildren();
+      container.setAttribute("aria-busy", "true");
+      container.dataset.componentState = "loading";
+
+      const palette = chartPalette();
+      const chart = window.agCharts.AgCharts.create({
+        container,
+        autoSize: true,
+        background: { fill: getCssVar("--surface", "#ffffff") },
+        theme: {
+          baseTheme: resolvedThemeMode() === "dark" ? "ag-default-dark" : "ag-default",
+          palette: {
+            fills: palette,
+            strokes: palette
+          },
+          params: {
+            backgroundColor: getCssVar("--surface", "#ffffff"),
+            foregroundColor: getCssVar("--text", "#172033"),
+            accentColor: palette[0]
+          }
         },
-        params: {
-          backgroundColor: getCssVar("--surface", "#ffffff"),
-          foregroundColor: getCssVar("--text", "#172033"),
-          accentColor: palette[0]
+        ...options
+      });
+
+      state.charts.push(chart);
+      window.requestAnimationFrame(() => {
+        if (container.isConnected) {
+          container.removeAttribute("aria-busy");
+          container.dataset.componentState = "ready";
         }
-      },
-      ...options
-    });
-    state.charts.push(chart);
-    return chart;
+      });
+      return chart;
+    } catch (error) {
+      console.error("AG Charts initialization failed", error);
+      renderComponentError(
+        container,
+        "สร้างกราฟไม่สำเร็จ",
+        normalizeError(error)
+      );
+      return null;
+    }
   }
 
   function chartPalette() {

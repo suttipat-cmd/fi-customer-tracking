@@ -1,12 +1,23 @@
 # FI Customer Tracking Web App
 
-> **Current version:** `0.5.0-ag-experience`  
-> **Base version:** `0.4.0-enterprise-ui`  
-> **Current status:** AG Grid/AG Charts frontend and Profile Theme migration prepared. Migration `004_profile_preferences` has not yet been executed against the real Supabase project, and this release has not yet been deployed or end-to-end tested with real accounts.  
+> **Current version:** `0.5.1-ag-loading-hotfix`  
+> **Base version:** `0.5.0-ag-experience`  
+> **Current status:** Frontend hotfix prepared for the AG Grid/AG Charts loading placeholder issue observed on the deployed GitHub Pages site. Database schema, RLS, RPC and migration requirements are unchanged from v0.5.0.  
+
 > **Runtime stack:** GitHub Pages + Plain HTML/CSS/JavaScript + Supabase Auth/PostgreSQL  
 > **Application repository:** `fi-customer-tracking`
 
 ## Changelog
+
+### 0.5.1-ag-loading-hotfix
+
+- แก้ Spinner `กำลังสร้างกราฟ...` และ `กำลังสร้างตาราง...` ค้างหลัง AG Grid/AG Charts Render สำเร็จ
+- ล้าง Temporary Loading Placeholder ด้วย `replaceChildren()` ก่อนให้ AG Component สร้าง DOM/Canvas
+- ผูกสถานะ `aria-busy` กับ `onGridReady`, `onFirstDataRendered` และ First Paint Fallback
+- เพิ่ม Error State เมื่อ AG Grid/AG Charts Initialize ไม่สำเร็จ แทนการปล่อย Loading ค้าง
+- ป้องกัน Exception จาก AG Charts ใน `requestAnimationFrame` กลายเป็น Unhandled Error
+- คง AG Grid `36.0.2`, AG Charts `14.0.2`, Business Logic, Supabase Schema, RLS และ RPC เดิม
+- อัปเดต Cache Busting และ Version Stamp เป็น `0.5.1-ag-loading-hotfix`
 
 ### 0.5.0-ag-experience
 
@@ -1021,8 +1032,8 @@ http://localhost:8080
 `index.html` โหลดไฟล์ด้วย:
 
 ```text
-style.css?v=0.5.0-ag-experience
-script.js?v=0.5.0-ag-experience
+style.css?v=0.5.1-ag-loading-hotfix
+script.js?v=0.5.1-ag-loading-hotfix
 ```
 
 เมื่อ Release ใหม่ต้องอัปเดต Version ใน:
@@ -1035,9 +1046,9 @@ script.js?v=0.5.0-ag-experience
 
 ### Frontend Rollback
 
-หาก v0.5.0 มีปัญหาหลัง Deploy:
+หาก v0.5.1 มีปัญหาหลัง Deploy:
 
-1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.4.0
+1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.5.0
 2. Push กลับไปที่ `main`
 3. รอ GitHub Pages Deploy
 4. Hard Refresh และตรวจ Version ที่ Sidebar/Login
@@ -1085,6 +1096,7 @@ Full Database Rollback จะลบ Application Tables และข้อมู�
 - ตรวจ SQL Migration/Verify/Rollback อยู่ใน Package แยก
 - ตรวจไม่พบ Database Password, Secret Key หรือ `service_role`
 - ตรวจ ZIP integrity
+- ตรวจ AG Grid/AG Charts initialization ล้าง Temporary Loading Placeholder ก่อนสร้าง Component
 
 ยังต้องทดสอบกับระบบจริง:
 
@@ -1100,7 +1112,7 @@ Full Database Rollback จะลบ Application Tables และข้อมู�
 
 - Migration `004_profile_preferences` ยังไม่ได้รันกับ Supabase Project จริงในรอบจัดทำ Package
 - ยังไม่ได้ทดสอบ PostgreSQL Runtime, RLS และ RPC ใหม่กับบัญชีจริง
-- Frontend v0.5.0 ผ่าน Static Validation เท่านั้นจนกว่าจะเชื่อม Project และทดสอบ Browser จริง
+- Frontend v0.5.1 ผ่าน Static Validation ในรอบจัดทำ Hotfix; ต้องตรวจซ้ำบน GitHub Pages หลัง Deploy
 - AG Grid และ AG Charts โหลดผ่าน CDN จึงต้องมี Internet Access และ CSP ต้องอนุญาต `cdn.jsdelivr.net`
 - หาก AG CDN ล้มเหลว หน้าที่ใช้ Grid/Chart จะแสดง Error State แต่ข้อมูลจะไม่แสดงเป็นตารางสำรอง
 - CSV Export ส่งออกเฉพาะข้อมูลที่โหลดเข้า Browser และผ่านสิทธิ์/ตัวกรองปัจจุบัน
@@ -1111,7 +1123,7 @@ Full Database Rollback จะลบ Application Tables และข้อมู�
 - Daily Report Item บันทึกทีละข้อเพื่อหลีกเลี่ยงการลบ/แทนที่ทั้งชุด
 - Manager Page โหลด Report ย้อนหลัง 60 วันต่อครั้ง
 - การสร้าง/เชิญ Auth User ต้องทำผ่าน Supabase Dashboard เพราะ Browser ห้ามใช้ Admin Secret API
-- Audit Log ยังอ่านได้ตาม Database Permission เดิม แต่ Frontend v0.5.0 ไม่ Query และไม่แสดงผล
+- Audit Log ยังอ่านได้ตาม Database Permission เดิม แต่ Frontend v0.5.1 ไม่ Query และไม่แสดงผล
 - Module/Feature Master Changes และ Profile Role Changes ยังไม่มี Dedicated Admin Audit Log
 - SQL ไม่อยู่ใน 4 Runtime Files ตามโครงสร้าง Repo จึงต้องเก็บ Migration Artifacts แยกอย่างมี Version
 - Driver Payment Method และ Trip Expense Management ยังเป็น Free Text
