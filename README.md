@@ -1,13 +1,37 @@
 # FI Customer Tracking Web App
 
-> **Current version:** `0.5.1-ag-loading-hotfix`  
-> **Base version:** `0.5.0-ag-experience`  
-> **Current status:** Frontend hotfix prepared for the AG Grid/AG Charts loading placeholder issue observed on the deployed GitHub Pages site. Database schema, RLS, RPC and migration requirements are unchanged from v0.5.0.  
+> **Current version:** `0.6.0-thai-customer-workflow`  
+> **Base version:** `0.5.1-ag-loading-hotfix`  
+> **Current status:** Frontend release package prepared. Database schema, RLS and RPC are unchanged. The visible Delete action reuses `archive_customer` as a one-way soft delete in the Frontend; deleted customers are hidden from every Frontend role and no Restore UI is exposed. This release has not yet been runtime-tested against the real Supabase project.  
 
 > **Runtime stack:** GitHub Pages + Plain HTML/CSS/JavaScript + Supabase Auth/PostgreSQL  
 > **Application repository:** `fi-customer-tracking`
 
 ## Changelog
+
+### 0.6.0-thai-customer-workflow
+
+- ปรับข้อความที่ผู้ใช้งานมองเห็นเป็นภาษาไทยทั้งระบบ โดยคงเฉพาะชื่อผลิตภัณฑ์และรหัสทางเทคนิคที่จำเป็น
+- ตัดปุ่มและตัวกรอง Archive/Restore ออกจาก Frontend
+- เพิ่มปุ่ม `ลบ` ใน Customer List และ Customer Detail
+- การลบใช้ `archive_customer` เป็น Soft Delete ภายในฐานข้อมูล แต่ Frontend ซ่อนรายการจากทุก Role และไม่มีหน้ากู้คืน
+- หน้า Customer Edit มีปุ่ม `ยกเลิก` และ `บันทึก` เพียงชุดเดียว
+- การบันทึกหน้า Edit ทำตามลำดับ: Core → Owners → Modules/Features → Operations → Contacts → optional Activity
+- หากขั้นตอนใดล้มเหลว จะแสดง Toast ระบุส่วนที่ผิดพลาดและไม่ Rollback ส่วนที่บันทึกสำเร็จก่อนหน้า
+- Contacts ถูกแก้ไขใน Draft ก่อน และเขียนลงฐานข้อมูลเมื่อกดปุ่มบันทึกหลัก
+- Module/Feature, Owner และ Operations ไม่บันทึกทันทีอีกต่อไป
+- ตัดการ์ดสารบัญด้านข้างของหน้า Edit
+- ปรับ Customer Detail ให้เรียง Section เหมือน Customer Edit
+- เพิ่ม Advanced Customer Filters แบบหุบ/ขยาย: Onboarding, Import, Engagement, Module, Feature, Fleet และช่วงวันที่
+- เปลี่ยน Export จาก CSV เป็น Excel `.xlsx` ด้วย SheetJS Community `0.18.5`
+- Excel Export ใช้ข้อมูลหลังผ่าน External Filter และ AG Grid Filter/Sort ปัจจุบัน
+- แปลเมนู ตัวกรอง และ Pagination ของ AG Grid เป็นภาษาไทย และปิด Built-in CSV Export
+- ตัดกราฟสถานะ Daily Report ออกจาก Dashboard
+- ตัด Checkbox รายงานย้อนหลัง 60 วันและข้อความแนะนำ Supabase ที่ไม่จำเป็น
+- ตัดข้อความช่วยเหลือรูปแบบวันที่ใต้ Field แต่คง Date Mask/Validation `DD/MM/YYYY`
+- Required Marker, Focus Border และ Focus Ring ใช้ Accent Color ตาม Theme
+- อัปเดต Cache Busting และ Version Stamp เป็น `0.6.0-thai-customer-workflow`
+- ไม่มี SQL Migration ใหม่
 
 ### 0.5.1-ag-loading-hotfix
 
@@ -97,12 +121,13 @@
 ระบบภายในสำหรับ:
 
 1. จัดเก็บและติดตามข้อมูลลูกค้า
-2. เก็บ Owner ของลูกค้าได้หลายคนแบบ Optional
-3. เก็บ Contacts, Modules, Features, Operations และ Activities
-4. เก็บประวัติการสร้าง แก้ไข Archive และ Restore ข้อมูลลูกค้า
-5. ให้ User ส่ง Daily Report ได้หนึ่งฉบับต่อวัน
-6. ให้ Manager รับทราบหรือตีกลับ Daily Report
+2. เก็บผู้รับผิดชอบของลูกค้าได้หลายคนแบบไม่บังคับ
+3. เก็บผู้ติดต่อ โมดูล ฟังก์ชัน รูปแบบการดำเนินงาน และประวัติการติดตาม
+4. เก็บประวัติการสร้าง แก้ไข และ Soft Delete ในฐานข้อมูล
+5. ให้ผู้ใช้งานส่งรายงานประจำวันได้หนึ่งฉบับต่อวัน
+6. ให้ผู้จัดการรับทราบหรือส่งรายงานกลับให้แก้ไข
 7. ใช้ Supabase Auth, Grants, RLS, Trigger และ RPC เป็นชั้นควบคุมความปลอดภัย
+8. แสดงวันที่เป็น `DD/MM/YYYY` และเวลาเป็น `DD/MM/YYYY HH:mm` ตาม Timezone `Asia/Bangkok`
 
 ```mermaid
 flowchart LR
@@ -154,68 +179,65 @@ SQL เป็น Deployment Artifacts สำหรับรันผ่าน Su
 ### `user`
 
 - Login เมื่อบัญชี `is_active = true`
-- ดูลูกค้าทั้งหมด รวมรายการ Archive
-- เพิ่มและแก้ไขลูกค้าทั้งหมด
-- Archive ลูกค้า
-- แก้ข้อมูลย่อยของลูกค้าที่ไม่ Archive
-- ไม่มีหน้า Customer Audit Log ใน Frontend; สิทธิ์อ่านข้อมูล Audit ระดับฐานข้อมูลยังคงตาม RLS เดิม
-- สร้าง Daily Report ของตัวเอง
-- ดู Report และ Event ของตัวเอง
-- แก้ Report ของตัวเองเมื่อสถานะยังไม่ถูกล็อก
-- ดู Report ของ User คนอื่นไม่ได้
+- ดู เพิ่ม และแก้ไขลูกค้าที่ยังไม่ถูกลบ
+- Soft Delete ลูกค้าผ่านปุ่ม `ลบ`
+- ไม่มีหน้า Restore และไม่เห็นลูกค้าที่ถูกลบ
+- ไม่มีหน้า Customer Audit Log ใน Frontend; Trigger Audit ยังทำงานในฐานข้อมูล
+- สร้าง ดู และแก้รายงานประจำวันของตัวเองตามสถานะที่อนุญาต
+- ดูรายงานของผู้อื่นไม่ได้
 
 ### `manager`
 
 - มี Active Manager ได้ไม่เกิน 1 คน
-- ดู เพิ่ม แก้ไข และ Archive ลูกค้าทั้งหมด
-- ไม่มีหน้า Customer Audit Log ใน Frontend; สิทธิ์อ่านข้อมูล Audit ระดับฐานข้อมูลยังคงตาม RLS เดิม
-- ดู Daily Report ของ User ทุกคน
-- รับทราบ Report
-- ตีกลับ Report พร้อมเหตุผล
-- แก้เนื้อหา Report แทน User ไม่ได้
-- Restore ลูกค้าไม่ได้
+- ดู เพิ่ม แก้ไข และ Soft Delete ลูกค้าที่ยังไม่ถูกลบ
+- ไม่มีหน้า Restore และไม่เห็นลูกค้าที่ถูกลบ
+- ดูรายงานประจำวันของผู้ใช้งานทุกคน
+- รับทราบหรือส่งรายงานกลับพร้อมเหตุผล
+- แก้เนื้อหารายงานแทนผู้ใช้งานไม่ได้
 
 ### `admin`
 
-- ดูและแก้ไขลูกค้าทั้งหมด
-- Archive และ Restore ลูกค้า
-- ดู Report ทั้งหมด
-- รับทราบหรือตีกลับ Report
+- ดู เพิ่ม แก้ไข และ Soft Delete ลูกค้าที่ยังไม่ถูกลบ
+- Frontend ไม่มี Restore UI และไม่แสดงลูกค้าที่ถูกลบ
+- ดูรายงานทั้งหมดและรับทราบหรือส่งกลับ
 - เปลี่ยน Role และ Active Status ของบัญชีอื่นผ่าน RPC
 - จัดการ Master Modules และ Features
-- เปลี่ยน Role หรือปิดบัญชีตัวเองผ่าน RPC ไม่ได้ เพื่อป้องกันการล็อกระบบโดยไม่ตั้งใจ
+- เปลี่ยน Role หรือปิดบัญชีตัวเองผ่าน RPC ไม่ได้
 
 ### Permission Matrix
 
 | Resource / Action | Admin | Manager | User |
 |---|---:|---:|---:|
-| อ่านลูกค้าทั้งหมด | Yes | Yes | Yes |
-| เพิ่ม/แก้ลูกค้าที่ยังไม่ Archive | Yes | Yes | Yes |
-| Archive ลูกค้า | Yes | Yes | Yes |
-| Restore ลูกค้า | Yes | No | No |
+| อ่านลูกค้าที่ยังไม่ถูกลบ | Yes | Yes | Yes |
+| เพิ่ม/แก้ลูกค้าที่ยังไม่ถูกลบ | Yes | Yes | Yes |
+| Soft Delete ลูกค้าผ่าน Frontend | Yes | Yes | Yes |
+| Restore ลูกค้าผ่าน Frontend | No | No | No |
 | Hard Delete ลูกค้าผ่าน Client | No | No | No |
-| อ่าน Customer Audit Log | Yes | Yes | Yes |
-| แก้ Audit Log | No | No | No |
+| อ่าน Customer Audit Log ผ่าน Frontend | No | No | No |
 | อ่าน Daily Report ทั้งหมด | Yes | Yes | No |
 | อ่าน Daily Report ของตัวเอง | N/A | N/A | Yes |
 | สร้าง Daily Report | No | No | Own only |
 | แก้ Report Items | No | No | Own and unlocked |
-| รับทราบ/ตีกลับ Report | Yes | Yes | No |
+| รับทราบ/ส่งกลับ Report | Yes | Yes | No |
 | จัดการ Role | Yes | No | No |
 | จัดการ Module/Feature Master | Yes | No | No |
 
 ## 4. Customer Rules
 
-- ลูกค้าหนึ่งรายมี Owner ได้ 0 คน, 1 คน หรือหลายคน
-- ลูกค้ามี Primary Owner ได้ไม่เกิน 1 คน
-- Owner ใช้ระบุผู้รับผิดชอบและกรองข้อมูล ไม่ได้จำกัดการมองเห็น
-- ทุก Active Role แก้ไขลูกค้าทั้งหมดได้
-- User/Manager แก้ข้อมูลลูกค้าที่ Archive แล้วไม่ได้
-- Admin แก้หรือ Restore ลูกค้าที่ Archive ได้
+- ลูกค้าหนึ่งรายมีผู้รับผิดชอบได้ 0 คน, 1 คน หรือหลายคน
+- ลูกค้ามีผู้รับผิดชอบหลักได้ไม่เกิน 1 คน
+- ผู้รับผิดชอบใช้ระบุผู้ดูแลและกรองข้อมูล ไม่ได้จำกัดสิทธิ์การอ่าน
+- ทุก Active Role แก้ไขลูกค้าที่ยังไม่ถูกลบได้
+- ปุ่ม `ลบ` เรียก RPC `archive_customer` และตั้ง `is_archived = true`
+- รายการที่ `is_archived = true` ไม่ถูก Query หรือแสดงใน Customer List, Dashboard, Customer Detail และ Customer Edit ของทุก Role
+- Frontend ไม่มี Restore Flow; `restore_customer` ยังอยู่ในฐานข้อมูลเพื่อ Backward Compatibility และงานดูแลระบบนอก Frontend
 - ไม่มี Client Policy สำหรับ Hard Delete
+- หน้า Edit มีปุ่มบันทึกหลักเพียงปุ่มเดียว
+- การบันทึกหลาย Section เป็น Sequential Save ไม่ใช่ Database Transaction รวม
+- หากขั้นตอนใดล้มเหลว ระบบแสดง Toast และส่วนที่บันทึกสำเร็จก่อนหน้าจะไม่ถูก Rollback
 - `tax_id` ต้องเป็นตัวเลข 13 หลักและไม่ซ้ำ
 - วันที่เก็บเป็น ค.ศ. ด้วย PostgreSQL `date`
-- Timestamp เก็บเป็น `timestamptz`; Frontend ต้องแสดงผลด้วย Timezone `Asia/Bangkok`
+- Timestamp เก็บเป็น `timestamptz`; Frontend แสดงผลด้วย Timezone `Asia/Bangkok`
 - `created_by`, `updated_by`, `archived_by` อ้างอิง `profiles.id`
 - `legacy_created_by_email` และ `legacy_updated_by_email` ใช้เก็บ Snapshot จาก Spreadsheet เดิม
 - `legacy_*` แก้ไม่ได้จาก Authenticated Client หลังสร้าง
@@ -629,14 +651,16 @@ Private helper functions:
 | `submit_daily_report(uuid)` | Report owner | Submit/Resubmit |
 | `acknowledge_daily_report(uuid, bigint)` | Manager/Admin | Acknowledge current content version |
 | `request_daily_report_revision(uuid, text, bigint)` | Manager/Admin | Return with reason |
-| `archive_customer(uuid)` | Any active role | Archive customer |
-| `restore_customer(uuid)` | Admin | Restore customer |
+| `archive_customer(uuid)` | Any active role | Soft Delete customer; Frontend แสดงเป็นปุ่ม `ลบ` |
+| `restore_customer(uuid)` | Admin | Legacy/Admin recovery RPC; Frontend ไม่มีปุ่มเรียกใช้ |
 | `admin_update_profile(uuid, text, boolean)` | Admin | Change another user's role/active status |
 | `save_customer_owners(uuid, uuid[], uuid)` | Any active role | Replace owners and primary owner atomically |
 | `save_customer_contact(uuid, uuid, text, text, text, text, text, boolean, boolean)` | Any active role | Insert/update contact and primary contact atomically |
 | `update_my_profile_preferences(text, text)` | Current active user | Save own Theme mode and accent color |
 
 Frontend ต้องเรียก Workflow และ Aggregate Save ผ่าน RPC เหล่านี้ ไม่อัปเดต Workflow Columns โดยตรง
+
+Customer Edit ใช้ Sequential Save จากปุ่มหลักหนึ่งปุ่ม โดย RPC/Query แต่ละส่วนทำงานตามลำดับและไม่มี Transaction รวมทั้งหน้า
 
 ## 10. Auth and Profile Bootstrap
 
@@ -698,11 +722,14 @@ const SUPABASE_PUBLISHABLE_KEY = "YOUR_PUBLISHABLE_KEY";
 Supabase JavaScript: @supabase/supabase-js@2
 AG Grid Community: 36.0.2
 AG Charts Community: 14.0.2
+SheetJS Community: 0.18.5
 ```
 
-ใช้เฉพาะ Community edition ไม่มี Enterprise licence key, Integrated Charts, Excel Export, Pivot หรือ Row Grouping แบบ Enterprise
+ใช้ AG Community เท่านั้น ไม่มี Enterprise licence key, Integrated Charts, Excel Export ของ AG Grid, Pivot หรือ Row Grouping แบบ Enterprise
 
-หาก CDN โหลดไม่สำเร็จ หน้า Grid/Chart จะแสดง Error State และปุ่มลองใหม่ ส่วน Auth และหน้าที่ไม่พึ่ง AG ยังทำงานตามปกติ
+Excel `.xlsx` สร้างด้วย SheetJS Community จากข้อมูลที่โหลดเข้า Browser และผ่านตัวกรองปัจจุบัน
+
+หาก CDN โหลดไม่สำเร็จ หน้า Grid/Chart หรือการส่งออก Excel จะแสดง Error/Toast ที่เข้าใจได้ ส่วน Auth และหน้าที่ไม่พึ่ง Dependency นั้นยังทำงานตามปกติ
 
 ## 12. Migration Files
 
@@ -872,46 +899,47 @@ Migration policy:
 
 ## 15. Testing Checklist for Database Foundation
 
-ต้องทดสอบจริงหลังรันบน Development Project:
+ต้องทดสอบจริงหลังรันบน Development Project โดยแยกพฤติกรรมระดับฐานข้อมูลออกจากหน้าจอเวอร์ชันปัจจุบัน:
 
 ### Auth/Profile
 
 - สร้าง Auth User แล้ว Profile ถูกสร้าง
-- Email เปลี่ยนแล้ว Profile sync
-- Inactive User อ่านหรือเขียน Application Data ไม่ได้
-- Active Manager มีได้ไม่เกิน 1 คน
+- เมื่ออีเมลเปลี่ยน ข้อมูลใน Profile ถูกปรับให้ตรงกัน
+- บัญชีที่ปิดใช้งานอ่านหรือเขียนข้อมูลระบบไม่ได้
+- มีผู้จัดการที่เปิดใช้งานได้ไม่เกิน 1 คน
 
 ### Customers
 
-- ทุก Active Role อ่านลูกค้าทั้งหมดได้
-- ทุก Active Role เพิ่มและแก้ลูกค้าที่ยังไม่ Archive ได้
-- User/Manager Archive ได้
-- User/Manager แก้ลูกค้าที่ Archive ไม่ได้
-- Admin Restore ได้
-- Tax ID ซ้ำหรือไม่ครบ 13 หลักถูกปฏิเสธ
-- Create/Update/Archive/Restore มี Audit Log
-- Child Insert/Update/Delete มี Audit Log
+- ทุก Role ที่เปิดใช้งานอ่านลูกค้าที่ยังไม่ถูก Soft Delete ได้
+- ทุก Role ที่เปิดใช้งานเพิ่มและแก้ไขลูกค้าที่ยังไม่ถูก Soft Delete ได้
+- RPC `archive_customer` ทำงานตามสิทธิ์เดิม และ Frontend v0.6.0 ใช้ RPC นี้กับปุ่ม `ลบ`
+- ลูกค้าที่มี `is_archived = true` ไม่แสดงใน List, Dashboard, Detail หรือ Edit ของทุก Role
+- RPC `restore_customer` ยังคงอยู่เพื่อ Backward Compatibility/Admin recovery แต่ Frontend v0.6.0 ไม่มีปุ่มหรือหน้ากู้คืน
+- เลขประจำตัวผู้เสียภาษีซ้ำหรือไม่ครบ 13 หลักถูกปฏิเสธ
+- Create, Update, Soft Delete และ Restore ระดับฐานข้อมูลสร้าง Audit Log
+- การเพิ่ม แก้ไข หรือลบข้อมูลย่อยสร้าง Audit Log
 
 ### Daily Reports
 
-- User สร้างได้หนึ่งฉบับต่อวัน
-- User คนอื่นอ่าน Report ไม่ได้
-- Manager/Admin อ่าน Report ทั้งหมดได้
-- Draft ที่ไม่มี Item Submit ไม่ได้
-- User แก้ Submitted Report ได้
-- Acknowledged Report แก้ไม่ได้
-- Manager ตีกลับพร้อมเหตุผลได้
-- User Resubmit ได้
-- Manager ใช้ Content Version เก่าแล้ว RPC ถูกปฏิเสธ
-- Manager แก้ Report Item ไม่ได้
+- ผู้ใช้งานสร้างได้หนึ่งฉบับต่อวัน
+- ผู้ใช้งานอ่านรายงานของผู้อื่นไม่ได้
+- ผู้จัดการและผู้ดูแลระบบอ่านรายงานทั้งหมดได้
+- ฉบับร่างที่ไม่มีรายการส่งไม่ได้
+- ผู้ใช้งานแก้รายงานที่ส่งแล้วได้ก่อนถูกล็อก
+- รายงานที่รับทราบแล้วแก้ไม่ได้
+- ผู้จัดการส่งกลับพร้อมเหตุผลได้
+- ผู้ใช้งานส่งรายงานที่แก้ไขแล้วอีกครั้งได้
+- RPC ปฏิเสธการดำเนินการเมื่อ Content Version ล้าสมัย
+- ผู้จัดการแก้รายการรายงานแทนผู้ใช้งานไม่ได้
 
 ### Security
 
-- `anon` อ่านตารางไม่ได้
-- Client เขียน Audit/Event Log ไม่ได้
-- Client Hard Delete Customer ไม่ได้
+- Role `anon` อ่านตารางไม่ได้
+- Frontend เขียน Audit/Event Log ไม่ได้
+- Frontend Hard Delete Customer ไม่ได้
 - Security Advisor ไม่มี Error สำคัญ
-- ไม่มี Secret ใน SQL, README หรือ Frontend
+- ไม่มี Database Password, Secret Key หรือ `service_role` ใน SQL, README หรือ Frontend
+
 
 ## 15.1 Frontend Test Checklist
 
@@ -921,32 +949,38 @@ Migration policy:
 - Inactive User ถูกปฏิเสธ
 - Navigation ตรงกับ Role และเปิด Profile จาก Topbar ได้
 - Theme `light`, `dark`, `system` ทำงานและบันทึกข้าม Session
-- Preset Color, Color Picker และ HEX Validation
-- Customer List ใช้ AG Grid: Sort, Filter, Resize, Pin, Pagination และ CSV
+- Required Marker, Focus Border และ Focus Ring เปลี่ยนตาม Accent Color
+- Customer List ใช้ AG Grid: Sort, Filter, Resize, Pin และ Pagination
+- External Filters และ Advanced Filters แบบหุบ/ขยายทำงานร่วมกัน
+- Customer Excel Export ใช้ข้อมูลหลังผ่าน External Filter และ AG Grid Filter/Sort
 - Customer Create ที่ `#/customers/new`
-- Customer Detail ที่ `#/customer/:id` เป็น Read-only
-- Customer Edit ที่ `#/customer/:id/edit` รวมทุก Section ในหน้าเดียว
+- Customer Detail ที่ `#/customer/:id` ใช้ Section order เดียวกับ Edit และเป็น Read-only
+- Customer Edit ที่ `#/customer/:id/edit` ไม่มี Side Navigation Card
+- Customer Edit มีปุ่ม `ยกเลิก` และ `บันทึก` เพียงชุดเดียว
+- Owner, Contact, Module, Feature, Operations และ optional Activity ถูกบันทึกจากปุ่มหลัก
+- Error ในแต่ละ Save Step แสดง Toast ระบุ Section และหน้าไม่ปิด
+- Retry หลัง Partial Save ไม่สร้าง Contact/Relation ซ้ำ
+- ปุ่ม `ลบ` ใน List และ Detail ทำ Soft Delete
+- ลูกค้าที่ถูกลบหายจากทุกหน้าและ Direct URL เปิดไม่ได้
+- Frontend ไม่มี Archive, Restore หรือ Deleted Customer Filter
 - Tax ID Validation และ Duplicate Error
 - วันที่ทุกจุดรับและแสดง `DD/MM/YYYY`
 - วันที่ไม่ถูกต้อง เช่น `31/02/2026` ถูกปฏิเสธก่อน Save
-- Owner Save และ Primary Owner
-- Contact Save และ Primary Contact
-- Module/Feature Toggle
-- Operations และ Timeline
 - หน้า Customer ไม่ Query หรือแสดง Audit Log แต่ Trigger Audit ยังทำงานในฐานข้อมูล
 - Daily Report หนึ่งฉบับต่อวัน
-- Add/Edit/Delete Today และ Tomorrow
+- Add/Edit/Delete รายการวันนี้และวันพรุ่งนี้
 - Submit, Acknowledge, Revision และ Resubmit
 - Content Version Conflict
-- Manager Report ใช้ AG Grid และ CSV Export
+- Manager Report ใช้ AG Grid และ Excel Export
+- Manager Report ไม่มี Checkbox ย้อนหลัง 60 วัน
 - Admin User Grid แก้ Role/Active ได้ตามสิทธิ์
-- Dashboard AG Charts แสดง Onboarding, Import และ Daily Report
+- Dashboard แสดงเฉพาะกราฟ Onboarding และ Import
 - Global Loading, Page Skeleton, Section Loading, Grid/Chart Loading และ Button Busy
 - Action ระหว่าง Loading กดซ้ำไม่ได้
 - User อ่าน Report ของผู้อื่นไม่ได้
 - Manager แก้ Report Item ไม่ได้
 - Mobile/Tablet Layout และ Horizontal Grid Scroll
-- Print/PDF A4
+- Print A4
 - Browser Console และ Network ไม่มี Error ที่ไม่คาดหมาย
 - GitHub Pages Hard Refresh และ Cache Busting
 
@@ -954,16 +988,18 @@ Migration policy:
 
 ### Implemented Screens
 
-- Login
-- Dashboard ตาม Role พร้อม AG Charts Community
-- Customer List ด้วย AG Grid Community พร้อม Search/Filter/Pagination/CSV
+- Login ภาษาไทย
+- Dashboard ตาม Role พร้อม AG Charts Community สำหรับสถานะการเริ่มใช้งานและการนำเข้าข้อมูล
+- Customer List ด้วย AG Grid Community พร้อม Search, Collapsible Advanced Filters, Pagination และ Excel
 - Customer Create Page
-- Customer Detail Read-only Page
-- Customer Edit Page ที่รวม Core, Owners, Contacts, Modules, Features, Operations และ Timeline
+- Customer Detail Read-only Page ที่ใช้ Layout เดียวกับ Edit
+- Customer Edit Page รวม Core, Owners, Contacts, Modules, Features, Operations และ Timeline
+- Customer Edit ใช้ปุ่ม Save หลักหนึ่งปุ่มและ Sequential Save
+- Customer Soft Delete จาก List/Detail โดยไม่มี Restore UI
 - User Profile และ Theme Settings
 - User Daily Report
-- Manager Report Review/Acknowledge/Revision ด้วย AG Grid Community
-- Print/PDF A4
+- Manager Report Review/Acknowledge/Revision ด้วย AG Grid Community และ Excel
+- Print A4
 - Admin Role/Active Management ด้วย AG Grid Community
 - Audit Log ไม่แสดงใน Frontend แต่ยังบันทึกใน Database
 
@@ -974,19 +1010,19 @@ Migration policy:
 - Layout: 8px spacing grid และ Content-first
 - Density: Enterprise Compact-Balanced
 - Primary color: ค่าเริ่มต้น Blue `#2f68e6` และผู้ใช้กำหนด Accent เองได้
-- Theme mode: Light, Dark และ System
+- Theme mode: สว่าง, มืด และตามอุปกรณ์
 - Supporting brand colors: Cyan `#2dcfc6`, Mint `#35dfa0`
 - Main background: Neutral `#f5f7fb`
 - Surface: White with subtle border and minimal shadow
 - Desktop sidebar: 268px และยุบเหลือ 80px โดยบันทึกค่าที่ `localStorage`
 - Content width: สูงสุด 1,680px พร้อม Margin 24–32px ตามขนาดหน้าจอ
-- Form: Label อยู่เหนือ Input และ Modal แบ่ง Section
-- Data Grid: AG Grid Community พร้อม Sort, Filter, Resize, Pin, Pagination, CSV และ Horizontal Scroll
+- Form: Label อยู่เหนือ Input, Required Marker อยู่บรรทัดเดียวกับ Label และ Focus ใช้สี Theme
+- Data Grid: AG Grid Community พร้อม Sort, Filter, Resize, Pin, Pagination, Excel และ Horizontal Scroll
 - Accessibility: Keyboard focus, semantic labels, `aria-current`, skip link และ reduced-motion support
 - Responsive breakpoint หลัก: 1,180px, 820px และ 480px
 
-Release นี้เพิ่มเฉพาะ Theme Columns และ RPC สำหรับบันทึก Theme ของ Profile
-ไม่เปลี่ยน Customer/Daily Report Business Status, Customer Permission หรือ Daily Report Workflow
+Release `0.6.0` ไม่เพิ่ม Database Migration และไม่เปลี่ยน Daily Report Workflow
+Customer Delete ใน Frontend ใช้ `archive_customer` เดิมเป็น Soft Delete แบบไม่มี Restore UI
 
 ### Frontend Configuration
 
@@ -1032,8 +1068,8 @@ http://localhost:8080
 `index.html` โหลดไฟล์ด้วย:
 
 ```text
-style.css?v=0.5.1-ag-loading-hotfix
-script.js?v=0.5.1-ag-loading-hotfix
+style.css?v=0.6.0-thai-customer-workflow
+script.js?v=0.6.0-thai-customer-workflow
 ```
 
 เมื่อ Release ใหม่ต้องอัปเดต Version ใน:
@@ -1046,13 +1082,14 @@ script.js?v=0.5.1-ag-loading-hotfix
 
 ### Frontend Rollback
 
-หาก v0.5.1 มีปัญหาหลัง Deploy:
+หาก v0.6.0 มีปัญหาหลัง Deploy:
 
-1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.5.0
+1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.5.1
 2. Push กลับไปที่ `main`
 3. รอ GitHub Pages Deploy
 4. Hard Refresh และตรวจ Version ที่ Sidebar/Login
-5. หากต้องการเก็บ Theme Columns ไว้ ไม่ต้อง Rollback Database
+5. ไม่ต้อง Rollback Database เพราะ v0.6.0 ไม่มี Migration ใหม่
+6. ลูกค้าที่ถูกกด `ลบ` ใน v0.6.0 จะยังมี `is_archived = true`; Frontend v0.5.1 อาจแสดงผ่านตัวกรอง Archive ตาม Behavior รุ่นเดิม
 
 ### Profile Theme Migration Rollback
 
@@ -1091,39 +1128,39 @@ Full Database Rollback จะลบ Application Tables และข้อมู�
 - ตรวจ HTML ID ไม่ซ้ำ
 - ตรวจ Cache Busting ตรงกับ `APP_VERSION`
 - ตรวจ CSS bracket balance
-- ตรวจ CDN ใช้ AG Grid Community และ AG Charts Community แบบล็อก Version
+- ตรวจ CDN ล็อก Version ของ Supabase JS, AG Grid Community, AG Charts Community และ SheetJS Community
 - ตรวจ Package Frontend มีเฉพาะ 4 ไฟล์
-- ตรวจ SQL Migration/Verify/Rollback อยู่ใน Package แยก
 - ตรวจไม่พบ Database Password, Secret Key หรือ `service_role`
 - ตรวจ ZIP integrity
+- ตรวจ Frontend ไม่มี Archive/Restore UI, CSV Export, Customer Audit Log และ Daily Report Chart
+- ตรวจ Customer Edit มี Submit หลักเพียงหนึ่งจุด
 - ตรวจ AG Grid/AG Charts initialization ล้าง Temporary Loading Placeholder ก่อนสร้าง Component
 
 ยังต้องทดสอบกับระบบจริง:
 
-- รัน Migration `004` บน Supabase Development Project
 - Login/Logout และ Theme persistence กับบัญชีจริง
-- RLS/RPC Runtime ของทุก Role
-- AG Grid/AG Charts บน GitHub Pages URL และ CSP จริง
+- RLS/RPC Runtime ของ Admin, Manager และ User
+- Customer Sequential Save ทุก Section รวม Partial Failure/Retry
+- Soft Delete และการซ่อนรายการจากทุก Frontend Role
+- Excel Export หลังใช้ External Filter และ AG Grid Column Filter
+- AG Grid/AG Charts/SheetJS บน GitHub Pages URL และ CSP จริง
 - Browser visual regression บน Desktop/Tablet/Mobile
-- Print/PDF ใน Browser เป้าหมาย
+- Print ใน Browser เป้าหมาย
 - Screen reader end-to-end
 
 ## 18. Known Limitations
 
-- Migration `004_profile_preferences` ยังไม่ได้รันกับ Supabase Project จริงในรอบจัดทำ Package
-- ยังไม่ได้ทดสอบ PostgreSQL Runtime, RLS และ RPC ใหม่กับบัญชีจริง
-- Frontend v0.5.1 ผ่าน Static Validation ในรอบจัดทำ Hotfix; ต้องตรวจซ้ำบน GitHub Pages หลัง Deploy
-- AG Grid และ AG Charts โหลดผ่าน CDN จึงต้องมี Internet Access และ CSP ต้องอนุญาต `cdn.jsdelivr.net`
-- หาก AG CDN ล้มเหลว หน้าที่ใช้ Grid/Chart จะแสดง Error State แต่ข้อมูลจะไม่แสดงเป็นตารางสำรอง
-- CSV Export ส่งออกเฉพาะข้อมูลที่โหลดเข้า Browser และผ่านสิทธิ์/ตัวกรองปัจจุบัน
-- Theme ใช้ Mode และ Accent Color เท่านั้น ยังไม่รองรับปรับ Font Size หรือ Density รายบุคคล
-- User และ Manager แก้ลูกค้าทั้งหมดได้ตาม Requirement ซึ่งมีความเสี่ยงจาก Human Error; Audit และ Archive ช่วยตรวจย้อนหลังแต่ไม่ป้องกันการแก้ผิดทั้งหมด
-- Customer Core Edit ยังไม่มี Optimistic Lock; การแก้ข้อมูลหลักพร้อมกันอาจเกิด Last-write-wins
-- Module/Feature Toggle บันทึกทีละรายการ ไม่ใช่ Aggregate Transaction
-- Daily Report Item บันทึกทีละข้อเพื่อหลีกเลี่ยงการลบ/แทนที่ทั้งชุด
-- Manager Page โหลด Report ย้อนหลัง 60 วันต่อครั้ง
+- Frontend v0.6.0 ต้องทดสอบกับ Supabase Project จริงหลัง Deploy
+- AG Grid, AG Charts และ SheetJS โหลดผ่าน CDN จึงต้องมี Internet Access และ CSP ต้องอนุญาต `cdn.jsdelivr.net`
+- หาก AG CDN ล้มเหลว หน้าที่ใช้ Grid/Chart จะแสดง Error State แต่ไม่มีตารางสำรอง
+- Excel Export ส่งออกเฉพาะข้อมูลที่โหลดเข้า Browser และผ่านสิทธิ์/ตัวกรองปัจจุบัน
+- Customer Edit เป็น Sequential Save ไม่ใช่ Database Transaction รวม; หากขั้นตอนหลังล้มเหลว ขั้นตอนก่อนหน้าอาจถูกบันทึกแล้ว
+- Frontend ไม่มี Restore UI แต่ RPC `restore_customer` ยังอยู่ในฐานข้อมูลสำหรับ Backward Compatibility/Admin recovery
+- Customer Core Edit ยังไม่มี Optimistic Lock; การแก้พร้อมกันอาจเกิด Last-write-wins
+- Daily Report Item บันทึกทีละข้อ
+- Manager Page โหลด Report ย้อนหลัง 60 วันจากฐานข้อมูล แต่หน้าจอกรองตามวันที่ที่เลือกและไม่มี Checkbox แสดงทั้งหมด
 - การสร้าง/เชิญ Auth User ต้องทำผ่าน Supabase Dashboard เพราะ Browser ห้ามใช้ Admin Secret API
-- Audit Log ยังอ่านได้ตาม Database Permission เดิม แต่ Frontend v0.5.1 ไม่ Query และไม่แสดงผล
+- Audit Log ยังอ่านได้ตาม Database Permission เดิม แต่ Frontend ไม่ Query และไม่แสดงผล
 - Module/Feature Master Changes และ Profile Role Changes ยังไม่มี Dedicated Admin Audit Log
 - SQL ไม่อยู่ใน 4 Runtime Files ตามโครงสร้าง Repo จึงต้องเก็บ Migration Artifacts แยกอย่างมี Version
 - Driver Payment Method และ Trip Expense Management ยังเป็น Free Text

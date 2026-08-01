@@ -170,7 +170,11 @@ code {
   color: var(--muted);
 }
 
-.required,
+.required {
+  display: inline;
+  color: var(--primary);
+}
+
 .text-danger {
   color: var(--danger);
 }
@@ -418,8 +422,7 @@ code {
 
 /* Form controls */
 label {
-  display: grid;
-  gap: 7px;
+  display: block;
   margin-bottom: 16px;
   color: var(--text-secondary);
   font-size: 0.86rem;
@@ -2996,6 +2999,128 @@ tbody tr:last-child td {
 
 
 /* Print */
+
+/* 0.6.0 unified customer workflow */
+.field-label {
+  display: inline;
+  line-height: 1.35;
+}
+
+label > input,
+label > select,
+label > textarea,
+label > .date-control {
+  margin-top: 7px;
+}
+
+label > .field-help {
+  display: block;
+  margin-top: 6px;
+}
+
+.form-field > label {
+  margin-bottom: 16px;
+}
+
+.form-field > label > .date-control {
+  margin-top: 7px;
+}
+
+.choice-card,
+.check-label,
+.theme-mode-card,
+.grid-switch,
+.native-color-label {
+  display: flex;
+}
+
+.edit-sections,
+.detail-sections,
+#customer-edit-form {
+  width: min(1200px, 100%);
+  margin-inline: auto;
+}
+
+.detail-sections {
+  gap: 20px;
+}
+
+.chart-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.advanced-filters {
+  width: 100%;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.advanced-filters summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 0.88rem;
+  font-weight: 700;
+  list-style-position: outside;
+}
+
+.advanced-filters[open] summary {
+  margin-bottom: 14px;
+}
+
+.advanced-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 14px;
+}
+
+.advanced-filter-grid label,
+.advanced-filter-grid .form-field {
+  min-width: 0;
+}
+
+#customer-contact-list .list-card {
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+#customer-edit-form .sticky-form-actions {
+  max-width: 1200px;
+}
+
+#customer-edit-form.is-busy {
+  pointer-events: none;
+}
+
+.btn-danger svg {
+  width: 17px;
+  height: 17px;
+}
+
+@media (max-width: 1180px) {
+  .advanced-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .advanced-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .toolbar-actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
 @media print {
   body * {
     visibility: hidden !important;
