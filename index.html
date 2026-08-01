@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="FI Customer Tracking and Daily Work Report">
+  <meta name="robots" content="noindex,nofollow">
+  <title>FI Customer Tracking</title>
+  <link rel="stylesheet" href="style.css?v=0.3.0-frontend-foundation">
+</head>
+<body>
+  <div id="loading-overlay" class="loading-overlay hidden" role="status" aria-live="polite">
+    <div class="spinner" aria-hidden="true"></div>
+    <span id="loading-text">กำลังโหลด...</span>
+  </div>
+
+  <section id="login-view" class="auth-shell">
+    <div class="auth-card">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">FI</div>
+        <div>
+          <h1>Customer Tracking</h1>
+          <p>ระบบข้อมูลลูกค้าและรายงานการทำงานประจำวัน</p>
+        </div>
+      </div>
+
+      <div id="config-warning" class="alert alert-warning hidden">
+        กรุณาตั้งค่า Supabase URL และ Publishable Key ใน <code>script.js</code> ก่อนใช้งาน
+      </div>
+
+      <form id="login-form" novalidate>
+        <label>
+          อีเมล
+          <input id="login-email" name="email" type="email" autocomplete="username" maxlength="320" required>
+        </label>
+        <label>
+          รหัสผ่าน
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button id="login-button" class="btn btn-primary btn-block" type="submit">เข้าสู่ระบบ</button>
+      </form>
+
+      <p class="muted auth-note">บัญชีผู้ใช้ต้องสร้างและเปิดใช้งานใน Supabase ก่อน</p>
+      <p class="version-label">Version <span data-app-version></span></p>
+    </div>
+  </section>
+
+  <div id="app-view" class="app-shell hidden">
+    <header class="topbar">
+      <button class="icon-button mobile-only" data-action="toggle-sidebar" aria-label="เปิดเมนู">☰</button>
+      <a class="topbar-brand" href="#/dashboard" aria-label="หน้าแรก">
+        <span class="brand-mark brand-mark-small">FI</span>
+        <span>Customer Tracking</span>
+      </a>
+      <div class="topbar-user">
+        <div class="user-copy">
+          <strong id="current-user-name">-</strong>
+          <span id="current-user-role" class="role-badge">-</span>
+        </div>
+        <button class="btn btn-light btn-small" data-action="logout">ออกจากระบบ</button>
+      </div>
+    </header>
+
+    <aside id="sidebar" class="sidebar" aria-label="เมนูหลัก">
+      <nav id="main-nav" class="nav-list"></nav>
+      <div class="sidebar-footer">v<span data-app-version></span></div>
+    </aside>
+
+    <main id="main-content" class="main-content" tabindex="-1"></main>
+  </div>
+
+  <dialog id="customer-dialog" class="dialog dialog-wide">
+    <form id="customer-form" method="dialog" novalidate>
+      <div class="dialog-header">
+        <div>
+          <h2 id="customer-dialog-title">เพิ่มลูกค้า</h2>
+          <p class="muted">ข้อมูลหลักของลูกค้า</p>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="customer-dialog" aria-label="ปิด">✕</button>
+      </div>
+      <input id="customer-id" name="id" type="hidden">
+
+      <div class="form-grid">
+        <label class="span-2">
+          ชื่อนิติบุคคล <span class="required">*</span>
+          <input name="legal_name" maxlength="500" required>
+        </label>
+        <label>
+          ชื่อย่อ
+          <input name="short_name" maxlength="300">
+        </label>
+        <label>
+          Tax ID <span class="required">*</span>
+          <input name="tax_id" inputmode="numeric" pattern="[0-9]{13}" minlength="13" maxlength="13" required>
+        </label>
+        <label>
+          จำนวนรถ
+          <input name="fleet_size" type="number" min="0" step="1" value="0" required>
+        </label>
+        <label>
+          สถานะบัญชี
+          <select name="account_status" required>
+            <option value="active">ใช้งาน</option>
+            <option value="inactive">ไม่ใช้งาน</option>
+          </select>
+        </label>
+        <label>
+          ขั้นตอน Onboarding
+          <select name="onboarding_stage">
+            <option value="">ไม่ระบุ</option>
+            <option value="to_do">To do</option>
+            <option value="pending_data">รอข้อมูล</option>
+            <option value="onboarding">Onboarding</option>
+            <option value="training_completed">อบรมแล้ว</option>
+            <option value="go_live">Go Live</option>
+          </select>
+        </label>
+        <label>
+          สถานะ Import
+          <select name="import_status" required>
+            <option value="waiting">รอ</option>
+            <option value="in_process">กำลังดำเนินการ</option>
+            <option value="done">เสร็จแล้ว</option>
+          </select>
+        </label>
+        <label>
+          Engagement
+          <select name="engagement_level">
+            <option value="">ไม่ระบุ</option>
+            <option value="interest">สนใจ</option>
+            <option value="neutral">เฉย ๆ</option>
+          </select>
+        </label>
+        <label>
+          วันที่เริ่ม
+          <input name="start_date" type="date">
+        </label>
+        <label>
+          วันที่เริ่ม Billing
+          <input name="billing_date" type="date">
+        </label>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-light" data-action="close-dialog" data-dialog="customer-dialog">ยกเลิก</button>
+        <button id="customer-save-button" type="submit" class="btn btn-primary">บันทึก</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="contact-dialog" class="dialog">
+    <form id="contact-form" method="dialog" novalidate>
+      <div class="dialog-header">
+        <div>
+          <h2 id="contact-dialog-title">เพิ่มผู้ติดต่อ</h2>
+          <p class="muted">ผู้ติดต่อของลูกค้า</p>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="contact-dialog" aria-label="ปิด">✕</button>
+      </div>
+      <input name="id" type="hidden">
+      <input name="customer_id" type="hidden">
+      <div class="form-grid">
+        <label class="span-2">
+          ชื่อผู้ติดต่อ <span class="required">*</span>
+          <input name="contact_name" maxlength="200" required>
+        </label>
+        <label>
+          ตำแหน่ง
+          <input name="position" maxlength="200">
+        </label>
+        <label>
+          โทรศัพท์
+          <input name="phone" maxlength="100">
+        </label>
+        <label>
+          อีเมล
+          <input name="email" type="email" maxlength="320">
+        </label>
+        <label>
+          LINE ID
+          <input name="line_id" maxlength="100">
+        </label>
+        <label class="check-label">
+          <input name="is_primary" type="checkbox">
+          ผู้ติดต่อหลัก
+        </label>
+        <label class="check-label">
+          <input name="is_active" type="checkbox" checked>
+          ใช้งาน
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-light" data-action="close-dialog" data-dialog="contact-dialog">ยกเลิก</button>
+        <button id="contact-save-button" type="submit" class="btn btn-primary">บันทึก</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="report-dialog" class="dialog dialog-wide">
+    <div id="report-dialog-content"></div>
+  </dialog>
+
+  <dialog id="revision-dialog" class="dialog">
+    <form id="revision-form" method="dialog" novalidate>
+      <div class="dialog-header">
+        <div>
+          <h2>ส่งกลับให้แก้ไข</h2>
+          <p class="muted">กรุณาระบุเหตุผลให้ผู้จัดทำทราบ</p>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="revision-dialog" aria-label="ปิด">✕</button>
+      </div>
+      <input name="report_id" type="hidden">
+      <input name="content_version" type="hidden">
+      <label>
+        เหตุผล <span class="required">*</span>
+        <textarea name="reason" rows="5" maxlength="2000" required></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-light" data-action="close-dialog" data-dialog="revision-dialog">ยกเลิก</button>
+        <button id="revision-submit-button" type="submit" class="btn btn-danger">ส่งกลับ</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="dialog dialog-small">
+    <form method="dialog">
+      <div class="dialog-header">
+        <h2 id="confirm-title">ยืนยันรายการ</h2>
+      </div>
+      <p id="confirm-message"></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn btn-light">ยกเลิก</button>
+        <button id="confirm-ok-button" value="confirm" class="btn btn-danger">ยืนยัน</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <section id="print-root" class="print-root" aria-hidden="true"></section>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js?v=0.3.0-frontend-foundation" defer></script>
+</body>
+</html>
