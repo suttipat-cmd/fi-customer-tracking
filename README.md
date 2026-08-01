@@ -1,13 +1,26 @@
 # FI Customer Tracking Web App
 
-> **Current version:** `0.6.0-thai-customer-workflow`  
-> **Base version:** `0.5.1-ag-loading-hotfix`  
-> **Current status:** Frontend release package prepared. Database schema, RLS and RPC are unchanged. The visible Delete action reuses `archive_customer` as a one-way soft delete in the Frontend; deleted customers are hidden from every Frontend role and no Restore UI is exposed. This release has not yet been runtime-tested against the real Supabase project.  
+> **Current version:** `0.6.1-interface-polish`  
+> **Base version:** `0.6.0-thai-customer-workflow`  
+> **Current status:** Frontend interface-polish release prepared. Database schema, RLS, RPC and customer/report business workflows are unchanged. This release improves the team-report modal, aligns the report filters, compacts action columns, removes visible version text and fixes the browser-tab title. This release has not yet been runtime-tested against the real Supabase project.  
 
 > **Runtime stack:** GitHub Pages + Plain HTML/CSS/JavaScript + Supabase Auth/PostgreSQL  
 > **Application repository:** `fi-customer-tracking`
 
 ## Changelog
+
+### 0.6.1-interface-polish
+
+- ปรับ Modal รายงานของทีมเป็นโครงสร้าง Header / Scrollable Body / Footer ชัดเจน ลดการชนและทับกันขององค์ประกอบ
+- จัดส่วนสถานะ รายการวันนี้ แผนวันพรุ่งนี้ และประวัติรายงานให้มีระยะห่างและลำดับการอ่านที่สม่ำเสมอ
+- จัดช่อง วันที่ ผู้ใช้งาน และสถานะในหน้ารายงานของทีมให้อยู่แนวเดียวกันบน Desktop และเรียงลงบน Mobile
+- ลดความกว้างคอลัมน์การกระทำของ AG Grid ทุกหน้า โดยใช้ปุ่มไอคอนขนาดกะทัดรัดพร้อม Tooltip และ Accessible Label
+- หน้า Customer List ใช้ไอคอน ดู แก้ไข และลบ; หน้า Team Reports ใช้ไอคอนเปิด; หน้า Admin Users ใช้ไอคอนบันทึก
+- ตัด Version String ที่มองเห็นได้จาก Login และ Sidebar
+- ปรับข้อความ `ระบบพร้อมใช้งาน` ให้คงอยู่บรรทัดเดียว
+- กำหนด Browser Tab Title เป็น `ระบบติดตามลูกค้า` ตลอดทุก Route
+- อัปเดต Cache Busting และ Internal Version Stamp เป็น `0.6.1-interface-polish`
+- ไม่มี SQL Migration ใหม่ และไม่เปลี่ยน Database Schema, RLS หรือ RPC
 
 ### 0.6.0-thai-customer-workflow
 
@@ -1017,11 +1030,13 @@ Migration policy:
 - Desktop sidebar: 268px และยุบเหลือ 80px โดยบันทึกค่าที่ `localStorage`
 - Content width: สูงสุด 1,680px พร้อม Margin 24–32px ตามขนาดหน้าจอ
 - Form: Label อยู่เหนือ Input, Required Marker อยู่บรรทัดเดียวกับ Label และ Focus ใช้สี Theme
-- Data Grid: AG Grid Community พร้อม Sort, Filter, Resize, Pin, Pagination, Excel และ Horizontal Scroll
+- Data Grid: AG Grid Community พร้อม Sort, Filter, Resize, Pin, Pagination, Excel, Horizontal Scroll และ Action Icons แบบกะทัดรัด
 - Accessibility: Keyboard focus, semantic labels, `aria-current`, skip link และ reduced-motion support
+- Report Modal: Header/Body/Footer แยกชัดเจน โดย Body เลื่อนได้และ Footer ไม่ทับเนื้อหา
+- Browser Tab Title: `ระบบติดตามลูกค้า` คงที่ทุก Route
 - Responsive breakpoint หลัก: 1,180px, 820px และ 480px
 
-Release `0.6.0` ไม่เพิ่ม Database Migration และไม่เปลี่ยน Daily Report Workflow
+Release `0.6.1` ไม่เพิ่ม Database Migration และไม่เปลี่ยน Daily Report Workflow
 Customer Delete ใน Frontend ใช้ `archive_customer` เดิมเป็น Soft Delete แบบไม่มี Restore UI
 
 ### Frontend Configuration
@@ -1068,8 +1083,8 @@ http://localhost:8080
 `index.html` โหลดไฟล์ด้วย:
 
 ```text
-style.css?v=0.6.0-thai-customer-workflow
-script.js?v=0.6.0-thai-customer-workflow
+style.css?v=0.6.1-interface-polish
+script.js?v=0.6.1-interface-polish
 ```
 
 เมื่อ Release ใหม่ต้องอัปเดต Version ใน:
@@ -1082,13 +1097,13 @@ script.js?v=0.6.0-thai-customer-workflow
 
 ### Frontend Rollback
 
-หาก v0.6.0 มีปัญหาหลัง Deploy:
+หาก v0.6.1 มีปัญหาหลัง Deploy:
 
-1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.5.1
+1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.6.0
 2. Push กลับไปที่ `main`
 3. รอ GitHub Pages Deploy
-4. Hard Refresh และตรวจ Version ที่ Sidebar/Login
-5. ไม่ต้อง Rollback Database เพราะ v0.6.0 ไม่มี Migration ใหม่
+4. Hard Refresh และตรวจหน้ารายงานของทีม ตารางลูกค้า และชื่อ Tab Browser
+5. ไม่ต้อง Rollback Database เพราะ v0.6.1 ไม่มี Migration ใหม่
 6. ลูกค้าที่ถูกกด `ลบ` ใน v0.6.0 จะยังมี `is_archived = true`; Frontend v0.5.1 อาจแสดงผ่านตัวกรอง Archive ตาม Behavior รุ่นเดิม
 
 ### Profile Theme Migration Rollback

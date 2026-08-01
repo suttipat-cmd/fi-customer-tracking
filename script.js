@@ -1,7 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.6.0-thai-customer-workflow";
+  const APP_VERSION = "0.6.1-interface-polish";
+  window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
   // secret key, or service_role key in this file.
@@ -872,14 +873,37 @@ function renderDashboardCharts(data = state.dashboardChartData) {
     return node;
   }
 
-  function actionButtonNode({ label: buttonLabel, action, id, className = "btn btn-secondary btn-small" }) {
+  function iconActionButtonNode({
+    label: buttonLabel,
+    action,
+    id,
+    iconName,
+    variant = "secondary"
+  }) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = className;
+    button.className = `grid-action-button grid-action-${variant}`;
     button.dataset.action = action;
     if (id) button.dataset.id = id;
-    button.textContent = buttonLabel;
+    button.setAttribute("aria-label", buttonLabel);
+    button.title = buttonLabel;
+    button.innerHTML = icon(iconName);
     return button;
+  }
+
+  function iconActionLinkNode({
+    label: linkLabel,
+    href,
+    iconName,
+    variant = "secondary"
+  }) {
+    const link = document.createElement("a");
+    link.className = `grid-action-button grid-action-${variant}`;
+    link.href = href;
+    link.setAttribute("aria-label", linkLabel);
+    link.title = linkLabel;
+    link.innerHTML = icon(iconName);
+    return link;
   }
 
 
@@ -957,10 +981,6 @@ async function runExcelExport(button, exporter) {
 }
 
   async function init() {
-    document.querySelectorAll("[data-app-version]").forEach((node) => {
-      node.textContent = APP_VERSION;
-    });
-
     applyThemePreferences({ theme_mode: "light", theme_accent: "#2f68e6" });
     bindGlobalEvents();
 
@@ -1244,7 +1264,7 @@ async function runExcelExport(button, exporter) {
       }
 
       if (token === state.routeRenderToken) {
-        document.title = `${pageLabels[route.name] || "ระบบติดตามลูกค้า FI"} · ระบบติดตามลูกค้า FI`;
+        document.title = "ระบบติดตามลูกค้า";
         el.mainContent.focus({ preventScroll: true });
       }
     } catch (error) {
@@ -1811,31 +1831,35 @@ function renderCustomerTable() {
         headerName: "",
         colId: "actions",
         pinned: "right",
-        width: 260,
-        minWidth: 260,
-        maxWidth: 260,
+        width: 142,
+        minWidth: 142,
+        maxWidth: 142,
         sortable: false,
         filter: false,
         resizable: false,
         suppressHeaderMenuButton: true,
         cellRenderer: (params) => {
           const wrapper = document.createElement("div");
-          wrapper.className = "grid-actions";
-          const view = document.createElement("a");
-          view.className = "btn btn-secondary btn-small";
-          view.href = `#/customer/${params.data.id}`;
-          view.innerHTML = `${icon("eye")}<span>ดู</span>`;
-          const edit = document.createElement("a");
-          edit.className = "btn btn-tertiary btn-small";
-          edit.href = `#/customer/${params.data.id}/edit`;
-          edit.innerHTML = `${icon("edit")}<span>แก้ไข</span>`;
-          const remove = actionButtonNode({
-            label: "ลบ",
-            action: "delete-customer",
-            id: params.data.id,
-            className: "btn btn-danger btn-small"
-          });
-          wrapper.append(view, edit, remove);
+          wrapper.className = "grid-actions grid-actions-compact";
+          wrapper.append(
+            iconActionLinkNode({
+              label: "ดูรายละเอียดลูกค้า",
+              href: `#/customer/${params.data.id}`,
+              iconName: "eye"
+            }),
+            iconActionLinkNode({
+              label: "แก้ไขข้อมูลลูกค้า",
+              href: `#/customer/${params.data.id}/edit`,
+              iconName: "edit"
+            }),
+            iconActionButtonNode({
+              label: "ลบลูกค้า",
+              action: "delete-customer",
+              id: params.data.id,
+              iconName: "delete",
+              variant: "danger"
+            })
+          );
           return wrapper;
         }
       }
@@ -2958,8 +2982,8 @@ async function renderManagerReportsPage() {
       [{ label: "รายงานของทีม" }]
     )}
     <section class="panel">
-      <div class="toolbar">
-        <div class="toolbar-row">
+      <div class="toolbar manager-report-toolbar">
+        <div class="manager-report-toolbar-row">
           <div class="toolbar-field">
             ${dateControlHtml({
               id: "manager-report-date",
@@ -2970,7 +2994,7 @@ async function renderManagerReportsPage() {
             })}
           </div>
           <div class="toolbar-field">
-            <label for="manager-report-user">ผู้ใช้งาน</label>
+            <label for="manager-report-user"><span class="field-label">ผู้ใช้งาน</span></label>
             <select id="manager-report-user">
               <option value="">ทั้งหมด</option>
               ${state.profiles.filter((profile) => profile.role === "user").map((profile) => `
@@ -2979,7 +3003,7 @@ async function renderManagerReportsPage() {
             </select>
           </div>
           <div class="toolbar-field">
-            <label for="manager-report-status">สถานะ</label>
+            <label for="manager-report-status"><span class="field-label">สถานะ</span></label>
             <select id="manager-report-status">
               <option value="">ทั้งหมด</option>
               <option value="draft" ${filters.status === "draft" ? "selected" : ""}>ฉบับร่าง</option>
@@ -2988,7 +3012,7 @@ async function renderManagerReportsPage() {
               <option value="revision_required" ${filters.status === "revision_required" ? "selected" : ""}>ส่งกลับให้แก้ไข</option>
             </select>
           </div>
-          <div class="toolbar-actions">
+          <div class="toolbar-actions manager-report-toolbar-actions">
             <button class="btn btn-secondary" data-action="reset-manager-filters">${icon("refresh")} ล้างตัวกรอง</button>
             <button class="btn btn-secondary" data-action="export-manager-reports-excel">${icon("download")} Excel</button>
           </div>
@@ -3082,20 +3106,21 @@ function renderManagerReportTable() {
         headerName: "",
         colId: "actions",
         pinned: "right",
-        width: 110,
-        minWidth: 110,
-        maxWidth: 110,
+        width: 58,
+        minWidth: 58,
+        maxWidth: 58,
         sortable: false,
         filter: false,
         resizable: false,
         suppressHeaderMenuButton: true,
         cellRenderer: (params) => {
           const wrapper = document.createElement("div");
-          wrapper.className = "grid-actions";
-          wrapper.append(actionButtonNode({
-            label: "เปิด",
+          wrapper.className = "grid-actions grid-actions-compact";
+          wrapper.append(iconActionButtonNode({
+            label: "เปิดรายงาน",
             action: "open-manager-report",
-            id: params.data.id
+            id: params.data.id,
+            iconName: "eye"
           }));
           return wrapper;
         }
@@ -3127,35 +3152,59 @@ function renderManagerReportTable() {
     const tomorrow = state.reviewReport.items.filter((item) => item.section === "tomorrow");
 
     el.reportDialogContent.innerHTML = `
-      <div class="dialog-header">
-        <div>
-          <h2>รายงาน ${h(formatDate(report.work_date))}</h2>
-          <p class="muted">${h(profileName(report.user_id))} · รุ่นเนื้อหา ${h(report.content_version)}</p>
+      <div class="report-review-dialog">
+        <div class="dialog-header report-review-header">
+          <div class="report-review-heading">
+            <span class="eyebrow">รายงานประจำวัน</span>
+            <div class="report-review-title-row">
+              <h2>รายงาน ${h(formatDate(report.work_date))}</h2>
+              <span class="status-badge" data-status="${h(report.status)}">${h(label("report_status", report.status))}</span>
+            </div>
+            <p class="muted">
+              ผู้จัดทำ ${h(profileName(report.user_id))}
+              <span aria-hidden="true">·</span>
+              รุ่นเนื้อหา ${h(report.content_version)}
+            </p>
+          </div>
+          <button type="button" class="icon-button" data-action="close-dialog" data-dialog="report-dialog" aria-label="ปิด">✕</button>
         </div>
-        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="report-dialog" aria-label="ปิด">✕</button>
-      </div>
-      <p><span class="status-badge" data-status="${h(report.status)}">${h(label("report_status", report.status))}</span></p>
-      ${report.status === "revision_required" ? `<div class="alert alert-danger">${h(report.last_revision_reason || "")}</div>` : ""}
-      ${renderReportReadOnlySection("วันนี้ — สิ่งที่ทำ", today)}
-      ${renderReportReadOnlySection("วันพรุ่งนี้ — แผนงาน", tomorrow)}
-      <h3>ประวัติ</h3>
-      <div class="stack">
-        ${state.reviewReport.events.map((event) => `
-          <article class="event-item">
-            <strong>${h(label("event_type", event.event_type))}</strong>
-            ${event.reason ? `<div>${h(event.reason)}</div>` : ""}
-            <small class="muted">${h(profileName(event.actor_id))} · ${h(formatDateTime(event.created_at))}</small>
-          </article>`).join("") || '<p class="muted">ไม่มีประวัติ</p>'}
-      </div>
-      <div class="dialog-actions">
-        <button class="btn btn-light" data-action="print-review-report">พิมพ์ / บันทึกเป็นไฟล์</button>
-        ${report.status === "submitted" ? `
-          <button class="btn btn-danger" data-action="open-revision" data-id="${h(report.id)}" data-version="${h(report.content_version)}">ส่งกลับ</button>
-          <button class="btn btn-success" data-action="ack-report" data-id="${h(report.id)}" data-version="${h(report.content_version)}">รับทราบ</button>
-        ` : report.status === "acknowledged" ? `
-          <button class="btn btn-danger" data-action="open-revision" data-id="${h(report.id)}" data-version="${h(report.content_version)}">เปิดให้แก้ไข</button>
-        ` : ""}
-        <button class="btn btn-light" data-action="close-dialog" data-dialog="report-dialog">ปิด</button>
+
+        <div class="dialog-body report-review-body">
+          ${report.status === "revision_required"
+            ? `<div class="alert alert-danger report-review-alert"><strong>เหตุผลที่ส่งกลับ</strong><span>${h(report.last_revision_reason || "-")}</span></div>`
+            : ""}
+          <div class="report-review-sections">
+            ${renderReportReadOnlySection("วันนี้ — สิ่งที่ทำ", today)}
+            ${renderReportReadOnlySection("วันพรุ่งนี้ — แผนงาน", tomorrow)}
+          </div>
+
+          <section class="report-history">
+            <div class="report-history-header">
+              <h3>ประวัติรายงาน</h3>
+              <span class="muted">${state.reviewReport.events.length.toLocaleString("th-TH")} รายการ</span>
+            </div>
+            <div class="report-history-list">
+              ${state.reviewReport.events.map((event) => `
+                <article class="event-item">
+                  <strong>${h(label("event_type", event.event_type))}</strong>
+                  ${event.reason ? `<div class="event-reason">${h(event.reason)}</div>` : ""}
+                  <small class="muted">${h(profileName(event.actor_id))} · ${h(formatDateTime(event.created_at))}</small>
+                </article>`).join("") || '<p class="muted">ไม่มีประวัติ</p>'}
+            </div>
+          </section>
+        </div>
+
+        <div class="dialog-actions report-review-actions">
+          <button class="btn btn-light" data-action="print-review-report">พิมพ์ / บันทึกเป็นไฟล์</button>
+          <span class="report-review-action-spacer" aria-hidden="true"></span>
+          ${report.status === "submitted" ? `
+            <button class="btn btn-danger" data-action="open-revision" data-id="${h(report.id)}" data-version="${h(report.content_version)}">ส่งกลับ</button>
+            <button class="btn btn-success" data-action="ack-report" data-id="${h(report.id)}" data-version="${h(report.content_version)}">รับทราบ</button>
+          ` : report.status === "acknowledged" ? `
+            <button class="btn btn-danger" data-action="open-revision" data-id="${h(report.id)}" data-version="${h(report.content_version)}">เปิดให้แก้ไข</button>
+          ` : ""}
+          <button class="btn btn-light" data-action="close-dialog" data-dialog="report-dialog">ปิด</button>
+        </div>
       </div>`;
     openDialog(el.reportDialog);
   }
@@ -3374,27 +3423,29 @@ function renderManagerReportTable() {
           headerName: "",
           colId: "actions",
           pinned: "right",
-          width: 120,
-          minWidth: 120,
-          maxWidth: 120,
+          width: 58,
+          minWidth: 58,
+          maxWidth: 58,
           sortable: false,
           filter: false,
           resizable: false,
           suppressHeaderMenuButton: true,
           cellRenderer: (params) => {
             const wrapper = document.createElement("div");
-            wrapper.className = "grid-actions";
+            wrapper.className = "grid-actions grid-actions-compact";
             if (params.data.id === state.profile.id) {
-              const muted = document.createElement("span");
-              muted.className = "muted";
-              muted.textContent = "บัญชีตนเอง";
-              wrapper.append(muted);
+              const placeholder = document.createElement("span");
+              placeholder.className = "grid-action-placeholder";
+              placeholder.textContent = "—";
+              placeholder.title = "บัญชีของคุณ";
+              wrapper.append(placeholder);
             } else {
-              wrapper.append(actionButtonNode({
-                label: "บันทึก",
+              wrapper.append(iconActionButtonNode({
+                label: "บันทึกการเปลี่ยนแปลงผู้ใช้",
                 action: "save-profile",
                 id: params.data.id,
-                className: "btn btn-primary btn-small"
+                iconName: "save",
+                variant: "primary"
               }));
             }
             return wrapper;
