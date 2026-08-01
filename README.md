@@ -1,11 +1,31 @@
 # FI Customer Tracking Web App
 
-> **Current version:** `0.3.0-frontend-foundation`  
-> **Current status:** Frontend and database artifacts prepared; SQL has not yet been executed against the Supabase Development Project and the app has not been deployed  
+> **Current version:** `0.4.0-enterprise-ui`  
+> **Base version:** `0.3.0-frontend-foundation`  
+> **Current status:** Enterprise UI release package prepared. Database schema, RPC and RLS are unchanged from v0.3.0. This release has not yet been deployed or browser-tested against the real Supabase project.  
 > **Runtime stack:** GitHub Pages + Plain HTML/CSS/JavaScript + Supabase Auth/PostgreSQL  
 > **Application repository:** `fi-customer-tracking`
 
 ## Changelog
+
+### 0.4.0-enterprise-ui
+
+- ปรับ UI ทุกหน้าเป็น Modern Enterprise แบบ Compact-Balanced
+- ใช้ Brand Palette จากโลโก้บริษัท: Blue, Cyan และ Mint โดยจำกัดการใช้ Gradient เฉพาะจุดสำคัญ
+- ฝังโลโก้แบบ Optimized Data URI ใน `index.html` เพื่อคง Repository เพียง 4 ไฟล์
+- ปรับ Login ให้เป็น Enterprise Sign-in Layout พร้อมข้อความระบบและ Security Context
+- เพิ่ม Topbar Context, User Avatar, Sidebar แบบยุบได้บน Desktop และ Drawer บน Mobile
+- จัด Navigation เป็นกลุ่ม พร้อม SVG Icons, Active State และ `aria-current`
+- เพิ่ม Breadcrumb และมาตรฐาน Page Header ให้ทุกหน้าหลัก
+- ปรับ Dashboard KPI, Customer List, Daily Report, Manager Reports และ Admin Users ให้มี Visual Hierarchy ชัดเจน
+- เพิ่ม Toolbar, Reset Filters, Sorting และ Client-side Pagination สำหรับ Customer List
+- เพิ่ม Client-side Pagination สำหรับ Manager Reports
+- เพิ่ม Sticky Table Header, Responsive Table Scroll, Empty State และ Table Footer
+- ปรับ Form, Dialog และ Modal ให้มี Section, Sticky Header/Footer และ Field Help
+- ปรับ Focus, Hover, Disabled, Loading, Toast, Confirmation และ Reduced Motion
+- ปรับ Responsive Layout สำหรับ Desktop, Tablet และ Mobile
+- คง Business Logic, Supabase Schema, RPC และ RLS เดิม
+- อัปเดต Cache Busting และ Version Stamp เป็น `0.4.0-enterprise-ui`
 
 ### 0.3.0-frontend-foundation
 
@@ -75,6 +95,8 @@ index.html
 script.js
 style.css
 ```
+
+โลโก้บริษัทถูกย่อและฝังเป็น Data URI ภายใน `index.html` จึงไม่ต้องเพิ่มไฟล์รูปภาพใน Repository และยังคงข้อกำหนด 4 ไฟล์
 
 SQL เป็น Deployment Artifacts สำหรับรันผ่าน Supabase SQL Editor และเก็บแยกจาก 4 ไฟล์ใน Repository:
 
@@ -856,6 +878,25 @@ Migration policy:
 - Print/PDF A4
 - Admin Role/Active Management
 
+### Enterprise UI Design System
+
+แนวทางปัจจุบัน:
+
+- Layout: 8px spacing grid และ Content-first
+- Density: Enterprise Compact-Balanced
+- Primary color: Blue `#2f68e6`
+- Supporting brand colors: Cyan `#2dcfc6`, Mint `#35dfa0`
+- Main background: Neutral `#f5f7fb`
+- Surface: White with subtle border and minimal shadow
+- Desktop sidebar: 268px และยุบเหลือ 80px โดยบันทึกค่าที่ `localStorage`
+- Content width: สูงสุด 1,680px พร้อม Margin 24–32px ตามขนาดหน้าจอ
+- Form: Label อยู่เหนือ Input และ Modal แบ่ง Section
+- Table: Sticky Header, Row Hover, Pagination และ Horizontal Scroll บนหน้าจอเล็ก
+- Accessibility: Keyboard focus, semantic labels, `aria-current`, skip link และ reduced-motion support
+- Responsive breakpoint หลัก: 1,180px, 820px และ 480px
+
+UI release นี้ไม่เพิ่ม Table, Column, RPC, RLS Policy หรือ Business Status ใหม่
+
 ### Frontend Configuration
 
 แก้เฉพาะสองค่าใน `script.js`:
@@ -900,17 +941,27 @@ http://localhost:8080
 `index.html` โหลดไฟล์ด้วย:
 
 ```text
-style.css?v=0.3.0-frontend-foundation
-script.js?v=0.3.0-frontend-foundation
+style.css?v=0.4.0-enterprise-ui
+script.js?v=0.4.0-enterprise-ui
 ```
 
 เมื่อ Release ใหม่ต้องอัปเดต Version ใน:
 
 - `APP_VERSION` ใน `script.js`
-- Query String ใน `index.html`
+- Query String ของ `style.css` และ `script.js` ใน `index.html`
 - Current Version และ Changelog ใน `README.md`
 
 ## 17. Rollback
+
+### Frontend Rollback
+
+หาก v0.4.0 มีปัญหาหลัง Deploy:
+
+1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.3.0
+2. Push กลับไปที่ `main`
+3. รอ GitHub Pages Deploy
+4. Hard Refresh และตรวจ Version ที่ Sidebar/Login
+5. ไม่ต้อง Rollback Database เพราะ Release นี้ไม่แก้ Schema, RPC หรือ RLS
 
 ก่อน Rollback:
 
@@ -939,11 +990,32 @@ script.js?v=0.3.0-frontend-foundation
 - Private Helper/RPC ถูกลบ
 - GitHub Pages ไม่ทำงานจนกว่าจะ Restore Database Version ที่เข้ากัน
 
+## 17.1 UI Release Validation
+
+ตรวจแล้วใน Release Package:
+
+- `node --check script.js`
+- ตรวจ HTML ID ไม่ซ้ำ
+- ตรวจ Cache Busting ตรงกับ `APP_VERSION`
+- ตรวจ CSS bracket balance และ media query structure
+- ตรวจ Package มีเฉพาะ 4 ไฟล์ตามข้อกำหนด
+- ตรวจไม่พบ Database Password, Secret Key หรือ `service_role`
+- ตรวจ ZIP integrity
+
+ยังไม่ได้ทดสอบจริง:
+
+- Login/Logout กับ Supabase Project จริง
+- RLS/RPC Runtime ของทุก Role
+- Browser visual regression บน GitHub Pages URL จริง
+- Mobile devices จริง
+- Print/PDF ในทุก Browser
+- Screen reader end-to-end
+
 ## 18. Known Limitations
 
-- SQL ยังไม่ได้รันกับ Supabase Project จริงในรอบนี้
+- งานรอบนี้ไม่เปลี่ยน SQL และไม่ได้รันทดสอบ SQL/RLS/RPC ซ้ำกับ Supabase Project จริง
 - ยังไม่ได้ทดสอบ PostgreSQL Runtime, RLS, Trigger หรือ RPC กับ Supabase จริง
-- Frontend ผ่าน Syntax Check แต่ยังไม่ได้ทดสอบ Browser Runtime กับ Project URL/Key จริง
+- Frontend v0.4.0 ผ่าน Syntax Check และ Static Validation แต่ยังไม่ได้ทดสอบ Browser Runtime กับ Project URL/Key จริง
 - ยังไม่ได้รัน Supabase Security/Performance Advisor
 - ยังไม่ได้ทำ Spreadsheet Migration Dry Run
 - ยังไม่ได้ทดสอบ Role/RLS ด้วยบัญชีจริง

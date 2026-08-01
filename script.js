@@ -1,12 +1,12 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.3.0-frontend-foundation";
+  const APP_VERSION = "0.4.0-enterprise-ui";
 
   // Public browser configuration only. Never place a database password,
   // secret key, or service_role key in this file.
-  const SUPABASE_URL = "https://edewezrgycqvhdtlprsw.supabase.co";
-  const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkZXdlenJneWNxdmhkdGxwcnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1Njc5NTIsImV4cCI6MjEwMTE0Mzk1Mn0.QPEkfCaRMOn77d_q5612MA1n-5EpJ7myiUdBpCFqQX8";
+  const SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "YOUR_PUBLISHABLE_KEY";
 
   const LABELS = {
     role: { admin: "Admin", manager: "Manager", user: "User" },
@@ -58,7 +58,14 @@
     managerReports: [],
     reviewReport: null,
     routeRenderToken: 0,
-    authHandling: false
+    authHandling: false,
+    ui: {
+      customerPage: 1,
+      customerPageSize: 20,
+      customerSort: "updated_desc",
+      managerPage: 1,
+      managerPageSize: 20
+    }
   };
 
   const el = {
@@ -70,8 +77,10 @@
     mainContent: document.getElementById("main-content"),
     mainNav: document.getElementById("main-nav"),
     sidebar: document.getElementById("sidebar"),
+    topbarPageLabel: document.getElementById("topbar-page-label"),
     currentUserName: document.getElementById("current-user-name"),
     currentUserRole: document.getElementById("current-user-role"),
+    currentUserAvatar: document.getElementById("current-user-avatar"),
     loadingOverlay: document.getElementById("loading-overlay"),
     loadingText: document.getElementById("loading-text"),
     customerDialog: document.getElementById("customer-dialog"),
@@ -107,6 +116,62 @@
   function label(group, value) {
     if (value === null || value === undefined || value === "") return "-";
     return LABELS[group]?.[value] ?? String(value);
+  }
+
+  function icon(name) {
+    const paths = {
+      dashboard: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M9.5 20v-6h5v6"/>',
+      customers: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h4M7 16h6"/>',
+      report: '<path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4M9 11h6M9 15h6"/>',
+      team: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M16 11a4 4 0 0 1 4 4v2"/>',
+      users: '<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v2M17 5h5M19.5 2.5v5"/>',
+      building: '<path d="M4 21V4h11v17M15 9h5v12M8 8h3M8 12h3M8 16h3M18 13h.01M18 17h.01"/>',
+      rocket: '<path d="M4 13c-1 1-2 4-2 4s3-1 4-2M14 3c4-1 7 0 7 0s1 3 0 7l-6 6-7-7z"/><path d="m9 15-1 5 5-1M15 9h.01"/>',
+      import: '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/>',
+      archive: '<path d="M3 6h18M5 6v14h14V6M9 10h6"/><path d="M4 3h16v3H4z"/>',
+      check: '<path d="m5 12 4 4L19 6"/>',
+      clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+      search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+      plus: '<path d="M12 5v14M5 12h14"/>',
+      refresh: '<path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M6.5 8a7 7 0 0 1 11-2l2.5 3M4 15l2.5 3a7 7 0 0 0 11-2"/>',
+      chevronLeft: '<path d="m15 18-6-6 6-6"/>',
+      chevronRight: '<path d="m9 18 6-6-6-6"/>'
+    };
+    const body = paths[name] || paths.dashboard;
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  }
+
+  function userInitials(name) {
+    const parts = String(name || "FI").trim().split(/\s+/).filter(Boolean);
+    return parts.slice(0, 2).map((part) => part.charAt(0)).join("").toUpperCase() || "FI";
+  }
+
+  function pageHeader(title, description = "", actions = "", breadcrumbs = []) {
+    const crumbs = [
+      '<a href="#/dashboard">หน้าหลัก</a>',
+      ...breadcrumbs.map((crumb) => crumb.href
+        ? `<a href="${h(crumb.href)}">${h(crumb.label)}</a>`
+        : `<span>${h(crumb.label)}</span>`)
+    ];
+    return `
+      <div class="page-header">
+        <div class="page-heading">
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            ${crumbs.map((crumb, index) => `${index ? '<span class="breadcrumb-separator">/</span>' : ""}${crumb}`).join("")}
+          </nav>
+          <h1>${h(title)}</h1>
+          ${description ? `<p class="muted">${h(description)}</p>` : ""}
+        </div>
+        ${actions ? `<div class="page-actions">${actions}</div>` : ""}
+      </div>`;
+  }
+
+  function paginationMeta(total, page, pageSize) {
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(Math.max(1, page), totalPages);
+    const start = total ? (safePage - 1) * pageSize + 1 : 0;
+    const end = Math.min(total, safePage * pageSize);
+    return { totalPages, page: safePage, start, end };
   }
 
   function formatDate(value) {
@@ -320,28 +385,50 @@
     el.appView.classList.remove("hidden");
     el.currentUserName.textContent = state.profile?.display_name || "-";
     el.currentUserRole.textContent = label("role", state.profile?.role);
+    if (el.currentUserAvatar) {
+      el.currentUserAvatar.textContent = userInitials(state.profile?.display_name);
+    }
+    const collapsed = window.localStorage.getItem("fi-sidebar-collapsed") === "true";
+    el.appView.classList.toggle("sidebar-collapsed", collapsed && window.innerWidth > 820);
     renderNavigation();
   }
 
   function renderNavigation() {
     const role = state.profile?.role;
-    const items = [
-      { route: "dashboard", icon: "⌂", label: "ภาพรวม", roles: ["admin", "manager", "user"] },
-      { route: "customers", icon: "▦", label: "ข้อมูลลูกค้า", roles: ["admin", "manager", "user"] },
-      { route: "daily-report", icon: "✎", label: "รายงานประจำวัน", roles: ["user"] },
-      { route: "manager-reports", icon: "✓", label: "รายงานของทีม", roles: ["admin", "manager"] },
-      { route: "admin-users", icon: "⚙", label: "จัดการผู้ใช้", roles: ["admin"] }
+    const groups = [
+      {
+        label: "Workspace",
+        items: [
+          { route: "dashboard", icon: "dashboard", label: "ภาพรวม", roles: ["admin", "manager", "user"] },
+          { route: "customers", icon: "customers", label: "ข้อมูลลูกค้า", roles: ["admin", "manager", "user"] }
+        ]
+      },
+      {
+        label: "Reports & Admin",
+        items: [
+          { route: "daily-report", icon: "report", label: "รายงานประจำวัน", roles: ["user"] },
+          { route: "manager-reports", icon: "team", label: "รายงานของทีม", roles: ["admin", "manager"] },
+          { route: "admin-users", icon: "users", label: "จัดการผู้ใช้", roles: ["admin"] }
+        ]
+      }
     ];
     const active = parseRoute().name;
-    el.mainNav.innerHTML = items
-      .filter((item) => item.roles.includes(role))
-      .map((item) => `
-        <a class="nav-link ${active === item.route ? "active" : ""}" href="#/${item.route}">
-          <span class="nav-icon" aria-hidden="true">${item.icon}</span>
-          <span>${h(item.label)}</span>
-        </a>
-      `)
-      .join("");
+    el.mainNav.innerHTML = groups.map((group) => {
+      const visible = group.items.filter((item) => item.roles.includes(role));
+      if (!visible.length) return "";
+      return `
+        <div class="nav-group">
+          <span class="nav-group-label">${h(group.label)}</span>
+          ${visible.map((item) => `
+            <a class="nav-link ${active === item.route ? "active" : ""}" href="#/${item.route}"
+               ${active === item.route ? 'aria-current="page"' : ""}
+               title="${h(item.label)}">
+              <span class="nav-icon">${icon(item.icon)}</span>
+              <span>${h(item.label)}</span>
+            </a>
+          `).join("")}
+        </div>`;
+    }).join("");
   }
 
   function parseRoute() {
@@ -370,6 +457,17 @@
     if (!state.profile) return;
     const token = ++state.routeRenderToken;
     const route = parseRoute();
+    const pageLabels = {
+      dashboard: "ภาพรวม",
+      customers: "ข้อมูลลูกค้า",
+      customer: "รายละเอียดลูกค้า",
+      "daily-report": "รายงานประจำวัน",
+      "manager-reports": "รายงานของทีม",
+      "admin-users": "จัดการผู้ใช้"
+    };
+    if (el.topbarPageLabel) {
+      el.topbarPageLabel.textContent = pageLabels[route.name] || "FI Workspace";
+    }
     renderNavigation();
     el.sidebar.classList.remove("open");
 
@@ -403,13 +501,15 @@
           location.hash = "#/dashboard";
       }
       if (token === state.routeRenderToken) {
+        document.title = `${pageLabels[route.name] || "FI Workspace"} · FI Customer Tracking`;
         el.mainContent.focus({ preventScroll: true });
       }
     } catch (error) {
       showError(error, "โหลดหน้าไม่สำเร็จ");
       el.mainContent.innerHTML = `
-        <div class="alert alert-danger">
-          โหลดข้อมูลไม่สำเร็จ <button class="btn btn-light btn-small" data-action="refresh-route">ลองใหม่</button>
+        <div class="alert alert-danger" role="alert">
+          โหลดข้อมูลไม่สำเร็จ
+          <button class="btn btn-secondary btn-small" data-action="refresh-route">ลองใหม่</button>
         </div>`;
     } finally {
       setLoading(false);
@@ -470,6 +570,7 @@
     const archived = state.customers.length - activeCustomers.length;
     const goLive = activeCustomers.filter((customer) => customer.onboarding_stage === "go_live").length;
     const importPending = activeCustomers.filter((customer) => customer.import_status !== "done").length;
+    const updatedAt = formatDateTime(new Date().toISOString());
 
     let rolePanel = "";
     if (state.profile.role === "user") {
@@ -482,17 +583,28 @@
       if (error) throw error;
       rolePanel = `
         <section class="panel">
-          <div class="panel-header"><h2>รายงานของวันนี้</h2></div>
+          <div class="panel-header">
+            <div>
+              <h2>รายงานประจำวันนี้</h2>
+              <p class="muted">บันทึกสิ่งที่ทำวันนี้และแผนงานวันพรุ่งนี้</p>
+            </div>
+            ${data ? `<span class="status-badge" data-status="${h(data.status)}">${h(label("report_status", data.status))}</span>` : ""}
+          </div>
           <div class="panel-body">
             ${data ? `
-              <p><span class="status-badge" data-status="${h(data.status)}">${h(label("report_status", data.status))}</span></p>
               ${data.last_revision_reason && data.status === "revision_required"
-                ? `<div class="alert alert-danger">${h(data.last_revision_reason)}</div>`
+                ? `<div class="alert alert-danger"><strong>Manager ส่งกลับ:</strong>&nbsp;${h(data.last_revision_reason)}</div>`
                 : ""}
-              <a class="btn btn-primary" href="#/daily-report">เปิดรายงาน</a>
+              <div class="toolbar-summary">
+                <span>อัปเดตล่าสุด ${h(formatDateTime(data.updated_at))}</span>
+                <a class="btn btn-primary" href="#/daily-report">เปิดรายงาน</a>
+              </div>
             ` : `
-              <p class="muted">ยังไม่มีรายงานประจำวันนี้</p>
-              <a class="btn btn-primary" href="#/daily-report">เริ่มเขียนรายงาน</a>
+              <div class="empty-state">
+                <strong>ยังไม่มีรายงานสำหรับวันนี้</strong>
+                <span>เริ่มบันทึกงานได้ทันทีและกลับมาแก้ไขก่อน Manager รับทราบ</span>
+                <a class="btn btn-primary" href="#/daily-report">${icon("plus")} เริ่มเขียนรายงาน</a>
+              </div>
             `}
           </div>
         </section>`;
@@ -505,31 +617,82 @@
       const reports = data || [];
       const pending = reports.filter((report) => report.status === "submitted").length;
       const acknowledged = reports.filter((report) => report.status === "acknowledged").length;
+      const revision = reports.filter((report) => report.status === "revision_required").length;
       rolePanel = `
         <section class="panel">
-          <div class="panel-header"><h2>รายงานของทีมวันนี้</h2></div>
+          <div class="panel-header">
+            <div>
+              <h2>รายงานของทีมวันนี้</h2>
+              <p class="muted">ติดตามรายงานที่รอรับทราบและรายการที่ส่งกลับ</p>
+            </div>
+            <a class="btn btn-secondary btn-small" href="#/manager-reports">ดูทั้งหมด</a>
+          </div>
           <div class="panel-body">
             <div class="cards-grid">
-              <div class="card stat-card"><span class="stat-label">ส่งแล้ว รอรับทราบ</span><span class="stat-value">${pending}</span></div>
-              <div class="card stat-card"><span class="stat-label">รับทราบแล้ว</span><span class="stat-value">${acknowledged}</span></div>
+              <div class="card stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">รอรับทราบ</span>
+                  <span class="stat-icon">${icon("clock")}</span>
+                </div>
+                <span class="stat-value">${pending}</span>
+                <span class="stat-meta">ฉบับที่ User ส่งแล้ว</span>
+              </div>
+              <div class="card stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">รับทราบแล้ว</span>
+                  <span class="stat-icon">${icon("check")}</span>
+                </div>
+                <span class="stat-value">${acknowledged}</span>
+                <span class="stat-meta">ฉบับที่ล็อกเรียบร้อย</span>
+              </div>
+              <div class="card stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">ส่งกลับแก้ไข</span>
+                  <span class="stat-icon">${icon("refresh")}</span>
+                </div>
+                <span class="stat-value">${revision}</span>
+                <span class="stat-meta">ฉบับที่รอ User แก้ไข</span>
+              </div>
             </div>
-            <p style="margin-top:16px"><a class="btn btn-primary" href="#/manager-reports">เปิดรายงานของทีม</a></p>
           </div>
         </section>`;
     }
 
     el.mainContent.innerHTML = `
-      <div class="page-header">
-        <div>
-          <h1>ภาพรวม</h1>
-          <p class="muted">ข้อมูลล่าสุด ณ ${h(formatDateTime(new Date().toISOString()))}</p>
+      ${pageHeader("ภาพรวม", `ข้อมูลล่าสุด ณ ${updatedAt}`)}
+      <section class="cards-grid" style="margin-bottom:20px">
+        <div class="card stat-card">
+          <div class="stat-card-header">
+            <span class="stat-label">ลูกค้าที่ใช้งาน</span>
+            <span class="stat-icon">${icon("building")}</span>
+          </div>
+          <span class="stat-value">${activeCustomers.length}</span>
+          <span class="stat-meta">ไม่รวมรายการ Archive</span>
         </div>
-      </div>
-      <section class="cards-grid" style="margin-bottom:18px">
-        <div class="card stat-card"><span class="stat-label">ลูกค้าทั้งหมด</span><span class="stat-value">${activeCustomers.length}</span></div>
-        <div class="card stat-card"><span class="stat-label">Go Live</span><span class="stat-value">${goLive}</span></div>
-        <div class="card stat-card"><span class="stat-label">Import ยังไม่เสร็จ</span><span class="stat-value">${importPending}</span></div>
-        <div class="card stat-card"><span class="stat-label">Archive</span><span class="stat-value">${archived}</span></div>
+        <div class="card stat-card">
+          <div class="stat-card-header">
+            <span class="stat-label">Go Live</span>
+            <span class="stat-icon">${icon("rocket")}</span>
+          </div>
+          <span class="stat-value">${goLive}</span>
+          <span class="stat-meta">ผ่านขั้นตอน Onboarding</span>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-card-header">
+            <span class="stat-label">Import ยังไม่เสร็จ</span>
+            <span class="stat-icon">${icon("import")}</span>
+          </div>
+          <span class="stat-value">${importPending}</span>
+          <span class="stat-meta">รอหรือกำลังดำเนินการ</span>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-card-header">
+            <span class="stat-label">Archive</span>
+            <span class="stat-icon">${icon("archive")}</span>
+          </div>
+          <span class="stat-value">${archived}</span>
+          <span class="stat-meta">เก็บประวัติและกู้คืนได้</span>
+        </div>
       </section>
       ${rolePanel}`;
   }
@@ -537,42 +700,53 @@
   async function renderCustomersPage() {
     await Promise.all([loadCommonData(), loadCustomers(true)]);
     el.mainContent.innerHTML = `
-      <div class="page-header">
-        <div>
-          <h1>ข้อมูลลูกค้า</h1>
-          <p class="muted">ดู เพิ่ม แก้ไข และติดตามประวัติลูกค้า</p>
-        </div>
-        <div class="page-actions">
-          <button class="btn btn-primary" data-action="open-customer-create">+ เพิ่มลูกค้า</button>
-        </div>
-      </div>
+      ${pageHeader(
+        "ข้อมูลลูกค้า",
+        "ค้นหา เพิ่ม แก้ไข และติดตามประวัติลูกค้าทั้งหมด",
+        `<button class="btn btn-primary" data-action="open-customer-create">${icon("plus")} เพิ่มลูกค้า</button>`,
+        [{ label: "ข้อมูลลูกค้า" }]
+      )}
       <section class="panel">
-        <div class="panel-body">
-          <div class="filters">
-            <label>ค้นหา
-              <input id="customer-search" type="search" placeholder="ชื่อ, ชื่อย่อ, Tax ID">
-            </label>
-            <label>สถานะบัญชี
+        <div class="toolbar">
+          <div class="toolbar-row">
+            <div class="toolbar-field toolbar-search">
+              <label for="customer-search">ค้นหา</label>
+              <input id="customer-search" type="search" placeholder="ชื่อบริษัท ชื่อย่อ หรือ Tax ID" autocomplete="off">
+            </div>
+            <div class="toolbar-field">
+              <label for="customer-status-filter">สถานะบัญชี</label>
               <select id="customer-status-filter">
                 <option value="">ทั้งหมด</option>
                 <option value="active">ใช้งาน</option>
                 <option value="inactive">ไม่ใช้งาน</option>
               </select>
-            </label>
-            <label>Owner
+            </div>
+            <div class="toolbar-field">
+              <label for="customer-owner-filter">Owner</label>
               <select id="customer-owner-filter">
                 <option value="">ทั้งหมด</option>
                 <option value="unassigned">ยังไม่มี Owner</option>
                 ${state.profiles.filter((p) => p.is_active).map((p) => `<option value="${h(p.id)}">${h(p.display_name)}</option>`).join("")}
               </select>
-            </label>
-            <label class="check-label">
-              <input id="customer-archive-filter" type="checkbox">
-              แสดงเฉพาะ Archive
-            </label>
+            </div>
+            <div class="toolbar-field">
+              <label for="customer-sort">เรียงตาม</label>
+              <select id="customer-sort">
+                <option value="updated_desc" ${state.ui.customerSort === "updated_desc" ? "selected" : ""}>อัปเดตล่าสุด</option>
+                <option value="name_asc" ${state.ui.customerSort === "name_asc" ? "selected" : ""}>ชื่อลูกค้า A–Z</option>
+                <option value="fleet_desc" ${state.ui.customerSort === "fleet_desc" ? "selected" : ""}>จำนวนรถมากไปน้อย</option>
+              </select>
+            </div>
+            <div class="toolbar-actions">
+              <label class="check-label">
+                <input id="customer-archive-filter" type="checkbox">
+                <span>เฉพาะ Archive</span>
+              </label>
+              <button class="btn btn-secondary" data-action="reset-customer-filters">${icon("refresh")} รีเซ็ต</button>
+            </div>
           </div>
-          <div id="customer-table-container"></div>
         </div>
+        <div id="customer-table-container" aria-live="polite"></div>
       </section>`;
     renderCustomerTable();
   }
@@ -584,6 +758,8 @@
     const status = document.getElementById("customer-status-filter")?.value || "";
     const owner = document.getElementById("customer-owner-filter")?.value || "";
     const archivedOnly = document.getElementById("customer-archive-filter")?.checked || false;
+    const sort = document.getElementById("customer-sort")?.value || state.ui.customerSort;
+    state.ui.customerSort = sort;
 
     const filtered = state.customers.filter((customer) => {
       const haystack = `${customer.legal_name} ${customer.short_name || ""} ${customer.tax_id}`.toLowerCase();
@@ -599,48 +775,78 @@
       );
     });
 
+    filtered.sort((a, b) => {
+      if (sort === "name_asc") return a.legal_name.localeCompare(b.legal_name, "th");
+      if (sort === "fleet_desc") return Number(b.fleet_size || 0) - Number(a.fleet_size || 0);
+      return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+    });
+
+    const meta = paginationMeta(filtered.length, state.ui.customerPage, state.ui.customerPageSize);
+    state.ui.customerPage = meta.page;
+    const pageRows = filtered.slice((meta.page - 1) * state.ui.customerPageSize, meta.page * state.ui.customerPageSize);
+
     if (!filtered.length) {
-      container.innerHTML = `<div class="empty-state">ไม่พบข้อมูลลูกค้าที่ตรงกับเงื่อนไข</div>`;
+      container.innerHTML = `
+        <div class="empty-state">
+          <strong>ไม่พบข้อมูลลูกค้า</strong>
+          <span>ลองเปลี่ยนคำค้นหา ตัวกรอง หรือรีเซ็ตเงื่อนไข</span>
+          <button class="btn btn-secondary btn-small" data-action="reset-customer-filters">รีเซ็ตตัวกรอง</button>
+        </div>`;
       return;
     }
 
     container.innerHTML = `
       <div class="table-wrap">
-        <table>
+        <table aria-label="รายชื่อลูกค้า">
           <thead>
             <tr>
               <th>ลูกค้า</th>
               <th>Tax ID</th>
+              <th class="text-right">จำนวนรถ</th>
               <th>Owner</th>
               <th>Onboarding</th>
               <th>Import</th>
               <th>อัปเดตล่าสุด</th>
-              <th></th>
+              <th aria-label="การทำงาน"></th>
             </tr>
           </thead>
           <tbody>
-            ${filtered.map((customer) => `
+            ${pageRows.map((customer) => `
               <tr>
-                <td>
+                <td class="table-primary-cell">
                   <strong>${h(customer.legal_name)}</strong>
-                  <div class="muted">${h(customer.short_name || "")}</div>
+                  <div class="table-secondary">${h(customer.short_name || "ไม่มีชื่อย่อ")}</div>
                   ${customer.is_archived ? `<span class="status-badge" data-status="inactive">Archive</span>` : ""}
                 </td>
                 <td class="nowrap">${h(customer.tax_id)}</td>
+                <td class="text-right">${Number(customer.fleet_size || 0).toLocaleString("th-TH")}</td>
                 <td>${ownerNames(customer.id).map(h).join("<br>") || '<span class="muted">ยังไม่มี Owner</span>'}</td>
                 <td>${h(label("onboarding_stage", customer.onboarding_stage))}</td>
                 <td><span class="status-badge" data-status="${h(customer.import_status)}">${h(label("import_status", customer.import_status))}</span></td>
-                <td>${h(formatDateTime(customer.updated_at))}<div class="muted">${h(profileName(customer.updated_by))}</div></td>
+                <td class="nowrap">${h(formatDateTime(customer.updated_at))}<div class="table-secondary">${h(profileName(customer.updated_by))}</div></td>
                 <td>
                   <div class="table-actions">
-                    <a class="btn btn-light btn-small" href="#/customer/${h(customer.id)}">เปิด</a>
-                    ${!customer.is_archived ? `<button class="btn btn-light btn-small" data-action="edit-customer" data-id="${h(customer.id)}">แก้ไข</button>` : ""}
+                    <a class="btn btn-secondary btn-small" href="#/customer/${h(customer.id)}">เปิด</a>
+                    ${!customer.is_archived ? `<button class="btn btn-tertiary btn-small" data-action="edit-customer" data-id="${h(customer.id)}">แก้ไข</button>` : ""}
                   </div>
                 </td>
               </tr>
             `).join("")}
           </tbody>
         </table>
+      </div>
+      <div class="table-footer">
+        <div class="pagination-info">แสดง ${meta.start}–${meta.end} จาก ${filtered.length} รายการ</div>
+        <div class="pagination">
+          <label class="muted" for="customer-page-size">ต่อหน้า</label>
+          <select id="customer-page-size" style="width:auto;min-height:34px">
+            ${[10, 20, 50, 100].map((size) => `<option value="${size}" ${state.ui.customerPageSize === size ? "selected" : ""}>${size}</option>`).join("")}
+          </select>
+          <button class="btn btn-secondary btn-small" data-action="customer-page-prev" ${meta.page <= 1 ? "disabled" : ""} aria-label="หน้าก่อนหน้า">${icon("chevronLeft")}</button>
+          <span class="pagination-page active" aria-current="page">${meta.page}</span>
+          <span class="pagination-info">/ ${meta.totalPages}</span>
+          <button class="btn btn-secondary btn-small" data-action="customer-page-next" ${meta.page >= meta.totalPages ? "disabled" : ""} aria-label="หน้าถัดไป">${icon("chevronRight")}</button>
+        </div>
       </div>`;
   }
 
@@ -759,22 +965,20 @@
     const selectedOwnerIds = new Set(data.owners.map((row) => row.profile_id));
     const primaryOwner = data.owners.find((row) => row.is_primary)?.profile_id || "";
 
+    const customerActions = !c.is_archived
+      ? `<button class="btn btn-secondary" data-action="edit-customer" data-id="${h(c.id)}">แก้ข้อมูลหลัก</button>
+         <button class="btn btn-danger" data-action="archive-customer" data-id="${h(c.id)}">Archive</button>`
+      : state.profile.role === "admin"
+        ? `<button class="btn btn-success" data-action="restore-customer" data-id="${h(c.id)}">Restore</button>`
+        : "";
+
     el.mainContent.innerHTML = `
-      <div class="page-header">
-        <div>
-          <p><a href="#/customers">← กลับไปรายชื่อลูกค้า</a></p>
-          <h1>${h(c.legal_name)}</h1>
-          <p class="muted">${h(c.short_name || c.tax_id)}</p>
-        </div>
-        <div class="page-actions">
-          ${!c.is_archived ? `
-            <button class="btn btn-light" data-action="edit-customer" data-id="${h(c.id)}">แก้ข้อมูลหลัก</button>
-            <button class="btn btn-danger" data-action="archive-customer" data-id="${h(c.id)}">Archive</button>
-          ` : state.profile.role === "admin" ? `
-            <button class="btn btn-success" data-action="restore-customer" data-id="${h(c.id)}">Restore</button>
-          ` : ""}
-        </div>
-      </div>
+      ${pageHeader(
+        c.legal_name,
+        c.short_name || c.tax_id,
+        customerActions,
+        [{ label: "ข้อมูลลูกค้า", href: "#/customers" }, { label: c.short_name || c.legal_name }]
+      )}
 
       ${c.is_archived ? `<div class="alert alert-warning">ลูกค้ารายนี้ถูก Archive ${locked ? "และเป็นแบบอ่านอย่างเดียว" : ""}</div>` : ""}
 
@@ -1121,44 +1325,58 @@
       .map((customer) => `<option value="${h(customer.id)}">${h(customer.short_name || customer.legal_name)}</option>`)
       .join("");
 
-    el.mainContent.innerHTML = `
-      <div class="page-header">
-        <div>
-          <h1>รายงานประจำวัน</h1>
-          <p class="muted">หนึ่งฉบับต่อหนึ่งวัน แบ่งเป็น Today และ Tomorrow</p>
-        </div>
-        <div class="page-actions">
-          ${report ? `<button class="btn btn-light" data-action="print-own-report">พิมพ์ / PDF</button>` : ""}
-        </div>
-      </div>
-      <section class="panel">
-        <div class="panel-body">
-          <div class="filters" style="grid-template-columns:minmax(180px,300px) 1fr">
-            <label>วันที่รายงาน
-              <input id="daily-report-date" type="date" value="${h(selectedDate)}">
-            </label>
-            <div>
-              ${report
-                ? `<p>สถานะ: <span class="status-badge" data-status="${h(report.status)}">${h(label("report_status", report.status))}</span></p>`
-                : `<p class="muted">ยังไม่มีรายงานสำหรับวันที่นี้</p>`}
-            </div>
-          </div>
+    const pageActions = report
+      ? `<button class="btn btn-secondary" data-action="print-own-report">พิมพ์ / PDF</button>`
+      : "";
 
+    el.mainContent.innerHTML = `
+      ${pageHeader(
+        "รายงานประจำวัน",
+        "สรุปสิ่งที่ทำวันนี้และวางแผนงานวันพรุ่งนี้",
+        pageActions,
+        [{ label: "รายงานประจำวัน" }]
+      )}
+      <section class="panel">
+        <div class="toolbar">
+          <div class="toolbar-row">
+            <div class="toolbar-field">
+              <label for="daily-report-date">วันที่รายงาน</label>
+              <input id="daily-report-date" type="date" value="${h(selectedDate)}">
+            </div>
+            <div class="toolbar-field">
+              <label>สถานะ</label>
+              <div style="min-height:42px;display:flex;align-items:center">
+                ${report
+                  ? `<span class="status-badge" data-status="${h(report.status)}">${h(label("report_status", report.status))}</span>`
+                  : `<span class="muted">ยังไม่มีรายงาน</span>`}
+              </div>
+            </div>
+            ${report ? `
+              <div class="toolbar-summary" style="margin-left:auto">
+                <span>อัปเดตล่าสุด ${h(formatDateTime(report.updated_at))}</span>
+              </div>` : ""}
+          </div>
+        </div>
+
+        <div class="panel-body">
           ${report?.status === "revision_required" ? `
-            <div class="alert alert-danger"><strong>เหตุผลที่ส่งกลับ:</strong> ${h(report.last_revision_reason || "-")}</div>
+            <div class="alert alert-danger"><strong>เหตุผลที่ Manager ส่งกลับ:</strong>&nbsp;${h(report.last_revision_reason || "-")}</div>
           ` : ""}
 
           ${!report ? `
-            <button class="btn btn-primary" data-action="create-daily-report" data-date="${h(selectedDate)}">สร้างรายงานวันนี้</button>
+            <div class="empty-state">
+              <strong>ยังไม่มีรายงานสำหรับวันที่ ${h(formatDate(selectedDate))}</strong>
+              <span>สร้างรายงานแล้วเพิ่มรายการใน Today และ Tomorrow ได้หลายข้อ</span>
+              <button class="btn btn-primary" data-action="create-daily-report" data-date="${h(selectedDate)}">${icon("plus")} สร้างรายงาน</button>
+            </div>
           ` : `
-            ${locked ? `<div class="alert alert-info">Manager รับทราบแล้ว รายงานนี้ถูกล็อกและแก้ไขไม่ได้</div>` : ""}
+            ${locked ? `<div class="alert alert-info">Manager รับทราบแล้ว รายงานนี้ถูกล็อกและไม่สามารถแก้ไขได้</div>` : ""}
             ${renderDailySection("today", "Today — สิ่งที่ทำวันนี้", items, customerOptions, locked)}
             ${renderDailySection("tomorrow", "Tomorrow — แผนวันพรุ่งนี้", items, customerOptions, locked)}
-            <div class="page-actions">
-              ${["draft", "revision_required"].includes(report.status)
-                ? `<button class="btn btn-primary" data-action="submit-report" data-id="${h(report.id)}">ส่งรายงานให้ Manager</button>`
-                : ""}
-            </div>
+            ${["draft", "revision_required"].includes(report.status) ? `
+              <div class="page-actions" style="border-top:1px solid var(--border);padding-top:20px">
+                <button class="btn btn-primary" data-action="submit-report" data-id="${h(report.id)}">ส่งรายงานให้ Manager</button>
+              </div>` : ""}
           `}
         </div>
       </section>`;
@@ -1302,25 +1520,28 @@
     state.managerReports = data || [];
 
     el.mainContent.innerHTML = `
-      <div class="page-header">
-        <div>
-          <h1>รายงานของทีม</h1>
-          <p class="muted">ดู รับทราบ หรือตีกลับรายงานของ User</p>
-        </div>
-      </div>
+      ${pageHeader(
+        "รายงานของทีม",
+        "ตรวจรายงาน รับทราบ หรือตีกลับให้ User แก้ไข",
+        "",
+        [{ label: "รายงานของทีม" }]
+      )}
       <section class="panel">
-        <div class="panel-body">
-          <div class="filters">
-            <label>วันที่
+        <div class="toolbar">
+          <div class="toolbar-row">
+            <div class="toolbar-field">
+              <label for="manager-report-date">วันที่</label>
               <input id="manager-report-date" type="date" value="${h(bangkokDate())}">
-            </label>
-            <label>User
+            </div>
+            <div class="toolbar-field">
+              <label for="manager-report-user">User</label>
               <select id="manager-report-user">
                 <option value="">ทั้งหมด</option>
                 ${state.profiles.filter((profile) => profile.role === "user").map((profile) => `<option value="${h(profile.id)}">${h(profile.display_name)}</option>`).join("")}
               </select>
-            </label>
-            <label>สถานะ
+            </div>
+            <div class="toolbar-field">
+              <label for="manager-report-status">สถานะ</label>
               <select id="manager-report-status">
                 <option value="">ทั้งหมด</option>
                 <option value="draft">ฉบับร่าง</option>
@@ -1328,14 +1549,17 @@
                 <option value="acknowledged">รับทราบแล้ว</option>
                 <option value="revision_required">ส่งกลับให้แก้ไข</option>
               </select>
-            </label>
-            <label class="check-label">
-              <input id="manager-report-all-dates" type="checkbox">
-              แสดงย้อนหลัง 60 วัน
-            </label>
+            </div>
+            <div class="toolbar-actions">
+              <label class="check-label">
+                <input id="manager-report-all-dates" type="checkbox">
+                <span>ย้อนหลัง 60 วัน</span>
+              </label>
+              <button class="btn btn-secondary" data-action="reset-manager-filters">${icon("refresh")} รีเซ็ต</button>
+            </div>
           </div>
-          <div id="manager-report-table"></div>
         </div>
+        <div id="manager-report-table" aria-live="polite"></div>
       </section>`;
     renderManagerReportTable();
   }
@@ -1353,28 +1577,58 @@
       && (!status || report.status === status)
     );
 
+    const meta = paginationMeta(reports.length, state.ui.managerPage, state.ui.managerPageSize);
+    state.ui.managerPage = meta.page;
+    const pageRows = reports.slice((meta.page - 1) * state.ui.managerPageSize, meta.page * state.ui.managerPageSize);
+
     if (!reports.length) {
-      container.innerHTML = `<div class="empty-state">ไม่พบรายงานที่ตรงกับเงื่อนไข</div>`;
+      container.innerHTML = `
+        <div class="empty-state">
+          <strong>ไม่พบรายงานที่ตรงกับเงื่อนไข</strong>
+          <span>ลองเลือกวันที่ User หรือสถานะใหม่</span>
+          <button class="btn btn-secondary btn-small" data-action="reset-manager-filters">รีเซ็ตตัวกรอง</button>
+        </div>`;
       return;
     }
 
     container.innerHTML = `
       <div class="table-wrap">
-        <table>
+        <table aria-label="รายงานของทีม">
           <thead>
-            <tr><th>วันที่</th><th>User</th><th>สถานะ</th><th>อัปเดต</th><th></th></tr>
+            <tr>
+              <th>วันที่</th>
+              <th>User</th>
+              <th>สถานะ</th>
+              <th>Version</th>
+              <th>อัปเดตล่าสุด</th>
+              <th aria-label="การทำงาน"></th>
+            </tr>
           </thead>
           <tbody>
-            ${reports.map((report) => `
+            ${pageRows.map((report) => `
               <tr>
-                <td>${h(formatDate(report.work_date))}</td>
+                <td class="nowrap"><strong>${h(formatDate(report.work_date))}</strong></td>
                 <td>${h(profileName(report.user_id))}</td>
                 <td><span class="status-badge" data-status="${h(report.status)}">${h(label("report_status", report.status))}</span></td>
-                <td>${h(formatDateTime(report.updated_at))}</td>
-                <td class="text-right"><button class="btn btn-light btn-small" data-action="open-manager-report" data-id="${h(report.id)}">เปิด</button></td>
+                <td>${h(report.content_version)}</td>
+                <td class="nowrap">${h(formatDateTime(report.updated_at))}</td>
+                <td class="text-right"><button class="btn btn-secondary btn-small" data-action="open-manager-report" data-id="${h(report.id)}">เปิดรายงาน</button></td>
               </tr>`).join("")}
           </tbody>
         </table>
+      </div>
+      <div class="table-footer">
+        <div class="pagination-info">แสดง ${meta.start}–${meta.end} จาก ${reports.length} รายงาน</div>
+        <div class="pagination">
+          <label class="muted" for="manager-page-size">ต่อหน้า</label>
+          <select id="manager-page-size" style="width:auto;min-height:34px">
+            ${[10, 20, 50].map((size) => `<option value="${size}" ${state.ui.managerPageSize === size ? "selected" : ""}>${size}</option>`).join("")}
+          </select>
+          <button class="btn btn-secondary btn-small" data-action="manager-page-prev" ${meta.page <= 1 ? "disabled" : ""} aria-label="หน้าก่อนหน้า">${icon("chevronLeft")}</button>
+          <span class="pagination-page active">${meta.page}</span>
+          <span class="pagination-info">/ ${meta.totalPages}</span>
+          <button class="btn btn-secondary btn-small" data-action="manager-page-next" ${meta.page >= meta.totalPages ? "disabled" : ""} aria-label="หน้าถัดไป">${icon("chevronRight")}</button>
+        </div>
       </div>`;
   }
 
@@ -1503,36 +1757,61 @@
   async function renderAdminUsersPage() {
     await loadCommonData(true);
     el.mainContent.innerHTML = `
-      <div class="page-header">
-        <div>
-          <h1>จัดการผู้ใช้</h1>
-          <p class="muted">กำหนด Role และสถานะบัญชี</p>
-        </div>
-      </div>
+      ${pageHeader(
+        "จัดการผู้ใช้",
+        "กำหนด Role และสถานะบัญชีสำหรับผู้ใช้งานระบบ",
+        "",
+        [{ label: "จัดการผู้ใช้" }]
+      )}
       <div class="alert alert-info">
         การสร้างหรือเชิญบัญชีใหม่ต้องทำใน Supabase Dashboard → Authentication → Users
         หน้านี้ไม่ใช้ Admin API และไม่มี Secret Key ใน Browser
       </div>
       <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>บัญชีผู้ใช้งาน</h2>
+            <p class="muted">Active Manager มีได้เพียงหนึ่งคนตามกฎของระบบ</p>
+          </div>
+          <span class="tag">${state.profiles.length} บัญชี</span>
+        </div>
         <div class="table-wrap">
-          <table>
-            <thead><tr><th>ชื่อ</th><th>อีเมล</th><th>Role</th><th>Active</th><th></th></tr></thead>
+          <table aria-label="รายชื่อผู้ใช้งาน">
+            <thead>
+              <tr>
+                <th>ชื่อ</th>
+                <th>อีเมล</th>
+                <th>Role</th>
+                <th>สถานะ</th>
+                <th aria-label="การทำงาน"></th>
+              </tr>
+            </thead>
             <tbody>
               ${state.profiles.map((profile) => {
                 const self = profile.id === state.profile.id;
                 return `
                   <tr data-profile-id="${h(profile.id)}">
-                    <td><strong>${h(profile.display_name)}</strong>${self ? ' <span class="tag">คุณ</span>' : ""}</td>
+                    <td class="table-primary-cell">
+                      <strong>${h(profile.display_name)}</strong>
+                      ${self ? ' <span class="tag">บัญชีของคุณ</span>' : ""}
+                    </td>
                     <td>${h(profile.email)}</td>
-                    <td>
-                      <select data-field="role" ${self ? "disabled" : ""}>
+                    <td style="min-width:180px">
+                      <select data-field="role" ${self ? "disabled" : ""} aria-label="Role ของ ${h(profile.display_name)}">
                         <option value="user" ${profile.role === "user" ? "selected" : ""}>User</option>
                         <option value="manager" ${profile.role === "manager" ? "selected" : ""}>Manager</option>
                         <option value="admin" ${profile.role === "admin" ? "selected" : ""}>Admin</option>
                       </select>
                     </td>
-                    <td><input data-field="is_active" type="checkbox" ${profile.is_active ? "checked" : ""} ${self ? "disabled" : ""}></td>
-                    <td class="text-right">${self ? "" : `<button class="btn btn-primary btn-small" data-action="save-profile" data-id="${h(profile.id)}">บันทึก</button>`}</td>
+                    <td>
+                      <label class="check-label">
+                        <input data-field="is_active" type="checkbox" ${profile.is_active ? "checked" : ""} ${self ? "disabled" : ""}>
+                        <span>${profile.is_active ? "Active" : "Inactive"}</span>
+                      </label>
+                    </td>
+                    <td class="text-right">
+                      ${self ? '<span class="muted">แก้บัญชีตัวเองไม่ได้</span>' : `<button class="btn btn-primary btn-small" data-action="save-profile" data-id="${h(profile.id)}">บันทึก</button>`}
+                    </td>
                   </tr>`;
               }).join("")}
             </tbody>
@@ -1660,6 +1939,11 @@
     el.revisionForm.addEventListener("submit", requestRevision);
 
     window.addEventListener("hashchange", renderRoute);
+    window.addEventListener("resize", () => {
+      if (window.innerWidth > 820) {
+        el.sidebar.classList.remove("open");
+      }
+    });
 
     document.addEventListener("visibilitychange", async () => {
       if (document.visibilityState !== "visible" || !state.client) return;
@@ -1687,17 +1971,30 @@
     });
 
     document.addEventListener("input", (event) => {
-      if (["customer-search"].includes(event.target.id)) renderCustomerTable();
+      if (event.target.id === "customer-search") {
+        state.ui.customerPage = 1;
+        renderCustomerTable();
+      }
     });
 
     document.addEventListener("change", async (event) => {
       const target = event.target;
       try {
-        if (["customer-status-filter", "customer-owner-filter", "customer-archive-filter"].includes(target.id)) {
+        if (["customer-status-filter", "customer-owner-filter", "customer-archive-filter", "customer-sort"].includes(target.id)) {
+          state.ui.customerPage = 1;
+          renderCustomerTable();
+        } else if (target.id === "customer-page-size") {
+          state.ui.customerPageSize = Number(target.value) || 20;
+          state.ui.customerPage = 1;
           renderCustomerTable();
         } else if (target.id === "daily-report-date") {
           await renderDailyReportPage(target.value);
         } else if (["manager-report-date", "manager-report-user", "manager-report-status", "manager-report-all-dates"].includes(target.id)) {
+          state.ui.managerPage = 1;
+          renderManagerReportTable();
+        } else if (target.id === "manager-page-size") {
+          state.ui.managerPageSize = Number(target.value) || 20;
+          state.ui.managerPage = 1;
           renderManagerReportTable();
         } else if (target.dataset.action === "toggle-module") {
           await toggleCustomerRelation("module", target.dataset.customerId, target.dataset.masterId, target.checked, target);
@@ -1716,7 +2013,16 @@
       try {
         switch (action) {
           case "toggle-sidebar":
-            el.sidebar.classList.toggle("open");
+            if (window.innerWidth <= 820) {
+              el.sidebar.classList.toggle("open");
+            } else {
+              const collapsed = !el.appView.classList.contains("sidebar-collapsed");
+              el.appView.classList.toggle("sidebar-collapsed", collapsed);
+              window.localStorage.setItem("fi-sidebar-collapsed", String(collapsed));
+            }
+            break;
+          case "close-sidebar":
+            el.sidebar.classList.remove("open");
             break;
           case "logout":
             setLoading(true, "กำลังออกจากระบบ...");
@@ -1728,6 +2034,51 @@
             break;
           case "refresh-route":
             await renderRoute();
+            break;
+          case "reset-customer-filters": {
+            const search = document.getElementById("customer-search");
+            const status = document.getElementById("customer-status-filter");
+            const owner = document.getElementById("customer-owner-filter");
+            const archive = document.getElementById("customer-archive-filter");
+            const sort = document.getElementById("customer-sort");
+            if (search) search.value = "";
+            if (status) status.value = "";
+            if (owner) owner.value = "";
+            if (archive) archive.checked = false;
+            if (sort) sort.value = "updated_desc";
+            state.ui.customerSort = "updated_desc";
+            state.ui.customerPage = 1;
+            renderCustomerTable();
+            break;
+          }
+          case "customer-page-prev":
+            state.ui.customerPage = Math.max(1, state.ui.customerPage - 1);
+            renderCustomerTable();
+            break;
+          case "customer-page-next":
+            state.ui.customerPage += 1;
+            renderCustomerTable();
+            break;
+          case "reset-manager-filters": {
+            const date = document.getElementById("manager-report-date");
+            const user = document.getElementById("manager-report-user");
+            const status = document.getElementById("manager-report-status");
+            const allDates = document.getElementById("manager-report-all-dates");
+            if (date) date.value = bangkokDate();
+            if (user) user.value = "";
+            if (status) status.value = "";
+            if (allDates) allDates.checked = false;
+            state.ui.managerPage = 1;
+            renderManagerReportTable();
+            break;
+          }
+          case "manager-page-prev":
+            state.ui.managerPage = Math.max(1, state.ui.managerPage - 1);
+            renderManagerReportTable();
+            break;
+          case "manager-page-next":
+            state.ui.managerPage += 1;
+            renderManagerReportTable();
             break;
           case "open-customer-create":
             openCustomerForm();
