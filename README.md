@@ -1,12 +1,35 @@
 # FI Customer Tracking Web App
 
-> **Current version:** `0.4.0-enterprise-ui`  
-> **Base version:** `0.3.0-frontend-foundation`  
-> **Current status:** Enterprise UI release package prepared. Database schema, RPC and RLS are unchanged from v0.3.0. This release has not yet been deployed or browser-tested against the real Supabase project.  
+> **Current version:** `0.5.0-ag-experience`  
+> **Base version:** `0.4.0-enterprise-ui`  
+> **Current status:** AG Grid/AG Charts frontend and Profile Theme migration prepared. Migration `004_profile_preferences` has not yet been executed against the real Supabase project, and this release has not yet been deployed or end-to-end tested with real accounts.  
 > **Runtime stack:** GitHub Pages + Plain HTML/CSS/JavaScript + Supabase Auth/PostgreSQL  
 > **Application repository:** `fi-customer-tracking`
 
 ## Changelog
+
+### 0.5.0-ag-experience
+
+- เพิ่ม AG Grid Community `36.0.2` ในหน้าข้อมูลลูกค้า รายงานของทีม และจัดการผู้ใช้
+- เพิ่ม AG Charts Community `14.0.2` บน Dashboard สำหรับ Onboarding, Import และ Daily Report
+- ล็อกเวอร์ชัน CDN เพื่อลดความเสี่ยงจาก Breaking Change โดยไม่เพิ่ม Build Tool
+- เพิ่มหน้า `#/profile` สำหรับดูข้อมูลบัญชีและตั้งค่า Theme
+- รองรับ Theme Mode: `light`, `dark`, `system`
+- รองรับ Accent Color แบบ Preset 24 สีและ Color Picker/HEX ที่กำหนดเอง
+- เพิ่ม Migration `004_profile_preferences` และ RPC `update_my_profile_preferences`
+- แยก Customer Flow เป็น:
+  - `#/customers/new` สำหรับ Create
+  - `#/customer/:id` สำหรับ Detail แบบ Read-only
+  - `#/customer/:id/edit` สำหรับ Edit ทุกส่วนในหน้าเดียว
+- หน้า Edit ลูกค้ารวมข้อมูลหลัก, Owner, Contacts, Modules, Functions, Operations และ Timeline
+- นำ Customer Audit Log ออกจากหน้าเว็บ แต่คง Table, Trigger, RLS และข้อมูล Audit ในฐานข้อมูล
+- เปลี่ยนวันที่แสดงและกรอกเป็น `DD/MM/YYYY`
+- เพิ่ม Date Picker, Input Mask และ Validation ก่อนแปลงเป็น PostgreSQL `YYYY-MM-DD`
+- เปลี่ยน Timestamp Display เป็น `DD/MM/YYYY HH:mm` ใน Timezone `Asia/Bangkok`
+- เพิ่ม Global Loading, Page Skeleton, Section Loading, Grid/Chart Loading และ Button Busy
+- เพิ่ม CSV Export เฉพาะข้อมูลที่ผ่านสิทธิ์และตัวกรองในหน้าลูกค้า/รายงานทีม
+- เพิ่มการทำลาย Grid และ Chart เมื่อเปลี่ยนหน้าเพื่อป้องกัน Event ซ้ำและ Memory Leak
+- อัปเดต Cache Busting และ Version Stamp เป็น `0.5.0-ag-experience`
 
 ### 0.4.0-enterprise-ui
 
@@ -108,6 +131,9 @@ SQL เป็น Deployment Artifacts สำหรับรันผ่าน Su
 003_frontend_support.sql
 003_frontend_support_verify.sql
 003_frontend_support_rollback.sql
+004_profile_preferences.sql
+004_profile_preferences_verify.sql
+004_profile_preferences_rollback.sql
 ```
 
 > ข้อจำกัด: หากไม่เก็บ SQL ใน Repository จะไม่มี Database Migration History ใน Git จึงต้องเก็บไฟล์ SQL ชุดที่ใช้จริงไว้ในพื้นที่สำรองที่ควบคุม Version ได้
@@ -121,7 +147,7 @@ SQL เป็น Deployment Artifacts สำหรับรันผ่าน Su
 - เพิ่มและแก้ไขลูกค้าทั้งหมด
 - Archive ลูกค้า
 - แก้ข้อมูลย่อยของลูกค้าที่ไม่ Archive
-- ดู Customer Audit Log
+- ไม่มีหน้า Customer Audit Log ใน Frontend; สิทธิ์อ่านข้อมูล Audit ระดับฐานข้อมูลยังคงตาม RLS เดิม
 - สร้าง Daily Report ของตัวเอง
 - ดู Report และ Event ของตัวเอง
 - แก้ Report ของตัวเองเมื่อสถานะยังไม่ถูกล็อก
@@ -131,7 +157,7 @@ SQL เป็น Deployment Artifacts สำหรับรันผ่าน Su
 
 - มี Active Manager ได้ไม่เกิน 1 คน
 - ดู เพิ่ม แก้ไข และ Archive ลูกค้าทั้งหมด
-- ดู Customer Audit Log
+- ไม่มีหน้า Customer Audit Log ใน Frontend; สิทธิ์อ่านข้อมูล Audit ระดับฐานข้อมูลยังคงตาม RLS เดิม
 - ดู Daily Report ของ User ทุกคน
 - รับทราบ Report
 - ตีกลับ Report พร้อมเหตุผล
@@ -257,6 +283,8 @@ Purpose: Application profile linked one-to-one with `auth.users`.
 | `email` | `text` | No | Unique by lowercase |
 | `role` | `text` | No | `user` |
 | `is_active` | `boolean` | No | `true` |
+| `theme_mode` | `text` | No | `light`; `light`, `dark`, `system` |
+| `theme_accent` | `text` | No | `#2f68e6`; HEX `#RRGGBB` |
 | `created_at` | `timestamptz` | No | Current timestamp |
 | `updated_at` | `timestamptz` | No | Current timestamp |
 
@@ -265,6 +293,8 @@ Constraints and indexes:
 - `display_name` สูงสุด 200 ตัวอักษร
 - `email` สูงสุด 320 ตัวอักษร
 - Role: `admin`, `manager`, `user`
+- Theme mode: `light`, `dark`, `system`
+- Theme accent ต้องเป็น HEX 6 หลักรูปแบบ `#RRGGBB`
 - Unique index on `lower(email)`
 - Partial unique index permits at most one row where `role = 'manager' AND is_active = true`
 - Auth User deletion is restricted; deactivate the Profile instead
@@ -554,6 +584,7 @@ Current applied versions after successful installation:
 ```text
 001_initial_schema
 003_frontend_support
+004_profile_preferences
 ```
 
 ## 8. RLS Design
@@ -592,6 +623,7 @@ Private helper functions:
 | `admin_update_profile(uuid, text, boolean)` | Admin | Change another user's role/active status |
 | `save_customer_owners(uuid, uuid[], uuid)` | Any active role | Replace owners and primary owner atomically |
 | `save_customer_contact(uuid, uuid, text, text, text, text, text, boolean, boolean)` | Any active role | Insert/update contact and primary contact atomically |
+| `update_my_profile_preferences(text, text)` | Current active user | Save own Theme mode and accent color |
 
 Frontend ต้องเรียก Workflow และ Aggregate Save ผ่าน RPC เหล่านี้ ไม่อัปเดต Workflow Columns โดยตรง
 
@@ -645,6 +677,21 @@ const SUPABASE_PUBLISHABLE_KEY = "YOUR_PUBLISHABLE_KEY";
 - Private API Key
 
 ความปลอดภัยของข้อมูลไม่ได้พึ่งการซ่อน Publishable Key แต่พึ่ง Grants, RLS, Trigger และ RPC
+
+
+### Frontend Community Dependencies
+
+โหลดผ่าน CDN แบบล็อก Version:
+
+```text
+Supabase JavaScript: @supabase/supabase-js@2
+AG Grid Community: 36.0.2
+AG Charts Community: 14.0.2
+```
+
+ใช้เฉพาะ Community edition ไม่มี Enterprise licence key, Integrated Charts, Excel Export, Pivot หรือ Row Grouping แบบ Enterprise
+
+หาก CDN โหลดไม่สำเร็จ หน้า Grid/Chart จะแสดง Error State และปุ่มลองใหม่ ส่วน Auth และหน้าที่ไม่พึ่ง AG ยังทำงานตามปกติ
 
 ## 12. Migration Files
 
@@ -708,6 +755,27 @@ Destructive rollback:
 
 ลบ Frontend Support RPC โดยไม่ลบ Customer Data
 
+
+### `004_profile_preferences.sql`
+
+เพิ่ม:
+
+- `profiles.theme_mode` ค่า `light`, `dark`, `system`
+- `profiles.theme_accent` ค่า HEX รูปแบบ `#RRGGBB`
+- RPC `update_my_profile_preferences(text, text)`
+- Execute Grant เฉพาะ `authenticated`
+- ตรวจ Active Profile และบังคับแก้ได้เฉพาะ Profile ของ `auth.uid()`
+
+Migration นี้ไม่เพิ่ม Client Update Policy บน `profiles`; การบันทึก Theme ต้องผ่าน RPC เพื่อไม่เปิดสิทธิ์แก้ Role หรือ Active Status
+
+### `004_profile_preferences_verify.sql`
+
+ตรวจ Migration Registry, Columns, Constraints, RLS, Function และ Execute Privilege โดยไม่แก้ข้อมูล
+
+### `004_profile_preferences_rollback.sql`
+
+ลบ RPC และ Theme Columns เท่านั้น ค่า Theme ที่ผู้ใช้บันทึกจะหาย แต่ Auth User, Role และข้อมูลธุรกิจยังคงอยู่
+
 ## 13. Installation Order
 
 ### Before Running SQL
@@ -727,19 +795,21 @@ Destructive rollback:
 4. วางเนื้อหา `001_initial_schema.sql`
 5. Run ทั้งไฟล์ครั้งเดียว
 6. รัน `003_frontend_support.sql`
-7. หากมี Error Transaction จะ Rollback
-8. อย่ารัน Migration เดิมซ้ำหลังสำเร็จ เพราะ Migration Guard จะปฏิเสธ
+7. รัน `004_profile_preferences.sql`
+8. หากมี Error Transaction จะ Rollback
+9. อย่ารัน Migration เดิมซ้ำหลังสำเร็จ เพราะ Migration Guard จะปฏิเสธ
 
 ### Verify
 
 1. รัน `001_initial_schema_verify.sql`
 2. รัน `003_frontend_support_verify.sql`
-3. ตรวจ Public Tables ครบ 14 ตาราง
-4. ตรวจ RLS เป็น `true` ทุกตาราง
-5. ตรวจ `anon` ไม่มี Table Privilege
-6. ตรวจ Public RPC ครบตาม Section 9
-7. เปิด Database → Advisors
-8. Rerun Security Advisor และ Performance Advisor
+3. รัน `004_profile_preferences_verify.sql`
+4. ตรวจ Public Tables ครบ 14 ตาราง
+5. ตรวจ RLS เป็น `true` ทุกตาราง
+6. ตรวจ `anon` ไม่มี Table Privilege
+7. ตรวจ Public RPC ครบตาม Section 9
+8. เปิด Database → Advisors
+9. Rerun Security Advisor และ Performance Advisor
 
 ### Bootstrap Roles
 
@@ -838,22 +908,33 @@ Migration policy:
 
 - Login, Logout, Session Restore และ Session Refresh
 - Inactive User ถูกปฏิเสธ
-- Navigation ตรงกับ Role
-- Customer Create/Edit/Archive/Restore
+- Navigation ตรงกับ Role และเปิด Profile จาก Topbar ได้
+- Theme `light`, `dark`, `system` ทำงานและบันทึกข้าม Session
+- Preset Color, Color Picker และ HEX Validation
+- Customer List ใช้ AG Grid: Sort, Filter, Resize, Pin, Pagination และ CSV
+- Customer Create ที่ `#/customers/new`
+- Customer Detail ที่ `#/customer/:id` เป็น Read-only
+- Customer Edit ที่ `#/customer/:id/edit` รวมทุก Section ในหน้าเดียว
 - Tax ID Validation และ Duplicate Error
+- วันที่ทุกจุดรับและแสดง `DD/MM/YYYY`
+- วันที่ไม่ถูกต้อง เช่น `31/02/2026` ถูกปฏิเสธก่อน Save
 - Owner Save และ Primary Owner
 - Contact Save และ Primary Contact
 - Module/Feature Toggle
 - Operations และ Timeline
-- Audit Log แสดง Actor/Timestamp
+- หน้า Customer ไม่ Query หรือแสดง Audit Log แต่ Trigger Audit ยังทำงานในฐานข้อมูล
 - Daily Report หนึ่งฉบับต่อวัน
 - Add/Edit/Delete Today และ Tomorrow
 - Submit, Acknowledge, Revision และ Resubmit
 - Content Version Conflict
+- Manager Report ใช้ AG Grid และ CSV Export
+- Admin User Grid แก้ Role/Active ได้ตามสิทธิ์
+- Dashboard AG Charts แสดง Onboarding, Import และ Daily Report
+- Global Loading, Page Skeleton, Section Loading, Grid/Chart Loading และ Button Busy
+- Action ระหว่าง Loading กดซ้ำไม่ได้
 - User อ่าน Report ของผู้อื่นไม่ได้
 - Manager แก้ Report Item ไม่ได้
-- Admin Role/Active Update
-- Mobile Layout
+- Mobile/Tablet Layout และ Horizontal Grid Scroll
 - Print/PDF A4
 - Browser Console และ Network ไม่มี Error ที่ไม่คาดหมาย
 - GitHub Pages Hard Refresh และ Cache Busting
@@ -863,20 +944,17 @@ Migration policy:
 ### Implemented Screens
 
 - Login
-- Dashboard ตาม Role
-- Customer List พร้อม Search/Filter
-- Customer Detail
-- Customer Core Create/Edit
-- Owners และ Primary Owner
-- Contacts และ Primary Contact
-- Modules และ Features
-- Driver Payment Method และ Trip Expense Management
-- Timeline/Activities
-- Customer Audit Log
+- Dashboard ตาม Role พร้อม AG Charts Community
+- Customer List ด้วย AG Grid Community พร้อม Search/Filter/Pagination/CSV
+- Customer Create Page
+- Customer Detail Read-only Page
+- Customer Edit Page ที่รวม Core, Owners, Contacts, Modules, Features, Operations และ Timeline
+- User Profile และ Theme Settings
 - User Daily Report
-- Manager Report Review/Acknowledge/Revision
+- Manager Report Review/Acknowledge/Revision ด้วย AG Grid Community
 - Print/PDF A4
-- Admin Role/Active Management
+- Admin Role/Active Management ด้วย AG Grid Community
+- Audit Log ไม่แสดงใน Frontend แต่ยังบันทึกใน Database
 
 ### Enterprise UI Design System
 
@@ -884,18 +962,20 @@ Migration policy:
 
 - Layout: 8px spacing grid และ Content-first
 - Density: Enterprise Compact-Balanced
-- Primary color: Blue `#2f68e6`
+- Primary color: ค่าเริ่มต้น Blue `#2f68e6` และผู้ใช้กำหนด Accent เองได้
+- Theme mode: Light, Dark และ System
 - Supporting brand colors: Cyan `#2dcfc6`, Mint `#35dfa0`
 - Main background: Neutral `#f5f7fb`
 - Surface: White with subtle border and minimal shadow
 - Desktop sidebar: 268px และยุบเหลือ 80px โดยบันทึกค่าที่ `localStorage`
 - Content width: สูงสุด 1,680px พร้อม Margin 24–32px ตามขนาดหน้าจอ
 - Form: Label อยู่เหนือ Input และ Modal แบ่ง Section
-- Table: Sticky Header, Row Hover, Pagination และ Horizontal Scroll บนหน้าจอเล็ก
+- Data Grid: AG Grid Community พร้อม Sort, Filter, Resize, Pin, Pagination, CSV และ Horizontal Scroll
 - Accessibility: Keyboard focus, semantic labels, `aria-current`, skip link และ reduced-motion support
 - Responsive breakpoint หลัก: 1,180px, 820px และ 480px
 
-UI release นี้ไม่เพิ่ม Table, Column, RPC, RLS Policy หรือ Business Status ใหม่
+Release นี้เพิ่มเฉพาะ Theme Columns และ RPC สำหรับบันทึก Theme ของ Profile
+ไม่เปลี่ยน Customer/Daily Report Business Status, Customer Permission หรือ Daily Report Workflow
 
 ### Frontend Configuration
 
@@ -941,8 +1021,8 @@ http://localhost:8080
 `index.html` โหลดไฟล์ด้วย:
 
 ```text
-style.css?v=0.4.0-enterprise-ui
-script.js?v=0.4.0-enterprise-ui
+style.css?v=0.5.0-ag-experience
+script.js?v=0.5.0-ag-experience
 ```
 
 เมื่อ Release ใหม่ต้องอัปเดต Version ใน:
@@ -955,79 +1035,84 @@ script.js?v=0.4.0-enterprise-ui
 
 ### Frontend Rollback
 
-หาก v0.4.0 มีปัญหาหลัง Deploy:
+หาก v0.5.0 มีปัญหาหลัง Deploy:
 
-1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.3.0
+1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.4.0
 2. Push กลับไปที่ `main`
 3. รอ GitHub Pages Deploy
 4. Hard Refresh และตรวจ Version ที่ Sidebar/Login
-5. ไม่ต้อง Rollback Database เพราะ Release นี้ไม่แก้ Schema, RPC หรือ RLS
+5. หากต้องการเก็บ Theme Columns ไว้ ไม่ต้อง Rollback Database
 
-ก่อน Rollback:
+### Profile Theme Migration Rollback
 
-1. Export/Backup Application Tables
-2. ตรวจว่าไม่มี Migration หลัง `001_initial_schema`
-3. ตรวจว่าไม่มีข้อมูลจริงที่ต้องเก็บ
-4. เก็บรายชื่อ Auth Users ไว้
+ก่อน Rollback ให้แจ้งผู้ใช้ว่า Theme ที่บันทึกจะหาย แล้วรัน:
 
-หากย้อนเฉพาะ Frontend Support RPC ให้รัน:
+```text
+004_profile_preferences_rollback.sql
+```
+
+ผลกระทบ:
+
+- ลบ `update_my_profile_preferences`
+- ลบ `profiles.theme_mode`
+- ลบ `profiles.theme_accent`
+- ไม่ลบ Auth User, Role, Customer หรือ Daily Report
+
+หากย้อนเฉพาะ Frontend Support RPC รุ่นก่อน ให้รัน:
 
 ```text
 003_frontend_support_rollback.sql
 ```
 
-หากย้อนฐานข้อมูลทั้งหมดให้รัน:
+หากย้อนฐานข้อมูลทั้งหมด ให้ Backup ก่อนแล้วรัน:
 
 ```text
 001_initial_schema_rollback.sql
 ```
 
-ผลกระทบ:
+Full Database Rollback จะลบ Application Tables และข้อมูลทั้งหมด แต่ `auth.users` ยังคงอยู่
 
-- Application Tables และข้อมูลถูกลบ
-- Profile ถูกลบ แต่ `auth.users` ยังคงอยู่
-- App Triggers บน `auth.users` ถูกลบ
-- Private Helper/RPC ถูกลบ
-- GitHub Pages ไม่ทำงานจนกว่าจะ Restore Database Version ที่เข้ากัน
+## 17.1 Release Validation
 
-## 17.1 UI Release Validation
-
-ตรวจแล้วใน Release Package:
+ตรวจใน Release Package ก่อนส่งมอบ:
 
 - `node --check script.js`
 - ตรวจ HTML ID ไม่ซ้ำ
 - ตรวจ Cache Busting ตรงกับ `APP_VERSION`
-- ตรวจ CSS bracket balance และ media query structure
-- ตรวจ Package มีเฉพาะ 4 ไฟล์ตามข้อกำหนด
+- ตรวจ CSS bracket balance
+- ตรวจ CDN ใช้ AG Grid Community และ AG Charts Community แบบล็อก Version
+- ตรวจ Package Frontend มีเฉพาะ 4 ไฟล์
+- ตรวจ SQL Migration/Verify/Rollback อยู่ใน Package แยก
 - ตรวจไม่พบ Database Password, Secret Key หรือ `service_role`
 - ตรวจ ZIP integrity
 
-ยังไม่ได้ทดสอบจริง:
+ยังต้องทดสอบกับระบบจริง:
 
-- Login/Logout กับ Supabase Project จริง
+- รัน Migration `004` บน Supabase Development Project
+- Login/Logout และ Theme persistence กับบัญชีจริง
 - RLS/RPC Runtime ของทุก Role
-- Browser visual regression บน GitHub Pages URL จริง
-- Mobile devices จริง
-- Print/PDF ในทุก Browser
+- AG Grid/AG Charts บน GitHub Pages URL และ CSP จริง
+- Browser visual regression บน Desktop/Tablet/Mobile
+- Print/PDF ใน Browser เป้าหมาย
 - Screen reader end-to-end
 
 ## 18. Known Limitations
 
-- งานรอบนี้ไม่เปลี่ยน SQL และไม่ได้รันทดสอบ SQL/RLS/RPC ซ้ำกับ Supabase Project จริง
-- ยังไม่ได้ทดสอบ PostgreSQL Runtime, RLS, Trigger หรือ RPC กับ Supabase จริง
-- Frontend v0.4.0 ผ่าน Syntax Check และ Static Validation แต่ยังไม่ได้ทดสอบ Browser Runtime กับ Project URL/Key จริง
-- ยังไม่ได้รัน Supabase Security/Performance Advisor
-- ยังไม่ได้ทำ Spreadsheet Migration Dry Run
-- ยังไม่ได้ทดสอบ Role/RLS ด้วยบัญชีจริง
+- Migration `004_profile_preferences` ยังไม่ได้รันกับ Supabase Project จริงในรอบจัดทำ Package
+- ยังไม่ได้ทดสอบ PostgreSQL Runtime, RLS และ RPC ใหม่กับบัญชีจริง
+- Frontend v0.5.0 ผ่าน Static Validation เท่านั้นจนกว่าจะเชื่อม Project และทดสอบ Browser จริง
+- AG Grid และ AG Charts โหลดผ่าน CDN จึงต้องมี Internet Access และ CSP ต้องอนุญาต `cdn.jsdelivr.net`
+- หาก AG CDN ล้มเหลว หน้าที่ใช้ Grid/Chart จะแสดง Error State แต่ข้อมูลจะไม่แสดงเป็นตารางสำรอง
+- CSV Export ส่งออกเฉพาะข้อมูลที่โหลดเข้า Browser และผ่านสิทธิ์/ตัวกรองปัจจุบัน
+- Theme ใช้ Mode และ Accent Color เท่านั้น ยังไม่รองรับปรับ Font Size หรือ Density รายบุคคล
 - User และ Manager แก้ลูกค้าทั้งหมดได้ตาม Requirement ซึ่งมีความเสี่ยงจาก Human Error; Audit และ Archive ช่วยตรวจย้อนหลังแต่ไม่ป้องกันการแก้ผิดทั้งหมด
 - Customer Core Edit ยังไม่มี Optimistic Lock; การแก้ข้อมูลหลักพร้อมกันอาจเกิด Last-write-wins
-- Module/Feature Toggle เป็นการบันทึกทีละรายการ ไม่ใช่ Aggregate Transaction
+- Module/Feature Toggle บันทึกทีละรายการ ไม่ใช่ Aggregate Transaction
 - Daily Report Item บันทึกทีละข้อเพื่อหลีกเลี่ยงการลบ/แทนที่ทั้งชุด
 - Manager Page โหลด Report ย้อนหลัง 60 วันต่อครั้ง
 - การสร้าง/เชิญ Auth User ต้องทำผ่าน Supabase Dashboard เพราะ Browser ห้ามใช้ Admin Secret API
-- Module/Feature Master Changes ยังไม่มี Dedicated Admin Audit Log
-- Profile Role Changes ยังไม่มี Dedicated Admin Audit Log
-- SQL ไม่อยู่ใน 4 Runtime Files ตามโครงสร้าง Repo ที่เลือก จึงต้องจัดเก็บ Migration Artifacts แยกอย่างมี Version
+- Audit Log ยังอ่านได้ตาม Database Permission เดิม แต่ Frontend v0.5.0 ไม่ Query และไม่แสดงผล
+- Module/Feature Master Changes และ Profile Role Changes ยังไม่มี Dedicated Admin Audit Log
+- SQL ไม่อยู่ใน 4 Runtime Files ตามโครงสร้าง Repo จึงต้องเก็บ Migration Artifacts แยกอย่างมี Version
 - Driver Payment Method และ Trip Expense Management ยังเป็น Free Text
-- Email Notification ยังไม่อยู่ใน Scope
-- Frontend โหลด `supabase-js` ผ่าน CDN จึงต้องมี Internet Access และควรทดสอบ CDN/CSP บน URL จริง
+- Email Notification และ Calendar/Scheduler ยังไม่อยู่ใน Scope รุ่นนี้
