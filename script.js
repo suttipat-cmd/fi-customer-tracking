@@ -5,8 +5,8 @@
 
   // Public browser configuration only. Never place a database password,
   // secret key, or service_role key in this file.
-  const SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co";
-  const SUPABASE_PUBLISHABLE_KEY = "YOUR_PUBLISHABLE_KEY";
+  const SUPABASE_URL = "https://edewezrgycqvhdtlprsw.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkZXdlenJneWNxdmhkdGxwcnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1Njc5NTIsImV4cCI6MjEwMTE0Mzk1Mn0.QPEkfCaRMOn77d_q5612MA1n-5EpJ7myiUdBpCFqQX8";
 
   const LABELS = {
     role: { admin: "Admin", manager: "Manager", user: "User" },
