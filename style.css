@@ -1,4 +1,4 @@
-/* FI Customer Tracking v0.8.0-customer-data-restructure */
+/* FI Customer Tracking v0.9.0-customer-accounts-report-groups */
 :root {
   --brand-blue: #3573ef;
   --brand-blue-strong: #245cd8;
@@ -3848,5 +3848,149 @@ label > .field-help {
   .auth-showcase-media {
     width: min(100%, 520px);
     justify-self: center;
+  }
+}
+
+
+/* v0.9.0 customer accounts and report customer groups */
+.customer-subsection + .customer-subsection {
+  margin-top: 26px;
+  border-top: 1px solid var(--border);
+  padding-top: 26px;
+}
+
+.subsection-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.subsection-header h2,
+.subsection-header h3,
+.subsection-header p {
+  margin-bottom: 0;
+}
+
+.subsection-header p {
+  margin-top: 3px;
+}
+
+.customer-secret-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 7px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.customer-secret-summary code {
+  margin-left: 4px;
+  letter-spacing: 0.05em;
+}
+
+.credential-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 7px 12px;
+  margin: 12px 0 0;
+}
+
+.credential-list dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.credential-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.customer-user-detail-card code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.panel-subsection {
+  margin-bottom: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  padding: 18px;
+}
+
+.report-customer-group .subsection-header {
+  margin-bottom: 14px;
+}
+
+.report-customer-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 10px;
+}
+
+.report-customer-choice {
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.report-group-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.report-use-group {
+  margin: 2px 0 0;
+}
+
+.report-item-editor > [data-report-group-summary] {
+  display: block;
+  margin-top: -4px;
+}
+
+.report-item-customer-tags {
+  margin-top: 7px;
+}
+
+.report-summary li + li {
+  margin-top: 10px;
+}
+
+@media (max-width: 900px) {
+  .report-customer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .subsection-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .subsection-header .btn {
+    width: 100%;
+  }
+
+  .report-customer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .credential-list {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .credential-list dd + dt {
+    margin-top: 8px;
   }
 }
