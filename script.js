@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.7.0-system-settings";
+  const APP_VERSION = "0.7.1-settings-hotfix";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -1108,7 +1108,17 @@ async function runExcelExport(button, exporter) {
     }
   }
 
-  function applySystemBranding() {
+  
+  function mediaMimeTypeFromPath(path) {
+    const cleanPath = String(path || "").split(/[?#]/, 1)[0].toLowerCase();
+    if (cleanPath.endsWith(".ico")) return "image/x-icon";
+    if (cleanPath.endsWith(".webp")) return "image/webp";
+    if (cleanPath.endsWith(".jpg") || cleanPath.endsWith(".jpeg")) return "image/jpeg";
+    if (cleanPath.endsWith(".svg")) return "image/svg+xml";
+    return "image/png";
+  }
+
+function applySystemBranding() {
     const settings = state.systemSettings || {};
     const loginUrl = publicMediaUrl(settings.login_image_path, settings.updated_at || APP_VERSION);
     if (el.loginBrandingMedia) {
@@ -1122,34 +1132,49 @@ async function runExcelExport(button, exporter) {
       const faviconUrl = publicMediaUrl(settings.favicon_path, settings.updated_at || APP_VERSION);
       el.appFavicon.href = faviconUrl || DEFAULT_FAVICON;
       el.appFavicon.type = settings.favicon_path
-        ? (settings.favicon_path.endsWith(".ico") ? "image/x-icon" : "image/png")
+        ? mediaMimeTypeFromPath(settings.favicon_path)
         : "image/svg+xml";
     }
   }
 
   async function loadPublicSettings(force = false) {
-    if (!state.client || (state.publicSettingsLoaded && !force)) return;
-    const result = await state.client
-      .from("app_settings")
-      .select("id,login_image_path,favicon_path,updated_at")
-      .eq("id", 1)
-      .maybeSingle();
-    if (result.error) {
-      if (/relation .*app_settings.*does not exist|Could not find the table/i.test(result.error.message || "")) {
-        state.publicSettingsLoaded = true;
+    if (!state.client || (state.publicSettingsLoaded && !force)) return true;
+
+    try {
+      const result = await state.client
+        .from("app_settings")
+        .select("id,login_image_path,favicon_path,updated_at")
+        .eq("id", 1)
+        .maybeSingle();
+
+      if (result.error) {
+        const missingTable = /relation .*app_settings.*does not exist|Could not find the table/i
+          .test(result.error.message || "");
+        if (!missingTable) {
+          console.warn("โหลดการตั้งค่าภาพระบบไม่สำเร็จ จึงใช้ค่าเริ่มต้น", result.error);
+          state.publicSettingsLoaded = false;
+        } else {
+          state.publicSettingsLoaded = true;
+        }
         applySystemBranding();
-        return;
+        return false;
       }
-      throw result.error;
+
+      state.systemSettings = result.data || {
+        id: 1,
+        login_image_path: null,
+        favicon_path: null,
+        updated_at: null
+      };
+      state.publicSettingsLoaded = true;
+      applySystemBranding();
+      return true;
+    } catch (error) {
+      console.warn("โหลดการตั้งค่าภาพระบบไม่สำเร็จ จึงใช้ค่าเริ่มต้น", error);
+      state.publicSettingsLoaded = false;
+      applySystemBranding();
+      return false;
     }
-    state.systemSettings = result.data || {
-      id: 1,
-      login_image_path: null,
-      favicon_path: null,
-      updated_at: null
-    };
-    state.publicSettingsLoaded = true;
-    applySystemBranding();
   }
 
   function externalUrl(value) {
@@ -1355,6 +1380,24 @@ async function runExcelExport(button, exporter) {
       : `<div class="media-preview-empty">${icon("image")}<span>ยังไม่ได้ตั้งค่ารูปภาพ</span></div>`;
   }
 
+  function updateBrandingControls(kind) {
+    const isLogin = kind === "login";
+    const column = isLogin ? "login_image_path" : "favicon_path";
+    const preview = document.getElementById(isLogin ? "login-image-preview" : "favicon-image-preview");
+    const input = document.getElementById(isLogin ? "login-image-file" : "favicon-image-file");
+    const removeButton = document.querySelector(`[data-action="remove-branding-image"][data-kind="${kind}"]`);
+
+    if (preview) {
+      preview.innerHTML = brandingPreview(
+        state.systemSettings?.[column],
+        isLogin ? "ภาพหน้าเข้าสู่ระบบ" : "ไอคอนแท็บเบราว์เซอร์"
+      );
+    }
+    if (input) input.value = "";
+    if (removeButton) removeButton.disabled = !state.systemSettings?.[column];
+  }
+
+
   async function renderSystemSettingsPage() {
     await loadPublicSettings(true);
     const settings = state.systemSettings || {};
@@ -1422,6 +1465,7 @@ async function runExcelExport(button, exporter) {
       showToast("กรุณาเลือกไฟล์รูปภาพ", "warning");
       return;
     }
+
     setButtonBusy(button, true, "กำลังอัปโหลด...");
     try {
       await validateImageFile(file, {
@@ -1431,25 +1475,33 @@ async function runExcelExport(button, exporter) {
           : ["image/png", "image/webp", "image/x-icon", "image/vnd.microsoft.icon"],
         requireSquare: true
       });
-      const nextPath = await uploadMedia(file, isLogin ? "branding/login" : "branding/favicon", PUBLIC_MEDIA_BUCKET);
+
+      const nextPath = await uploadMedia(
+        file,
+        isLogin ? "branding/login" : "branding/favicon",
+        PUBLIC_MEDIA_BUCKET
+      );
       const column = isLogin ? "login_image_path" : "favicon_path";
       const previousPath = state.systemSettings?.[column] || null;
+
       const { data, error } = await state.client
         .from("app_settings")
         .update({ [column]: nextPath })
         .eq("id", 1)
         .select("id,login_image_path,favicon_path,updated_at")
         .single();
+
       if (error) {
         await removeMedia(nextPath);
         throw error;
       }
+
       state.systemSettings = data;
       state.publicSettingsLoaded = true;
       applySystemBranding();
+      updateBrandingControls(kind);
       await removeMedia(previousPath);
       showToast("บันทึกรูปภาพแล้ว");
-      await renderSystemSettingsPage();
     } catch (error) {
       showError(error, "บันทึกรูปภาพไม่สำเร็จ");
     } finally {
@@ -1457,32 +1509,97 @@ async function runExcelExport(button, exporter) {
     }
   }
 
-  async function removeBrandingImage(kind) {
+  async function removeBrandingImage(kind, button = null) {
     const isLogin = kind === "login";
     const column = isLogin ? "login_image_path" : "favicon_path";
     const previousPath = state.systemSettings?.[column] || null;
     if (!previousPath) return;
+
     const confirmed = await confirmAction(
       isLogin ? "ต้องการลบภาพหน้าเข้าสู่ระบบหรือไม่" : "ต้องการลบไอคอนแท็บเบราว์เซอร์หรือไม่",
       "ยืนยันการลบ",
       "ลบ"
     );
     if (!confirmed) return;
-    const { data, error } = await state.client
-      .from("app_settings")
-      .update({ [column]: null })
-      .eq("id", 1)
-      .select("id,login_image_path,favicon_path,updated_at")
-      .single();
-    if (error) throw error;
-    state.systemSettings = data;
-    applySystemBranding();
-    await removeMedia(previousPath);
-    showToast("ลบรูปภาพแล้ว");
-    await renderSystemSettingsPage();
+
+    setButtonBusy(button, true, "กำลังลบ...");
+    try {
+      const { data, error } = await state.client
+        .from("app_settings")
+        .update({ [column]: null })
+        .eq("id", 1)
+        .select("id,login_image_path,favicon_path,updated_at")
+        .single();
+
+      if (error) throw error;
+
+      state.systemSettings = data;
+      state.publicSettingsLoaded = true;
+      applySystemBranding();
+      updateBrandingControls(kind);
+      await removeMedia(previousPath);
+      showToast("ลบรูปภาพแล้ว");
+    } finally {
+      setButtonBusy(button, false);
+    }
   }
 
-  function externalLinkCards() {
+  
+  async function loadExternalLinksData() {
+    const { data, error } = await state.client
+      .from("external_links")
+      .select("id,display_name,url,sort_order,is_active,created_at,updated_at")
+      .order("sort_order")
+      .order("display_name");
+    if (error) throw error;
+    state.externalLinks = data || [];
+    return state.externalLinks;
+  }
+
+  async function loadMasterGroupData(groupKey) {
+    const config = MASTER_GROUPS[groupKey];
+    if (!config) throw new Error("ไม่พบหมวดข้อมูลตัวเลือกกลาง");
+
+    if (config.source === "modules" || config.source === "features") {
+      let result = await state.client
+        .from(config.source)
+        .select("id,code,name,is_active,sort_order")
+        .order("sort_order")
+        .order("name");
+
+      if (result.error && /sort_order|column .* does not exist/i.test(result.error.message || "")) {
+        result = await state.client
+          .from(config.source)
+          .select("id,code,name,is_active")
+          .order("name");
+      }
+      if (result.error) throw result.error;
+
+      const rows = (result.data || []).map((item) => ({
+        ...item,
+        sort_order: Number(item.sort_order || 0)
+      }));
+      if (config.source === "modules") state.modules = rows;
+      else state.features = rows;
+      return rows;
+    }
+
+    const { data, error } = await state.client
+      .from("master_options")
+      .select("id,group_key,option_value,display_name,sort_order,is_active,created_at,updated_at")
+      .eq("group_key", groupKey)
+      .order("sort_order")
+      .order("display_name");
+    if (error) throw error;
+
+    state.masterOptions = [
+      ...state.masterOptions.filter((item) => item.group_key !== groupKey),
+      ...(data || [])
+    ];
+    return data || [];
+  }
+
+function externalLinkCards() {
     const rows = [...state.externalLinks].sort((a, b) =>
       Number(a.sort_order || 0) - Number(b.sort_order || 0)
       || String(a.display_name).localeCompare(String(b.display_name), "th")
@@ -1510,8 +1627,16 @@ async function runExcelExport(button, exporter) {
     `).join("");
   }
 
+  function renderExternalLinksList() {
+    const count = document.getElementById("external-link-count");
+    const list = document.getElementById("external-link-list");
+    if (count) count.textContent = `${state.externalLinks.length.toLocaleString("th-TH")} รายการ`;
+    if (list) list.innerHTML = externalLinkCards();
+  }
+
+
   async function renderExternalLinksPage() {
-    await loadCommonData(true);
+    await loadExternalLinksData();
     el.mainContent.innerHTML = `
       ${pageHeader(
         "ลิงก์เว็บไซต์ภายนอก",
@@ -1549,9 +1674,9 @@ async function runExcelExport(button, exporter) {
         <section class="panel">
           <div class="panel-header">
             <h2>รายการลิงก์</h2>
-            <span class="muted">${state.externalLinks.length.toLocaleString("th-TH")} รายการ</span>
+            <span id="external-link-count" class="muted">${state.externalLinks.length.toLocaleString("th-TH")} รายการ</span>
           </div>
-          <div class="panel-body stack">${externalLinkCards()}</div>
+          <div id="external-link-list" class="panel-body stack" aria-live="polite">${externalLinkCards()}</div>
         </section>
       </div>`;
   }
@@ -1582,30 +1707,47 @@ async function runExcelExport(button, exporter) {
     event.preventDefault();
     const form = event.target;
     if (!form.reportValidity()) return;
+
     const button = document.getElementById("external-link-save-button");
     const data = new FormData(form);
+    const id = String(data.get("id") || "");
     const url = externalUrl(data.get("url"));
+
     if (!url) {
       showToast("URL ต้องขึ้นต้นด้วย http:// หรือ https://", "error");
       return;
     }
+
     const payload = {
       display_name: String(data.get("display_name") || "").trim(),
       url,
       sort_order: Number(data.get("sort_order") || 0),
       is_active: data.get("is_active") === "on"
     };
+
     setButtonBusy(button, true, "กำลังบันทึก...");
     try {
-      const id = String(data.get("id") || "");
-      const query = id
+      let query = id
         ? state.client.from("external_links").update(payload).eq("id", id)
         : state.client.from("external_links").insert(payload);
-      const { error } = await query;
+
+      query = query
+        .select("id,display_name,url,sort_order,is_active,created_at,updated_at")
+        .single();
+
+      const { data: savedRow, error } = await query;
       if (error) throw error;
+
+      if (id) {
+        state.externalLinks = state.externalLinks.map((row) => row.id === id ? savedRow : row);
+      } else {
+        state.externalLinks = [...state.externalLinks, savedRow];
+      }
+
+      resetExternalLinkForm();
+      renderExternalLinksList();
+      renderNavigation();
       showToast(id ? "แก้ไขลิงก์แล้ว" : "เพิ่มลิงก์แล้ว");
-      state.configurationLoaded = false;
-      await renderExternalLinksPage();
     } catch (error) {
       showError(error, "บันทึกลิงก์ไม่สำเร็จ");
     } finally {
@@ -1613,20 +1755,30 @@ async function runExcelExport(button, exporter) {
     }
   }
 
-  async function deleteExternalLink(id) {
+  async function deleteExternalLink(id, button = null) {
     const item = state.externalLinks.find((row) => row.id === id);
     if (!item) return;
+
     const confirmed = await confirmAction(
       `ต้องการลบลิงก์ “${item.display_name}” หรือไม่`,
       "ลบลิงก์เว็บไซต์",
       "ลบ"
     );
     if (!confirmed) return;
-    const { error } = await state.client.from("external_links").delete().eq("id", id);
-    if (error) throw error;
-    showToast("ลบลิงก์แล้ว");
-    state.configurationLoaded = false;
-    await renderExternalLinksPage();
+
+    setButtonBusy(button, true, "กำลังลบ...");
+    try {
+      const { error } = await state.client.from("external_links").delete().eq("id", id);
+      if (error) throw error;
+
+      state.externalLinks = state.externalLinks.filter((row) => row.id !== id);
+      resetExternalLinkForm();
+      renderExternalLinksList();
+      renderNavigation();
+      showToast("ลบลิงก์แล้ว");
+    } finally {
+      setButtonBusy(button, false);
+    }
   }
 
   function masterRows(groupKey) {
@@ -1681,11 +1833,27 @@ async function runExcelExport(button, exporter) {
     `).join("");
   }
 
+  function renderMasterDataList(groupKey) {
+    const rows = masterRows(groupKey);
+    const count = document.getElementById("master-option-count");
+    const list = document.getElementById("master-option-list");
+    if (count) count.textContent = `${rows.length.toLocaleString("th-TH")} รายการ`;
+    if (list) list.innerHTML = masterListHtml(groupKey);
+  }
+
+
   async function renderMasterDataPage(groupKey = null) {
-    await loadCommonData(true);
     const selectedGroup = MASTER_GROUPS[groupKey] ? groupKey : Object.keys(MASTER_GROUPS)[0];
+    await loadMasterGroupData(selectedGroup);
+
     const config = MASTER_GROUPS[selectedGroup];
     const rows = masterRows(selectedGroup);
+    const isCodeGroup = config.source === "modules" || config.source === "features";
+    const codePattern = isCodeGroup ? "[A-Za-z0-9_]+" : "[A-Za-z0-9_\\-ก-๙ .()/]+";
+    const codeTitle = isCodeGroup
+      ? "ใช้ตัวอักษรอังกฤษ ตัวเลข และขีดล่างเท่านั้น"
+      : "ใช้ตัวอักษร ตัวเลข และสัญลักษณ์พื้นฐาน";
+
     el.mainContent.innerHTML = `
       ${pageHeader(
         "ข้อมูลตัวเลือกกลาง",
@@ -1712,7 +1880,8 @@ async function runExcelExport(button, exporter) {
             <input name="id" type="hidden">
             <label>
               <span class="field-label">รหัสค่า <span class="required">*</span></span>
-              <input name="option_value" maxlength="100" pattern="[A-Za-z0-9_\\-ก-๙ .()/]+" required>
+              <input name="option_value" maxlength="100" pattern="${h(codePattern)}"
+                     title="${h(codeTitle)}" autocomplete="off" required>
             </label>
             <label>
               <span class="field-label">ชื่อที่แสดง <span class="required">*</span></span>
@@ -1735,9 +1904,9 @@ async function runExcelExport(button, exporter) {
         <section class="panel">
           <div class="panel-header">
             <h2>รายการ ${h(config.label)}</h2>
-            <span class="muted">${rows.length.toLocaleString("th-TH")} รายการ</span>
+            <span id="master-option-count" class="muted">${rows.length.toLocaleString("th-TH")} รายการ</span>
           </div>
-          <div class="panel-body stack">${masterListHtml(selectedGroup)}</div>
+          <div id="master-option-list" class="panel-body stack" aria-live="polite">${masterListHtml(selectedGroup)}</div>
         </section>
       </div>`;
   }
@@ -1770,21 +1939,30 @@ async function runExcelExport(button, exporter) {
     event.preventDefault();
     const form = event.target;
     if (!form.reportValidity()) return;
+
     const groupKey = form.dataset.group;
     const config = MASTER_GROUPS[groupKey];
     if (!config) return;
+
     const button = document.getElementById("master-option-save-button");
     const data = new FormData(form);
     const id = String(data.get("id") || "");
+    const rawOptionValue = String(data.get("option_value") || "").trim();
+    const optionValue = config.source === "modules" || config.source === "features"
+      ? rawOptionValue.toLowerCase()
+      : rawOptionValue;
+
     const payload = {
       display_name: String(data.get("display_name") || "").trim(),
       sort_order: Number(data.get("sort_order") || 0),
       is_active: data.get("is_active") === "on"
     };
-    if (!id) payload.option_value = String(data.get("option_value") || "").trim();
+    if (!id) payload.option_value = optionValue;
+
     setButtonBusy(button, true, "กำลังบันทึก...");
     try {
-      let query;
+      let result;
+
       if (config.source === "modules" || config.source === "features") {
         const table = config.source;
         const tablePayload = {
@@ -1792,10 +1970,15 @@ async function runExcelExport(button, exporter) {
           sort_order: payload.sort_order,
           is_active: payload.is_active
         };
-        if (!id) tablePayload.code = payload.option_value.toLowerCase().replace(/\s+/g, "_");
-        query = id
+        if (!id) tablePayload.code = payload.option_value;
+
+        let query = id
           ? state.client.from(table).update(tablePayload).eq("id", id)
           : state.client.from(table).insert(tablePayload);
+
+        result = await query
+          .select("id,code,name,is_active,sort_order")
+          .single();
       } else {
         const tablePayload = {
           group_key: groupKey,
@@ -1804,15 +1987,36 @@ async function runExcelExport(button, exporter) {
           is_active: payload.is_active
         };
         if (!id) tablePayload.option_value = payload.option_value;
-        query = id
+
+        let query = id
           ? state.client.from("master_options").update(tablePayload).eq("id", id)
           : state.client.from("master_options").insert(tablePayload);
+
+        result = await query
+          .select("id,group_key,option_value,display_name,sort_order,is_active,created_at,updated_at")
+          .single();
       }
-      const { error } = await query;
-      if (error) throw error;
+
+      if (result.error) throw result.error;
+      const savedRow = result.data;
+
+      if (config.source === "modules") {
+        state.modules = id
+          ? state.modules.map((row) => row.id === id ? savedRow : row)
+          : [...state.modules, savedRow];
+      } else if (config.source === "features") {
+        state.features = id
+          ? state.features.map((row) => row.id === id ? savedRow : row)
+          : [...state.features, savedRow];
+      } else {
+        state.masterOptions = id
+          ? state.masterOptions.map((row) => row.id === id ? savedRow : row)
+          : [...state.masterOptions, savedRow];
+      }
+
+      resetMasterOptionForm();
+      renderMasterDataList(groupKey);
       showToast(id ? "แก้ไขรายการแล้ว" : "เพิ่มรายการแล้ว");
-      state.configurationLoaded = false;
-      await renderMasterDataPage(groupKey);
     } catch (error) {
       showError(error, "บันทึกข้อมูลตัวเลือกไม่สำเร็จ");
     } finally {
@@ -4915,7 +5119,7 @@ async function deleteCustomer(customerId) {
             await saveBrandingImage(target.dataset.kind, target);
             break;
           case "remove-branding-image":
-            await removeBrandingImage(target.dataset.kind);
+            await removeBrandingImage(target.dataset.kind, target);
             break;
           case "reset-external-link-form":
             resetExternalLinkForm();
@@ -4924,7 +5128,7 @@ async function deleteCustomer(customerId) {
             editExternalLink(target.dataset.id);
             break;
           case "delete-external-link":
-            await deleteExternalLink(target.dataset.id);
+            await deleteExternalLink(target.dataset.id, target);
             break;
           case "reset-master-option-form":
             resetMasterOptionForm();

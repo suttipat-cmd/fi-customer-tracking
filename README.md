@@ -1,13 +1,26 @@
 # FI Customer Tracking Web App
 
-> **Current version:** `0.7.0-system-settings`  
-> **Base version:** `0.6.1-interface-polish`  
-> **Current status:** Full-release package prepared with Frontend changes plus Migration `005_system_settings_media_master_data`. The release adds public branding media, profile avatars, external website links and configurable master data. SQL and Frontend have been statically validated but have not yet been runtime-tested against the real Supabase project.  
+> **Current version:** `0.7.1-settings-hotfix`  
+> **Base version:** `0.7.0-system-settings`  
+> **Current status:** Frontend hotfix prepared for system settings. Saving external links, master data and branding now updates only the affected content instead of rebuilding the whole page. Navigation refreshes immediately, public branding failures no longer block Login, favicon MIME is derived from the uploaded file type, and Module/Feature code validation matches the database constraint. Database schema, RLS, Storage policies and Migration `005_system_settings_media_master_data` are unchanged. Static checks passed; runtime testing against the real Supabase project is still required.  
 
 > **Runtime stack:** GitHub Pages + Plain HTML/CSS/JavaScript + Supabase Auth/PostgreSQL  
 > **Application repository:** `fi-customer-tracking`
 
 ## Changelog
+
+### 0.7.1-settings-hotfix
+
+- แก้อาการหน้า `ลิงก์เว็บไซต์ภายนอก` และ `ข้อมูลตัวเลือกกลาง` กะพริบเหมือน Refresh หลังบันทึก
+- เปลี่ยนการบันทึกให้รับ Row ที่บันทึกสำเร็จกลับมา แล้วอัปเดต State, จำนวนรายการ และ List เฉพาะส่วน
+- หลังเพิ่ม แก้ไข ปิดใช้งาน หรือลบลิงก์ เมนูเว็บไซต์ภายนอกใน Sidebar อัปเดตทันที
+- แยกการโหลดข้อมูลลิงก์และ Master ออกจาก `loadCommonData()` เพื่อลด Query ที่ไม่เกี่ยวข้องและไม่สร้าง Signed URL รูปโปรไฟล์ซ้ำ
+- ปรับ Module/Feature code ให้รับเฉพาะตัวอักษรอังกฤษ ตัวเลข และ `_` ก่อนแปลงเป็นตัวพิมพ์เล็กให้ตรงกับ Database CHECK
+- แก้ MIME ของ Favicon ให้รองรับ PNG, WebP, JPEG, ICO และ SVG ตามนามสกุลจริง
+- การโหลด Branding ก่อน Login เป็น Optional Failure: หาก Query ล้มเหลว ระบบใช้ภาพและไอคอนเริ่มต้นต่อโดยไม่หยุด Login
+- การบันทึก/ลบภาพ Branding อัปเดต Preview เฉพาะการ์ด ไม่สร้างหน้าตั้งค่าทั้งหน้าใหม่
+- อัปเดต Cache Busting และ Internal Version Stamp เป็น `0.7.1-settings-hotfix`
+- ไม่มี SQL Migration ใหม่ และไม่เปลี่ยน Schema, RLS, RPC หรือ Storage Policy
 
 ### 0.7.0-system-settings
 
@@ -1172,9 +1185,14 @@ Migration policy:
 - ผู้ดูแลระบบเปลี่ยน/ลบรูปโปรไฟล์ทุกบัญชีได้
 - รูปที่ไม่ใช่ 1:1, MIME ไม่รองรับ หรือเกินขนาดถูกปฏิเสธ
 - ภาพหน้า Login และ Favicon โหลดได้ก่อน Login
+- หากโหลด `app_settings` ไม่สำเร็จ Login ยังทำงานต่อด้วยภาพและ Favicon เริ่มต้น
+- Favicon PNG, WebP และ ICO ถูกกำหนด MIME ตรงกับไฟล์จริง
 - ผู้ใช้ทั่วไปอัปโหลด Branding ไม่ได้จาก Storage API
 - External Links แสดงเฉพาะรายการเปิดใช้งาน เปิดแท็บใหม่ และ URL ไม่ปลอดภัยถูกปฏิเสธ
+- บันทึก/แก้ไข/ลบ External Link แล้ว List และ Sidebar อัปเดตทันทีโดยหน้าไม่กะพริบหรือเลื่อนกลับด้านบน
 - Master Data ทั้ง 8 กลุ่มเพิ่ม แก้ไข จัดลำดับ และปิดใช้งานได้
+- บันทึก Master Data แล้วอัปเดตเฉพาะรายการในหมวดเดิม โดยฟอร์มไม่ถูกสร้างใหม่ทั้งหน้า
+- Module/Feature code ปฏิเสธอักษรไทย ช่องว่าง ขีดกลาง และสัญลักษณ์ที่ Database ไม่รองรับ
 - ค่าที่ปิดใช้งานไม่แสดงในฟอร์มใหม่ แต่ข้อมูลเก่ายังแสดงชื่อได้
 - Required Marker, Focus Border และ Focus Ring เปลี่ยนตาม Accent Color
 - Customer List ใช้ AG Grid: Sort, Filter, Resize, Pin และ Pagination
@@ -1225,8 +1243,8 @@ Migration policy:
 - Customer Soft Delete จาก List/Detail โดยไม่มี Restore UI
 - User Profile, Avatar และ Theme Settings
 - Admin System Branding Settings สำหรับ Login Image/Favicon
-- Admin External Website Links
-- Admin Master Data Settings 8 กลุ่ม
+- Admin External Website Links พร้อม Partial DOM Update และ Sidebar Refresh ทันที
+- Admin Master Data Settings 8 กลุ่ม พร้อม Partial DOM Update เฉพาะรายการ
 - External Website Links ใน Sidebar ของผู้ใช้งานทุก Role
 - User Daily Report
 - Manager Report Review/Acknowledge/Revision ด้วย AG Grid Community และ Excel
@@ -1254,7 +1272,7 @@ Migration policy:
 - Browser Tab Title: `ระบบติดตามลูกค้า` คงที่ทุก Route
 - Responsive breakpoint หลัก: 1,180px, 820px และ 480px
 
-Release `0.7.0` ใช้ Migration `005_system_settings_media_master_data` และไม่เปลี่ยน Daily Report Workflow
+Release `0.7.1-settings-hotfix` ใช้ Schema/Policy จาก Migration `005_system_settings_media_master_data` เดิม และไม่เปลี่ยน Daily Report Workflow
 Customer Delete ใน Frontend ใช้ `archive_customer` เดิมเป็น Soft Delete แบบไม่มี Restore UI
 ไฟล์ภาพไม่เก็บใน Repository แต่เก็บใน Public Storage Bucket และบันทึกเฉพาะ Path ในฐานข้อมูล
 
@@ -1302,8 +1320,8 @@ http://localhost:8080
 `index.html` โหลดไฟล์ด้วย:
 
 ```text
-style.css?v=0.7.0-system-settings
-script.js?v=0.7.0-system-settings
+style.css?v=0.7.1-settings-hotfix
+script.js?v=0.7.1-settings-hotfix
 ```
 
 เมื่อ Release ใหม่ต้องอัปเดต Version ใน:
@@ -1316,16 +1334,14 @@ script.js?v=0.7.0-system-settings
 
 ### Frontend Rollback
 
-หาก v0.7.0 มีปัญหาหลัง Deploy:
+หาก `0.7.1-settings-hotfix` มีปัญหาหลัง Deploy:
 
-1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ v0.6.1
+1. Restore `README.md`, `index.html`, `script.js`, `style.css` จาก Tag/Commit ของ `0.7.0-system-settings`
 2. Push กลับไปที่ `main`
 3. รอ GitHub Pages Deploy และ Hard Refresh
-4. ทดสอบ Login, Customer, Daily Report และ Team Report
-5. Frontend v0.6.1 จะเพิกเฉยต่อ Tables/Columns ใหม่ จึง Rollback Frontend ก่อนได้
-6. เมื่อต้องการย้อน Database ให้ตรวจ Compatibility Guard แล้วรัน `005_system_settings_media_master_data_rollback.sql`
-7. Rollback SQL ไม่ลบไฟล์ Storage อัตโนมัติ และจะเปลี่ยน Bucket เป็น Private
-8. สำรองไฟล์ Branding/Avatar ก่อนลบ Bucket หรือ Objects ด้วยตนเอง
+4. ทดสอบ Login, External Links, Master Data, Branding และเมนู Sidebar
+5. Hotfix นี้ไม่มี Database Change จึงไม่ต้อง Rollback SQL
+6. Migration `005_system_settings_media_master_data` และข้อมูลเดิมยังคงอยู่
 
 ### System Settings Migration Rollback
 
@@ -1396,7 +1412,7 @@ Full Database Rollback จะลบ Application Tables และข้อมู�
 
 ## 18. Known Limitations
 
-- Frontend v0.7.0 และ Migration 005 ต้องทดสอบกับ Supabase Project จริงหลัง Deploy
+- Frontend `0.7.1-settings-hotfix` และ Migration 005 ต้องทดสอบกับ Supabase Project จริงหลัง Deploy
 - AG Grid, AG Charts และ SheetJS โหลดผ่าน CDN จึงต้องมี Internet Access และ CSP ต้องอนุญาต `cdn.jsdelivr.net`
 - หาก AG CDN ล้มเหลว หน้าที่ใช้ Grid/Chart จะแสดง Error State แต่ไม่มีตารางสำรอง
 - Excel Export ส่งออกเฉพาะข้อมูลที่โหลดเข้า Browser และผ่านสิทธิ์/ตัวกรองปัจจุบัน
