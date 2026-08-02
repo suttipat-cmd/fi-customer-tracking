@@ -1,3 +1,4 @@
+/* FI Customer Tracking v0.8.0-customer-data-restructure */
 :root {
   --brand-blue: #3573ef;
   --brand-blue-strong: #245cd8;
@@ -3619,26 +3620,8 @@ label > .field-help {
   height: 34px;
 }
 
-.external-link-admin-card,
 .master-option-card {
   min-width: 0;
-}
-
-.external-link-url {
-  max-width: 680px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.external-nav-group .nav-link {
-  align-items: flex-start;
-}
-
-.external-nav-group .nav-link > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .master-toolbar-panel {
@@ -3727,5 +3710,143 @@ label > .field-help {
   .auth-showcase-media {
     aspect-ratio: 1;
     min-height: 0;
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   v0.8.0 Customer data restructure and date range modal
+   -------------------------------------------------------------------------- */
+.auth-layout {
+  align-items: center;
+}
+
+.auth-showcase-media {
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 1;
+  align-self: center;
+  background-size: cover;
+  background-position: center;
+}
+
+.profile-settings-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.grid-edit-cell {
+  width: 100%;
+  display: grid;
+  align-items: center;
+  gap: 6px;
+}
+
+.grid-edit-cell .tag {
+  justify-self: start;
+}
+
+.date-range-filter-field {
+  display: grid;
+  align-content: end;
+  gap: 6px;
+}
+
+.date-range-filter-field .field-label {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.date-range-trigger {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 9px 12px;
+  text-align: left;
+}
+
+.date-range-trigger:hover {
+  border-color: var(--primary);
+  background: var(--surface-subtle);
+}
+
+.date-range-trigger svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+
+.dialog-date-range {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.date-range-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.date-range-preset {
+  min-height: 42px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  padding: 8px 10px;
+  font-weight: 700;
+}
+
+.date-range-preset:hover,
+.date-range-preset.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+}
+
+.date-range-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 14px;
+}
+
+.date-range-fields .form-field,
+.date-range-fields label {
+  margin: 0;
+}
+
+.date-range-separator {
+  display: grid;
+  min-height: 42px;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .date-range-presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .date-range-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .date-range-separator {
+    display: none;
+  }
+
+  .auth-showcase-media {
+    width: min(100%, 520px);
+    justify-self: center;
   }
 }

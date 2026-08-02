@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.7.1-settings-hotfix";
+  const APP_VERSION = "0.8.0-customer-data-restructure";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -18,9 +18,7 @@
     onboarding_stage: { label: "ขั้นตอนเริ่มใช้งาน", source: "master_options" },
     import_status: { label: "สถานะการนำเข้าข้อมูล", source: "master_options" },
     engagement_level: { label: "ระดับความสนใจ", source: "master_options" },
-    activity_type: { label: "ประเภทกิจกรรม", source: "master_options" },
-    driver_payment_method: { label: "วิธีจ่ายพนักงานขับรถ", source: "master_options" },
-    trip_expense_management: { label: "รูปแบบจัดการค่าใช้จ่ายเที่ยว", source: "master_options" }
+    contract_type: { label: "ประเภทสัญญา", source: "master_options" }
   };
 
   const LABELS = {
@@ -35,18 +33,12 @@
     },
     import_status: { waiting: "รอดำเนินการ", in_process: "กำลังดำเนินการ", done: "เสร็จแล้ว" },
     engagement_level: { interest: "สนใจ", neutral: "ทั่วไป" },
+    contract_type: { monthly: "รายเดือน", annual: "รายปี" },
     report_status: {
       draft: "ฉบับร่าง",
       submitted: "ส่งแล้ว",
       acknowledged: "รับทราบแล้ว",
       revision_required: "ส่งกลับให้แก้ไข"
-    },
-    activity_type: {
-      note: "หมายเหตุ",
-      call: "โทรศัพท์",
-      meeting: "ประชุม",
-      follow_up: "ติดตาม",
-      system: "ระบบ"
     },
     event_type: {
       created: "สร้างรายงาน",
@@ -69,7 +61,6 @@
     modules: [],
     features: [],
     masterOptions: [],
-    externalLinks: [],
     systemSettings: {
       id: 1,
       login_image_path: null,
@@ -107,6 +98,7 @@
         onboarding: "",
         importStatus: "",
         engagement: "",
+        contractType: "",
         moduleId: "",
         featureId: "",
         fleetMin: "",
@@ -122,7 +114,13 @@
         userId: "",
         status: ""
       },
-      profileDrafts: new Map()
+      profileDrafts: new Map(),
+      dateRangeDraft: {
+        kind: null,
+        from: "",
+        to: "",
+        preset: ""
+      }
     }
   };
 
@@ -149,6 +147,13 @@
     avatarFile: document.getElementById("avatar-file"),
     avatarRemoveButton: document.getElementById("avatar-remove-button"),
     avatarSaveButton: document.getElementById("avatar-save-button"),
+    dateRangeDialog: document.getElementById("date-range-dialog"),
+    dateRangeForm: document.getElementById("date-range-form"),
+    dateRangeTitle: document.getElementById("date-range-title"),
+    dateRangeFromDisplay: document.getElementById("date-range-from-display"),
+    dateRangeFrom: document.getElementById("date-range-from"),
+    dateRangeToDisplay: document.getElementById("date-range-to-display"),
+    dateRangeTo: document.getElementById("date-range-to"),
     loadingOverlay: document.getElementById("loading-overlay"),
     loadingText: document.getElementById("loading-text"),
     contactDialog: document.getElementById("contact-dialog"),
@@ -178,10 +183,9 @@
     const trimmed = String(value ?? "").trim();
     return trimmed === "" ? null : trimmed;
   }
-
   function label(group, value) {
     if (value === null || value === undefined || value === "") return "-";
-    const masterGroup = ["onboarding_stage", "import_status", "engagement_level", "activity_type", "driver_payment_method", "trip_expense_management"].includes(group)
+    const masterGroup = ["onboarding_stage", "import_status", "engagement_level", "contract_type"].includes(group)
       ? group
       : null;
     if (masterGroup) {
@@ -295,14 +299,18 @@
     const day = String(bangkok.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   }
-
   function normalizeError(error) {
     const message = error?.message || String(error || "เกิดข้อผิดพลาด");
     const known = [
+      ["customers_tax_id", "เลขประจำตัวผู้เสียภาษีนี้มีอยู่แล้ว"],
+      ["master_options_group_sort_order_uq", "ลำดับการแสดงนี้ถูกใช้งานแล้วในหมวดเดียวกัน"],
+      ["modules_sort_order_uq", "ลำดับการแสดงของโมดูลนี้ถูกใช้งานแล้ว"],
+      ["features_sort_order_uq", "ลำดับการแสดงของฟังก์ชันนี้ถูกใช้งานแล้ว"],
+      ["Sort order is already used", "ลำดับการแสดงนี้ถูกใช้งานแล้วในหมวดเดียวกัน"],
+      ["Sort order must be between 1 and 9999", "ลำดับการแสดงต้องเป็นจำนวนเต็มตั้งแต่ 1 ถึง 9999"],
+      ["Invalid contract type", "ประเภทสัญญาไม่ถูกต้องหรือถูกนำออกจากข้อมูลตัวเลือกกลาง"],
       ["Invalid login credentials", "อีเมลหรือรหัสผ่านไม่ถูกต้อง"],
       ["Email not confirmed", "บัญชียังไม่ได้ยืนยันอีเมล"],
-      ["duplicate key value", "ข้อมูลซ้ำกับรายการที่มีอยู่แล้ว"],
-      ["customers_tax_id", "เลขประจำตัวผู้เสียภาษีนี้มีอยู่แล้ว"],
       ["Only one active manager is allowed", "ระบบอนุญาตให้มีผู้จัดการที่เปิดใช้งานได้เพียง 1 คน"],
       ["Daily report is locked", "รายงานนี้ถูกล็อกแล้ว"],
       ["Report content changed", "เนื้อหารายงานมีการเปลี่ยนแปลง กรุณาโหลดใหม่"],
@@ -315,6 +323,7 @@
       ["Every owner must be an active profile", "ผู้รับผิดชอบทุกคนต้องเป็นบัญชีที่เปิดใช้งาน"],
       ["Contact name is required", "กรุณาระบุชื่อผู้ติดต่อ"],
       ["Customer contact not found", "ไม่พบข้อมูลผู้ติดต่อ"],
+      ["duplicate key value", "ข้อมูลซ้ำกับรายการที่มีอยู่แล้ว"],
       ["Failed to fetch", "เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ"],
       ["JWT expired", "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่"],
       ["Could not find the function", "ระบบฐานข้อมูลยังติดตั้งส่วนที่จำเป็นไม่ครบ"]
@@ -601,6 +610,139 @@ function dateControlHtml({
     const native = scope.querySelector(`[data-date-native][name="${CSS.escape(nameOrId)}"]`)
       || scope.querySelector(`#${CSS.escape(nameOrId)}[data-date-native]`);
     return native?.value || null;
+  }
+
+  function dateRangeConfig(kind) {
+    const configs = {
+      start: {
+        title: "ช่วงวันที่เริ่มใช้งานจริง",
+        fromKey: "startFrom",
+        toKey: "startTo"
+      },
+      billing: {
+        title: "ช่วงวันที่เริ่มวางบิล",
+        fromKey: "billingFrom",
+        toKey: "billingTo"
+      }
+    };
+    return configs[kind] || null;
+  }
+
+  function isoDate(year, month, day) {
+    return new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10);
+  }
+
+  function dateRangePresetValues(preset) {
+    const [year, month] = bangkokDate().split("-").map(Number);
+    if (preset === "this_month") {
+      return {
+        from: isoDate(year, month, 1),
+        to: isoDate(year, month + 1, 0)
+      };
+    }
+    if (preset === "last_month") {
+      return {
+        from: isoDate(year, month - 1, 1),
+        to: isoDate(year, month, 0)
+      };
+    }
+    if (preset === "this_year") {
+      return { from: isoDate(year, 1, 1), to: isoDate(year, 12, 31) };
+    }
+    if (preset === "last_year") {
+      return { from: isoDate(year - 1, 1, 1), to: isoDate(year - 1, 12, 31) };
+    }
+    return { from: "", to: "" };
+  }
+
+  function dateRangeButtonText(kind) {
+    const config = dateRangeConfig(kind);
+    if (!config) return "เลือกช่วงวันที่";
+    const from = state.ui.customerFilters[config.fromKey];
+    const to = state.ui.customerFilters[config.toKey];
+    if (!from && !to) return "ทั้งหมด";
+    if (from && to) return `${formatDate(from)} – ${formatDate(to)}`;
+    if (from) return `ตั้งแต่ ${formatDate(from)}`;
+    return `ถึง ${formatDate(to)}`;
+  }
+
+  function setDateRangeDialogValues(from = "", to = "") {
+    if (el.dateRangeFrom) {
+      el.dateRangeFrom.value = from || "";
+      syncDateControlFromNative(el.dateRangeFrom, false);
+    }
+    if (el.dateRangeTo) {
+      el.dateRangeTo.value = to || "";
+      syncDateControlFromNative(el.dateRangeTo, false);
+    }
+  }
+
+  function updateDateRangePresetButtons() {
+    document.querySelectorAll("[data-action='select-date-range-preset']").forEach((button) => {
+      button.classList.toggle("active", button.dataset.preset === state.ui.dateRangeDraft.preset);
+    });
+  }
+
+  function openDateRangeDialog(kind) {
+    const config = dateRangeConfig(kind);
+    if (!config || !el.dateRangeDialog) return;
+    const from = state.ui.customerFilters[config.fromKey] || "";
+    const to = state.ui.customerFilters[config.toKey] || "";
+    state.ui.dateRangeDraft = { kind, from, to, preset: "" };
+    if (el.dateRangeTitle) el.dateRangeTitle.textContent = config.title;
+    setDateRangeDialogValues(from, to);
+    updateDateRangePresetButtons();
+    openDialog(el.dateRangeDialog);
+  }
+
+  function selectDateRangePreset(preset) {
+    const values = dateRangePresetValues(preset);
+    state.ui.dateRangeDraft = {
+      ...state.ui.dateRangeDraft,
+      ...values,
+      preset
+    };
+    setDateRangeDialogValues(values.from, values.to);
+    updateDateRangePresetButtons();
+  }
+
+  function clearDateRangeDraft() {
+    state.ui.dateRangeDraft = {
+      ...state.ui.dateRangeDraft,
+      from: "",
+      to: "",
+      preset: ""
+    };
+    setDateRangeDialogValues("", "");
+    updateDateRangePresetButtons();
+  }
+
+  function renderDateRangeButtons() {
+    ["start", "billing"].forEach((kind) => {
+      const text = document.querySelector(`[data-date-range-label="${kind}"]`);
+      if (text) text.textContent = dateRangeButtonText(kind);
+    });
+  }
+
+  function saveDateRange(event) {
+    event.preventDefault();
+    const config = dateRangeConfig(state.ui.dateRangeDraft.kind);
+    if (!config || !el.dateRangeForm) return;
+    if (!validateDateControls(el.dateRangeForm) || !el.dateRangeForm.reportValidity()) return;
+
+    const from = el.dateRangeFrom?.value || "";
+    const to = el.dateRangeTo?.value || "";
+    if (from && to && from > to) {
+      showToast("วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด", "error");
+      el.dateRangeFromDisplay?.focus();
+      return;
+    }
+
+    state.ui.customerFilters[config.fromKey] = from;
+    state.ui.customerFilters[config.toKey] = to;
+    closeDialog(el.dateRangeDialog);
+    renderDateRangeButtons();
+    renderCustomerTable();
   }
 
   function setElementBusy(node, busy, message = "กำลังประมวลผล...") {
@@ -995,32 +1137,34 @@ function exportRowsToExcel(rows, columns, fileName, sheetName) {
   window.XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
   window.XLSX.writeFile(workbook, fileName, { compression: true });
 }
-
-function exportCustomersExcel() {
-  const rows = [];
-  state.grids.customers?.forEachNodeAfterFilterAndSort?.((node) => {
-    if (node.data) rows.push(node.data);
-  });
-  if (!state.grids.customers && state.filteredCustomerRows?.length) {
-    rows.push(...state.filteredCustomerRows);
+  function exportCustomersExcel() {
+    const rows = [];
+    state.grids.customers?.forEachNodeAfterFilterAndSort?.((node) => {
+      if (node.data) rows.push(node.data);
+    });
+    if (!state.grids.customers && state.filteredCustomerRows?.length) {
+      rows.push(...state.filteredCustomerRows);
+    }
+    exportRowsToExcel(rows, [
+      { header: "ชื่อนิติบุคคล", value: (row) => row.legal_name || "-", width: 36 },
+      { header: "ชื่อย่อ", value: (row) => row.short_name || "-", width: 24 },
+      { header: "เลขประจำตัวผู้เสียภาษี", value: (row) => row.tax_id || "-", width: 20 },
+      { header: "จำนวนรถ", value: (row) => Number(row.fleet_size || 0), width: 12 },
+      { header: "สถานะบัญชี", value: (row) => label("account_status", row.account_status), width: 16 },
+      { header: "สถานะการนำเข้าข้อมูล", value: (row) => row.import_text || "-", width: 24 },
+      { header: "ขั้นตอนเริ่มใช้งาน", value: (row) => row.onboarding_text || "-", width: 22 },
+      { header: "ระดับความสนใจ", value: (row) => row.engagement_text || "-", width: 18 },
+      { header: "วันที่เริ่มใช้งานจริง", value: (row) => formatDate(row.start_date), width: 20 },
+      { header: "วันที่เริ่มวางบิล", value: (row) => formatDate(row.billing_date), width: 18 },
+      { header: "ผู้รับผิดชอบ", value: (row) => row.owner_text || "-", width: 28 },
+      { header: "โมดูล", value: (row) => row.module_text || "-", width: 26 },
+      { header: "ฟังก์ชัน", value: (row) => row.feature_text || "-", width: 26 },
+      { header: "สัญญา", value: (row) => row.contract_text || "-", width: 16 },
+      { header: "สอนใช้งานนอกสถานที่ (ครั้ง)", value: (row) => Number(row.onsite_training_count || 0), width: 26 },
+      { header: "อัปเดตล่าสุด", value: (row) => formatDateTime(row.updated_at), width: 20 },
+      { header: "แก้ไขล่าสุดโดย", value: (row) => row.updated_by_name || "-", width: 22 }
+    ], `ข้อมูลลูกค้า-${bangkokDate()}.xlsx`, "ข้อมูลลูกค้า");
   }
-  exportRowsToExcel(rows, [
-    { header: "ชื่อนิติบุคคล", value: (row) => row.legal_name || "-", width: 36 },
-    { header: "ชื่อย่อ", value: (row) => row.short_name || "-", width: 24 },
-    { header: "เลขประจำตัวผู้เสียภาษี", value: (row) => row.tax_id || "-", width: 20 },
-    { header: "จำนวนรถ", value: (row) => Number(row.fleet_size || 0), width: 12 },
-    { header: "ผู้รับผิดชอบ", value: (row) => row.owner_text || "-", width: 28 },
-    { header: "ขั้นตอนเริ่มใช้งาน", value: (row) => row.onboarding_text || "-", width: 22 },
-    { header: "สถานะการนำเข้าข้อมูล", value: (row) => row.import_text || "-", width: 24 },
-    { header: "ระดับความสนใจ", value: (row) => row.engagement_text || "-", width: 18 },
-    { header: "โมดูล", value: (row) => row.module_text || "-", width: 26 },
-    { header: "ฟังก์ชัน", value: (row) => row.feature_text || "-", width: 26 },
-    { header: "วันที่เริ่ม", value: (row) => formatDate(row.start_date), width: 14 },
-    { header: "วันที่เริ่มวางบิล", value: (row) => formatDate(row.billing_date), width: 18 },
-    { header: "อัปเดตล่าสุด", value: (row) => formatDateTime(row.updated_at), width: 20 },
-    { header: "แก้ไขล่าสุดโดย", value: (row) => row.updated_by_name || "-", width: 22 }
-  ], `ข้อมูลลูกค้า-${bangkokDate()}.xlsx`, "ข้อมูลลูกค้า");
-}
 
 function exportManagerReportsExcel() {
   const rows = [];
@@ -1177,15 +1321,6 @@ function applySystemBranding() {
     }
   }
 
-  function externalUrl(value) {
-    try {
-      const url = new URL(String(value || "").trim());
-      if (!["https:", "http:"].includes(url.protocol)) return null;
-      return url.toString();
-    } catch (_error) {
-      return null;
-    }
-  }
 
   function fileExtension(file) {
     const map = {
@@ -1424,7 +1559,7 @@ function applySystemBranding() {
               <span class="field-label">เลือกไฟล์รูปภาพ</span>
               <input id="login-image-file" type="file" accept="image/png,image/jpeg,image/webp">
             </label>
-            <small class="field-help">รองรับ PNG, JPEG หรือ WebP ขนาดไม่เกิน 5 MB และต้องมีอัตราส่วน 1:1</small>
+            <small class="field-help">รองรับ PNG, JPEG หรือ WebP ขนาดไม่เกิน 5 MB ระบบจะแสดงผลแบบครอบภาพในกรอบ 1:1</small>
           </div>
           <div class="panel-footer-actions panel-footer-actions-between">
             <button type="button" class="btn btn-danger" data-action="remove-branding-image" data-kind="login" ${settings.login_image_path ? "" : "disabled"}>ลบรูป</button>
@@ -1473,7 +1608,7 @@ function applySystemBranding() {
         allowedTypes: isLogin
           ? ["image/png", "image/jpeg", "image/webp"]
           : ["image/png", "image/webp", "image/x-icon", "image/vnd.microsoft.icon"],
-        requireSquare: true
+        requireSquare: !isLogin
       });
 
       const nextPath = await uploadMedia(
@@ -1543,41 +1678,21 @@ function applySystemBranding() {
       setButtonBusy(button, false);
     }
   }
-
-  
-  async function loadExternalLinksData() {
-    const { data, error } = await state.client
-      .from("external_links")
-      .select("id,display_name,url,sort_order,is_active,created_at,updated_at")
-      .order("sort_order")
-      .order("display_name");
-    if (error) throw error;
-    state.externalLinks = data || [];
-    return state.externalLinks;
-  }
-
   async function loadMasterGroupData(groupKey) {
     const config = MASTER_GROUPS[groupKey];
     if (!config) throw new Error("ไม่พบหมวดข้อมูลตัวเลือกกลาง");
 
     if (config.source === "modules" || config.source === "features") {
-      let result = await state.client
+      const result = await state.client
         .from(config.source)
         .select("id,code,name,is_active,sort_order")
         .order("sort_order")
         .order("name");
-
-      if (result.error && /sort_order|column .* does not exist/i.test(result.error.message || "")) {
-        result = await state.client
-          .from(config.source)
-          .select("id,code,name,is_active")
-          .order("name");
-      }
       if (result.error) throw result.error;
 
       const rows = (result.data || []).map((item) => ({
         ...item,
-        sort_order: Number(item.sort_order || 0)
+        sort_order: Number(item.sort_order)
       }));
       if (config.source === "modules") state.modules = rows;
       else state.features = rows;
@@ -1598,189 +1713,6 @@ function applySystemBranding() {
     ];
     return data || [];
   }
-
-function externalLinkCards() {
-    const rows = [...state.externalLinks].sort((a, b) =>
-      Number(a.sort_order || 0) - Number(b.sort_order || 0)
-      || String(a.display_name).localeCompare(String(b.display_name), "th")
-    );
-    if (!rows.length) {
-      return '<div class="empty-state compact"><strong>ยังไม่มีลิงก์เว็บไซต์</strong></div>';
-    }
-    return rows.map((item) => `
-      <article class="list-card external-link-admin-card">
-        <div class="list-card-header">
-          <div>
-            <strong>${h(item.display_name)}</strong>
-            <div class="muted external-link-url">${h(item.url)}</div>
-            <div class="tag-list">
-              <span class="status-badge" data-status="${item.is_active ? "active" : "inactive"}">${item.is_active ? "เปิดใช้งาน" : "ปิดใช้งาน"}</span>
-              <span class="tag">ลำดับ ${Number(item.sort_order || 0)}</span>
-            </div>
-          </div>
-          <div class="list-card-actions">
-            <button class="btn btn-secondary btn-small" type="button" data-action="edit-external-link" data-id="${h(item.id)}">แก้ไข</button>
-            <button class="btn btn-danger btn-small" type="button" data-action="delete-external-link" data-id="${h(item.id)}">ลบ</button>
-          </div>
-        </div>
-      </article>
-    `).join("");
-  }
-
-  function renderExternalLinksList() {
-    const count = document.getElementById("external-link-count");
-    const list = document.getElementById("external-link-list");
-    if (count) count.textContent = `${state.externalLinks.length.toLocaleString("th-TH")} รายการ`;
-    if (list) list.innerHTML = externalLinkCards();
-  }
-
-
-  async function renderExternalLinksPage() {
-    await loadExternalLinksData();
-    el.mainContent.innerHTML = `
-      ${pageHeader(
-        "ลิงก์เว็บไซต์ภายนอก",
-        "เพิ่มลิงก์ที่จะแสดงในเมนูของผู้ใช้งานทุกคน",
-        "",
-        [{ label: "ลิงก์เว็บไซต์ภายนอก" }]
-      )}
-      <div class="settings-two-column">
-        <form id="external-link-form" class="panel" novalidate>
-          <div class="panel-header"><h2>ข้อมูลลิงก์</h2></div>
-          <div class="panel-body">
-            <input name="id" type="hidden">
-            <label>
-              <span class="field-label">ชื่อที่แสดง <span class="required">*</span></span>
-              <input name="display_name" maxlength="120" required>
-            </label>
-            <label>
-              <span class="field-label">URL <span class="required">*</span></span>
-              <input name="url" type="url" maxlength="2048" placeholder="https://example.com" required>
-            </label>
-            <label>
-              <span class="field-label">ลำดับการแสดง</span>
-              <input name="sort_order" type="number" min="0" max="9999" step="1" value="0">
-            </label>
-            <label class="check-label">
-              <input name="is_active" type="checkbox" checked>
-              <span>เปิดใช้งาน</span>
-            </label>
-          </div>
-          <div class="panel-footer-actions">
-            <button type="button" class="btn btn-secondary" data-action="reset-external-link-form">ล้างฟอร์ม</button>
-            <button id="external-link-save-button" type="submit" class="btn btn-primary">${icon("save")} บันทึก</button>
-          </div>
-        </form>
-        <section class="panel">
-          <div class="panel-header">
-            <h2>รายการลิงก์</h2>
-            <span id="external-link-count" class="muted">${state.externalLinks.length.toLocaleString("th-TH")} รายการ</span>
-          </div>
-          <div id="external-link-list" class="panel-body stack" aria-live="polite">${externalLinkCards()}</div>
-        </section>
-      </div>`;
-  }
-
-  function resetExternalLinkForm() {
-    const form = document.getElementById("external-link-form");
-    if (!form) return;
-    form.reset();
-    form.elements.id.value = "";
-    form.elements.sort_order.value = "0";
-    form.elements.is_active.checked = true;
-  }
-
-  function editExternalLink(id) {
-    const item = state.externalLinks.find((row) => row.id === id);
-    const form = document.getElementById("external-link-form");
-    if (!item || !form) return;
-    form.elements.id.value = item.id;
-    form.elements.display_name.value = item.display_name;
-    form.elements.url.value = item.url;
-    form.elements.sort_order.value = item.sort_order || 0;
-    form.elements.is_active.checked = Boolean(item.is_active);
-    form.scrollIntoView({ behavior: "smooth", block: "start" });
-    form.elements.display_name.focus();
-  }
-
-  async function saveExternalLink(event) {
-    event.preventDefault();
-    const form = event.target;
-    if (!form.reportValidity()) return;
-
-    const button = document.getElementById("external-link-save-button");
-    const data = new FormData(form);
-    const id = String(data.get("id") || "");
-    const url = externalUrl(data.get("url"));
-
-    if (!url) {
-      showToast("URL ต้องขึ้นต้นด้วย http:// หรือ https://", "error");
-      return;
-    }
-
-    const payload = {
-      display_name: String(data.get("display_name") || "").trim(),
-      url,
-      sort_order: Number(data.get("sort_order") || 0),
-      is_active: data.get("is_active") === "on"
-    };
-
-    setButtonBusy(button, true, "กำลังบันทึก...");
-    try {
-      let query = id
-        ? state.client.from("external_links").update(payload).eq("id", id)
-        : state.client.from("external_links").insert(payload);
-
-      query = query
-        .select("id,display_name,url,sort_order,is_active,created_at,updated_at")
-        .single();
-
-      const { data: savedRow, error } = await query;
-      if (error) throw error;
-
-      if (id) {
-        state.externalLinks = state.externalLinks.map((row) => row.id === id ? savedRow : row);
-      } else {
-        state.externalLinks = [...state.externalLinks, savedRow];
-      }
-
-      resetExternalLinkForm();
-      renderExternalLinksList();
-      renderNavigation();
-      showToast(id ? "แก้ไขลิงก์แล้ว" : "เพิ่มลิงก์แล้ว");
-    } catch (error) {
-      showError(error, "บันทึกลิงก์ไม่สำเร็จ");
-    } finally {
-      setButtonBusy(button, false);
-    }
-  }
-
-  async function deleteExternalLink(id, button = null) {
-    const item = state.externalLinks.find((row) => row.id === id);
-    if (!item) return;
-
-    const confirmed = await confirmAction(
-      `ต้องการลบลิงก์ “${item.display_name}” หรือไม่`,
-      "ลบลิงก์เว็บไซต์",
-      "ลบ"
-    );
-    if (!confirmed) return;
-
-    setButtonBusy(button, true, "กำลังลบ...");
-    try {
-      const { error } = await state.client.from("external_links").delete().eq("id", id);
-      if (error) throw error;
-
-      state.externalLinks = state.externalLinks.filter((row) => row.id !== id);
-      resetExternalLinkForm();
-      renderExternalLinksList();
-      renderNavigation();
-      showToast("ลบลิงก์แล้ว");
-    } finally {
-      setButtonBusy(button, false);
-    }
-  }
-
   function masterRows(groupKey) {
     const config = MASTER_GROUPS[groupKey];
     if (!config) return [];
@@ -1789,7 +1721,7 @@ function externalLinkCards() {
         id: item.id,
         option_value: item.code,
         display_name: item.name,
-        sort_order: item.sort_order || 0,
+        sort_order: Number(item.sort_order),
         is_active: item.is_active,
         source: "modules"
       }));
@@ -1799,14 +1731,31 @@ function externalLinkCards() {
         id: item.id,
         option_value: item.code,
         display_name: item.name,
-        sort_order: item.sort_order || 0,
+        sort_order: Number(item.sort_order),
         is_active: item.is_active,
         source: "features"
       }));
     }
     return state.masterOptions
       .filter((item) => item.group_key === groupKey)
-      .map((item) => ({ ...item, source: "master_options" }));
+      .map((item) => ({ ...item, sort_order: Number(item.sort_order), source: "master_options" }));
+  }
+
+  function nextMasterSortOrder(groupKey) {
+    const used = new Set(masterRows(groupKey).map((item) => Number(item.sort_order)));
+    let candidate = 10;
+    while (used.has(candidate) && candidate < 9999) candidate += 10;
+    if (candidate <= 9999 && !used.has(candidate)) return candidate;
+
+    candidate = 1;
+    while (used.has(candidate) && candidate < 9999) candidate += 1;
+    return Math.min(candidate, 9999);
+  }
+
+  function masterSortOrderAvailable(groupKey, sortOrder, excludedId = null) {
+    return !masterRows(groupKey).some((item) =>
+      item.id !== excludedId && Number(item.sort_order) === Number(sortOrder)
+    );
   }
 
   function masterListHtml(groupKey) {
@@ -1840,8 +1789,6 @@ function externalLinkCards() {
     if (count) count.textContent = `${rows.length.toLocaleString("th-TH")} รายการ`;
     if (list) list.innerHTML = masterListHtml(groupKey);
   }
-
-
   async function renderMasterDataPage(groupKey = null) {
     const selectedGroup = MASTER_GROUPS[groupKey] ? groupKey : Object.keys(MASTER_GROUPS)[0];
     await loadMasterGroupData(selectedGroup);
@@ -1853,6 +1800,7 @@ function externalLinkCards() {
     const codeTitle = isCodeGroup
       ? "ใช้ตัวอักษรอังกฤษ ตัวเลข และขีดล่างเท่านั้น"
       : "ใช้ตัวอักษร ตัวเลข และสัญลักษณ์พื้นฐาน";
+    const nextOrder = nextMasterSortOrder(selectedGroup);
 
     el.mainContent.innerHTML = `
       ${pageHeader(
@@ -1888,8 +1836,10 @@ function externalLinkCards() {
               <input name="display_name" maxlength="200" required>
             </label>
             <label>
-              <span class="field-label">ลำดับการแสดง</span>
-              <input name="sort_order" type="number" min="0" max="9999" step="1" value="0">
+              <span class="field-label">ลำดับการแสดง <span class="required">*</span></span>
+              <input name="sort_order" type="number" min="1" max="9999" step="1"
+                     value="${nextOrder}" required>
+              <small class="field-help">ต้องมากกว่า 0 และห้ามซ้ำภายในหมวดเดียวกัน</small>
             </label>
             <label class="check-label">
               <input name="is_active" type="checkbox" checked>
@@ -1910,17 +1860,18 @@ function externalLinkCards() {
         </section>
       </div>`;
   }
-
   function resetMasterOptionForm() {
     const form = document.getElementById("master-option-form");
     if (!form) return;
+    const groupKey = form.dataset.group;
     form.reset();
     form.elements.id.value = "";
-    form.elements.sort_order.value = "0";
+    form.elements.sort_order.value = String(nextMasterSortOrder(groupKey));
     form.elements.is_active.checked = true;
     form.elements.option_value.disabled = false;
+    form.elements.option_value.setCustomValidity("");
+    form.elements.sort_order.setCustomValidity("");
   }
-
   function editMasterOption(id, groupKey) {
     const item = masterRows(groupKey).find((row) => row.id === id);
     const form = document.getElementById("master-option-form");
@@ -1929,17 +1880,15 @@ function externalLinkCards() {
     form.elements.option_value.value = item.option_value;
     form.elements.option_value.disabled = true;
     form.elements.display_name.value = item.display_name;
-    form.elements.sort_order.value = item.sort_order || 0;
+    form.elements.sort_order.value = String(item.sort_order);
     form.elements.is_active.checked = Boolean(item.is_active);
+    form.elements.sort_order.setCustomValidity("");
     form.scrollIntoView({ behavior: "smooth", block: "start" });
     form.elements.display_name.focus();
   }
-
   async function saveMasterOption(event) {
     event.preventDefault();
     const form = event.target;
-    if (!form.reportValidity()) return;
-
     const groupKey = form.dataset.group;
     const config = MASTER_GROUPS[groupKey];
     if (!config) return;
@@ -1947,71 +1896,72 @@ function externalLinkCards() {
     const button = document.getElementById("master-option-save-button");
     const data = new FormData(form);
     const id = String(data.get("id") || "");
-    const rawOptionValue = String(data.get("option_value") || "").trim();
+    const rawOptionValue = String(form.elements.option_value.value || "").trim();
     const optionValue = config.source === "modules" || config.source === "features"
       ? rawOptionValue.toLowerCase()
       : rawOptionValue;
+    const sortOrder = Number(data.get("sort_order"));
 
-    const payload = {
-      display_name: String(data.get("display_name") || "").trim(),
-      sort_order: Number(data.get("sort_order") || 0),
-      is_active: data.get("is_active") === "on"
-    };
-    if (!id) payload.option_value = optionValue;
+    form.elements.sort_order.setCustomValidity("");
+    if (!Number.isInteger(sortOrder) || sortOrder < 1 || sortOrder > 9999) {
+      form.elements.sort_order.setCustomValidity("ลำดับการแสดงต้องเป็นจำนวนเต็มตั้งแต่ 1 ถึง 9999");
+    } else if (!masterSortOrderAvailable(groupKey, sortOrder, id || null)) {
+      form.elements.sort_order.setCustomValidity("ลำดับนี้ถูกใช้งานแล้วในหมวดเดียวกัน");
+    }
+
+    if (!form.reportValidity()) return;
 
     setButtonBusy(button, true, "กำลังบันทึก...");
     try {
-      let result;
+      const { data: saved, error } = await state.client.rpc("admin_save_master_item", {
+        p_group_key: groupKey,
+        p_item_id: id || null,
+        p_option_value: optionValue,
+        p_display_name: String(data.get("display_name") || "").trim(),
+        p_sort_order: sortOrder,
+        p_is_active: data.get("is_active") === "on"
+      });
+      if (error) throw error;
 
-      if (config.source === "modules" || config.source === "features") {
-        const table = config.source;
-        const tablePayload = {
-          name: payload.display_name,
-          sort_order: payload.sort_order,
-          is_active: payload.is_active
-        };
-        if (!id) tablePayload.code = payload.option_value;
-
-        let query = id
-          ? state.client.from(table).update(tablePayload).eq("id", id)
-          : state.client.from(table).insert(tablePayload);
-
-        result = await query
-          .select("id,code,name,is_active,sort_order")
-          .single();
-      } else {
-        const tablePayload = {
-          group_key: groupKey,
-          display_name: payload.display_name,
-          sort_order: payload.sort_order,
-          is_active: payload.is_active
-        };
-        if (!id) tablePayload.option_value = payload.option_value;
-
-        let query = id
-          ? state.client.from("master_options").update(tablePayload).eq("id", id)
-          : state.client.from("master_options").insert(tablePayload);
-
-        result = await query
-          .select("id,group_key,option_value,display_name,sort_order,is_active,created_at,updated_at")
-          .single();
-      }
-
-      if (result.error) throw result.error;
-      const savedRow = result.data;
+      const savedRow = Array.isArray(saved) ? saved[0] : saved;
+      if (!savedRow?.id) throw new Error("ฐานข้อมูลไม่ส่งข้อมูลรายการที่บันทึกกลับมา");
 
       if (config.source === "modules") {
+        const row = {
+          id: savedRow.id,
+          code: savedRow.option_value,
+          name: savedRow.display_name,
+          sort_order: Number(savedRow.sort_order),
+          is_active: Boolean(savedRow.is_active)
+        };
         state.modules = id
-          ? state.modules.map((row) => row.id === id ? savedRow : row)
-          : [...state.modules, savedRow];
+          ? state.modules.map((item) => item.id === id ? row : item)
+          : [...state.modules, row];
       } else if (config.source === "features") {
+        const row = {
+          id: savedRow.id,
+          code: savedRow.option_value,
+          name: savedRow.display_name,
+          sort_order: Number(savedRow.sort_order),
+          is_active: Boolean(savedRow.is_active)
+        };
         state.features = id
-          ? state.features.map((row) => row.id === id ? savedRow : row)
-          : [...state.features, savedRow];
+          ? state.features.map((item) => item.id === id ? row : item)
+          : [...state.features, row];
       } else {
+        const row = {
+          id: savedRow.id,
+          group_key: groupKey,
+          option_value: savedRow.option_value,
+          display_name: savedRow.display_name,
+          sort_order: Number(savedRow.sort_order),
+          is_active: Boolean(savedRow.is_active),
+          created_at: savedRow.created_at || null,
+          updated_at: savedRow.updated_at || null
+        };
         state.masterOptions = id
-          ? state.masterOptions.map((row) => row.id === id ? savedRow : row)
-          : [...state.masterOptions, savedRow];
+          ? state.masterOptions.map((item) => item.id === id ? row : item)
+          : [...state.masterOptions, row];
       }
 
       resetMasterOptionForm();
@@ -2093,23 +2043,23 @@ function externalLinkCards() {
       if (!sameUser) {
         let profileResult = await state.client
           .from("profiles")
-          .select("id,display_name,email,role,is_active,theme_mode,theme_accent,avatar_path,created_at,updated_at")
+          .select("id,display_name,email,position,role,is_active,theme_mode,theme_accent,avatar_path,created_at,updated_at")
           .eq("id", session.user.id)
           .single();
 
         if (
           profileResult.error &&
-          /theme_mode|theme_accent|avatar_path|column .* does not exist/i.test(profileResult.error.message || "")
+          /position|theme_mode|theme_accent|avatar_path|column .* does not exist/i.test(profileResult.error.message || "")
         ) {
           profileResult = await state.client
             .from("profiles")
-            .select("id,display_name,email,role,is_active,theme_mode,theme_accent,created_at,updated_at")
+            .select("id,display_name,email,role,is_active,theme_mode,theme_accent,avatar_path,created_at,updated_at")
             .eq("id", session.user.id)
             .single();
 
           if (
             profileResult.error &&
-            /theme_mode|theme_accent|column .* does not exist/i.test(profileResult.error.message || "")
+            /theme_mode|theme_accent|avatar_path|column .* does not exist/i.test(profileResult.error.message || "")
           ) {
             profileResult = await state.client
               .from("profiles")
@@ -2122,6 +2072,7 @@ function externalLinkCards() {
             profileResult.data.theme_mode = profileResult.data.theme_mode || "light";
             profileResult.data.theme_accent = profileResult.data.theme_accent || "#2f68e6";
             profileResult.data.avatar_path = null;
+            profileResult.data.position = profileResult.data.position || null;
             showToast("ยังไม่ได้ติดตั้งการตั้งค่าระบบเวอร์ชันล่าสุด จึงใช้ค่าเริ่มต้นชั่วคราว", "warning");
           }
         }
@@ -2165,19 +2116,17 @@ function externalLinkCards() {
     el.loginForm.reset();
     applySystemBranding();
   }
-
   function showApp() {
     el.loginView.classList.add("hidden");
     el.appView.classList.remove("hidden");
     el.currentUserName.textContent = state.profile?.display_name || "-";
-    el.currentUserRole.textContent = label("role", state.profile?.role);
+    el.currentUserRole.textContent = state.profile?.position || "ไม่ระบุตำแหน่ง";
     renderAvatarInto(el.currentUserAvatar, state.profile);
     applyThemePreferences(state.profile || {});
     const collapsed = window.localStorage.getItem("fi-sidebar-collapsed") === "true";
     el.appView.classList.toggle("sidebar-collapsed", collapsed && window.innerWidth > 820);
     renderNavigation();
   }
-
   function renderNavigation() {
     const role = state.profile?.role;
     const groups = [
@@ -2200,7 +2149,6 @@ function externalLinkCards() {
         items: [
           { route: "admin-users", icon: "users", label: "จัดการผู้ใช้", roles: ["admin"] },
           { route: "system-settings", icon: "image", label: "ตั้งค่าภาพระบบ", roles: ["admin"] },
-          { route: "external-links", icon: "link", label: "ลิงก์เว็บไซต์ภายนอก", roles: ["admin"] },
           { route: "master-data", icon: "database", label: "ข้อมูลตัวเลือกกลาง", roles: ["admin"] }
         ]
       },
@@ -2211,8 +2159,9 @@ function externalLinkCards() {
         ]
       }
     ];
+
     const active = parseRoute().name;
-    const internalHtml = groups.map((group) => {
+    el.mainNav.innerHTML = groups.map((group) => {
       const visible = group.items.filter((item) => item.roles.includes(role));
       if (!visible.length) return "";
       return `
@@ -2228,27 +2177,6 @@ function externalLinkCards() {
           `).join("")}
         </div>`;
     }).join("");
-
-    const linkRows = state.externalLinks
-      .filter((item) => item.is_active && externalUrl(item.url))
-      .sort((a, b) =>
-        Number(a.sort_order || 0) - Number(b.sort_order || 0)
-        || String(a.display_name).localeCompare(String(b.display_name), "th")
-      );
-    const externalHtml = linkRows.length ? `
-      <div class="nav-group external-nav-group">
-        <span class="nav-group-label">เว็บไซต์อื่น</span>
-        ${linkRows.map((item) => `
-          <a class="nav-link" href="${h(item.url)}" target="_blank" rel="noopener noreferrer"
-             title="${h(item.display_name)}">
-            <span class="nav-icon">${icon("external")}</span>
-            <span>${h(item.display_name)}</span>
-          </a>
-        `).join("")}
-      </div>
-    ` : "";
-
-    el.mainNav.innerHTML = internalHtml + externalHtml;
   }
 
   function parseRoute() {
@@ -2273,7 +2201,6 @@ function externalLinkCards() {
       "manager-reports": ["admin", "manager"],
       "admin-users": ["admin"],
       "system-settings": ["admin"],
-      "external-links": ["admin"],
       "master-data": ["admin"]
     };
     return rules[routeName]?.includes(role) ?? false;
@@ -2292,7 +2219,6 @@ function externalLinkCards() {
       "manager-reports": "รายงานของทีม",
       "admin-users": "จัดการผู้ใช้",
       "system-settings": "ตั้งค่าภาพระบบ",
-      "external-links": "ลิงก์เว็บไซต์ภายนอก",
       "master-data": "ข้อมูลตัวเลือกกลาง"
     };
 
@@ -2354,9 +2280,6 @@ function externalLinkCards() {
         case "system-settings":
           await renderSystemSettingsPage();
           break;
-        case "external-links":
-          await renderExternalLinksPage();
-          break;
         case "master-data":
           await renderMasterDataPage(route.id);
           break;
@@ -2381,26 +2304,25 @@ function externalLinkCards() {
       setLoading(false);
     }
   }
-
   async function loadCommonData(force = false) {
     if (!force && state.configurationLoaded) return;
 
     let profilesResult = await state.client
       .from("profiles")
-      .select("id,display_name,email,role,is_active,theme_mode,theme_accent,avatar_path,created_at,updated_at")
+      .select("id,display_name,email,position,role,is_active,theme_mode,theme_accent,avatar_path,created_at,updated_at")
       .order("display_name");
 
     if (
-      profilesResult.error &&
-      /theme_mode|theme_accent|avatar_path|column .* does not exist/i.test(profilesResult.error.message || "")
+      profilesResult.error
+      && /position|theme_mode|theme_accent|avatar_path|column .* does not exist/i.test(profilesResult.error.message || "")
     ) {
       profilesResult = await state.client
         .from("profiles")
-        .select("id,display_name,email,role,is_active,theme_mode,theme_accent,created_at,updated_at")
+        .select("id,display_name,email,role,is_active,theme_mode,theme_accent,avatar_path,created_at,updated_at")
         .order("display_name");
       if (
-        profilesResult.error &&
-        /theme_mode|theme_accent|column .* does not exist/i.test(profilesResult.error.message || "")
+        profilesResult.error
+        && /theme_mode|theme_accent|avatar_path|column .* does not exist/i.test(profilesResult.error.message || "")
       ) {
         profilesResult = await state.client
           .from("profiles")
@@ -2410,9 +2332,10 @@ function externalLinkCards() {
       if (!profilesResult.error) {
         profilesResult.data = (profilesResult.data || []).map((profile) => ({
           ...profile,
+          position: null,
           theme_mode: profile.theme_mode || "light",
           theme_accent: profile.theme_accent || "#2f68e6",
-          avatar_path: null
+          avatar_path: profile.avatar_path || null
         }));
       }
     }
@@ -2435,61 +2358,55 @@ function externalLinkCards() {
       featuresResult = await state.client.from("features").select("id,code,name,is_active").order("name");
     }
 
-    const [masterResult, linkResult] = await Promise.all([
-      state.client
-        .from("master_options")
-        .select("id,group_key,option_value,display_name,sort_order,is_active,created_at,updated_at")
-        .order("group_key")
-        .order("sort_order")
-        .order("display_name"),
-      state.client
-        .from("external_links")
-        .select("id,display_name,url,sort_order,is_active,created_at,updated_at")
-        .order("sort_order")
-        .order("display_name")
-    ]);
+    const masterResult = await state.client
+      .from("master_options")
+      .select("id,group_key,option_value,display_name,sort_order,is_active,created_at,updated_at")
+      .order("group_key")
+      .order("sort_order")
+      .order("display_name");
 
     if (profilesResult.error) throw profilesResult.error;
     if (modulesResult.error) throw modulesResult.error;
     if (featuresResult.error) throw featuresResult.error;
 
     const fallbackRows = [
-      ...Object.entries(LABELS.onboarding_stage).map(([option_value, display_name], sort_order) => ({
+      ...Object.entries(LABELS.onboarding_stage).map(([option_value, display_name], index) => ({
         id: `fallback-onboarding-${option_value}`,
         group_key: "onboarding_stage",
         option_value,
         display_name,
-        sort_order,
+        sort_order: (index + 1) * 10,
         is_active: true
       })),
-      ...Object.entries(LABELS.import_status).map(([option_value, display_name], sort_order) => ({
+      ...Object.entries(LABELS.import_status).map(([option_value, display_name], index) => ({
         id: `fallback-import-${option_value}`,
         group_key: "import_status",
         option_value,
         display_name,
-        sort_order,
+        sort_order: (index + 1) * 10,
         is_active: true
       })),
-      ...Object.entries(LABELS.engagement_level).map(([option_value, display_name], sort_order) => ({
+      ...Object.entries(LABELS.engagement_level).map(([option_value, display_name], index) => ({
         id: `fallback-engagement-${option_value}`,
         group_key: "engagement_level",
         option_value,
         display_name,
-        sort_order,
+        sort_order: (index + 1) * 10,
         is_active: true
       })),
-      ...Object.entries(LABELS.activity_type).map(([option_value, display_name], sort_order) => ({
-        id: `fallback-activity-${option_value}`,
-        group_key: "activity_type",
+      ...Object.entries(LABELS.contract_type).map(([option_value, display_name], index) => ({
+        id: `fallback-contract-${option_value}`,
+        group_key: "contract_type",
         option_value,
         display_name,
-        sort_order,
-        is_active: option_value !== "system"
+        sort_order: (index + 1) * 10,
+        is_active: true
       }))
     ];
 
     const preparedProfiles = (profilesResult.data || []).map((profile) => ({
       ...profile,
+      position: profile.position || null,
       theme_mode: profile.theme_mode || "light",
       theme_accent: normalizeHex(profile.theme_accent || "#2f68e6"),
       avatar_path: profile.avatar_path || null
@@ -2499,48 +2416,49 @@ function externalLinkCards() {
       const currentProfile = state.profiles.find((profile) => profile.id === state.profile.id);
       if (currentProfile) state.profile = { ...state.profile, ...currentProfile };
     }
-    state.modules = (modulesResult.data || []).map((item) => ({ ...item, sort_order: item.sort_order || 0 }));
-    state.features = (featuresResult.data || []).map((item) => ({ ...item, sort_order: item.sort_order || 0 }));
-    state.masterOptions = masterResult.error
-      ? fallbackRows
-      : (masterResult.data || []);
-    state.externalLinks = linkResult.error
-      ? []
-      : (linkResult.data || []);
+
+    state.modules = (modulesResult.data || []).map((item, index) => ({
+      ...item,
+      sort_order: Number(item.sort_order || index + 1)
+    }));
+    state.features = (featuresResult.data || []).map((item, index) => ({
+      ...item,
+      sort_order: Number(item.sort_order || index + 1)
+    }));
+    state.masterOptions = masterResult.error ? fallbackRows : (masterResult.data || []);
     state.configurationLoaded = true;
   }
-
-async function loadCustomers(force = false) {
-  if (!force && state.customers.length) return;
-  const [customersResult, ownersResult, modulesResult, featuresResult] = await Promise.all([
-    state.client
-      .from("customers")
-      .select("id,legacy_customer_id,legal_name,short_name,tax_id,fleet_size,account_status,onboarding_stage,import_status,engagement_level,start_date,billing_date,is_archived,archived_at,archived_by,created_at,created_by,updated_at,updated_by")
-      .eq("is_archived", false)
-      .order("updated_at", { ascending: false })
-      .limit(1000),
-    state.client
-      .from("customer_owners")
-      .select("customer_id,profile_id,is_primary")
-      .limit(5000),
-    state.client
-      .from("customer_modules")
-      .select("customer_id,module_id")
-      .limit(5000),
-    state.client
-      .from("customer_features")
-      .select("customer_id,feature_id")
-      .limit(5000)
-  ]);
-  [customersResult, ownersResult, modulesResult, featuresResult].forEach((result) => {
-    if (result.error) throw result.error;
-  });
-  state.customers = customersResult.data || [];
-  const activeIds = new Set(state.customers.map((customer) => customer.id));
-  state.customerOwners = (ownersResult.data || []).filter((row) => activeIds.has(row.customer_id));
-  state.customerModules = (modulesResult.data || []).filter((row) => activeIds.has(row.customer_id));
-  state.customerFeatures = (featuresResult.data || []).filter((row) => activeIds.has(row.customer_id));
-}
+  async function loadCustomers(force = false) {
+    if (!force && state.customers.length) return;
+    const [customersResult, ownersResult, modulesResult, featuresResult] = await Promise.all([
+      state.client
+        .from("customers")
+        .select("id,legacy_customer_id,legal_name,short_name,tax_id,fleet_size,account_status,onboarding_stage,import_status,engagement_level,start_date,billing_date,contract_type,onsite_training_count,is_archived,archived_at,archived_by,created_at,created_by,updated_at,updated_by")
+        .eq("is_archived", false)
+        .order("updated_at", { ascending: false })
+        .limit(1000),
+      state.client
+        .from("customer_owners")
+        .select("customer_id,profile_id,is_primary")
+        .limit(5000),
+      state.client
+        .from("customer_modules")
+        .select("customer_id,module_id")
+        .limit(5000),
+      state.client
+        .from("customer_features")
+        .select("customer_id,feature_id")
+        .limit(5000)
+    ]);
+    [customersResult, ownersResult, modulesResult, featuresResult].forEach((result) => {
+      if (result.error) throw result.error;
+    });
+    state.customers = customersResult.data || [];
+    const activeIds = new Set(state.customers.map((customer) => customer.id));
+    state.customerOwners = (ownersResult.data || []).filter((row) => activeIds.has(row.customer_id));
+    state.customerModules = (modulesResult.data || []).filter((row) => activeIds.has(row.customer_id));
+    state.customerFeatures = (featuresResult.data || []).filter((row) => activeIds.has(row.customer_id));
+  }
 
   function profileName(id) {
     return state.profiles.find((profile) => profile.id === id)?.display_name || "-";
@@ -2718,458 +2636,628 @@ async function renderDashboard() {
 
   window.requestAnimationFrame(() => renderDashboardCharts(state.dashboardChartData));
 }
+  async function renderCustomersPage() {
+    try { state.grids.customers?.destroy?.(); } catch (error) { console.warn(error); }
+    state.grids.customers = null;
+    await Promise.all([loadCommonData(), loadCustomers(true)]);
+    const filters = state.ui.customerFilters;
 
-async function renderCustomersPage() {
-  try { state.grids.customers?.destroy?.(); } catch (error) { console.warn(error); }
-  state.grids.customers = null;
-  await Promise.all([loadCommonData(), loadCustomers(true)]);
-  const filters = state.ui.customerFilters;
-  el.mainContent.innerHTML = `
-    ${pageHeader(
-      "ข้อมูลลูกค้า",
-      "ค้นหา กรอง และจัดการข้อมูลลูกค้า",
-      `<a class="btn btn-primary" href="#/customers/new">${icon("plus")} เพิ่มลูกค้า</a>`,
-      [{ label: "ข้อมูลลูกค้า" }]
-    )}
-    <section class="panel">
-      <div class="toolbar">
-        <div class="toolbar-row">
-          <div class="toolbar-field toolbar-search">
-            <label for="customer-search">ค้นหา</label>
-            <input id="customer-search" type="search" placeholder="ชื่อบริษัท ชื่อย่อ เลขประจำตัวผู้เสียภาษี หรือผู้รับผิดชอบ"
-                   autocomplete="off" value="${h(filters.search)}">
+    el.mainContent.innerHTML = `
+      ${pageHeader(
+        "ข้อมูลลูกค้า",
+        "ค้นหา กรอง และจัดการข้อมูลลูกค้า",
+        `<a class="btn btn-primary" href="#/customers/new">${icon("plus")} เพิ่มลูกค้า</a>`,
+        [{ label: "ข้อมูลลูกค้า" }]
+      )}
+      <section class="panel">
+        <div class="toolbar">
+          <div class="toolbar-row">
+            <div class="toolbar-field toolbar-search">
+              <label for="customer-search">ค้นหา</label>
+              <input id="customer-search" type="search"
+                     placeholder="ชื่อบริษัท ชื่อย่อ เลขประจำตัวผู้เสียภาษี หรือผู้รับผิดชอบ"
+                     autocomplete="off" value="${h(filters.search)}">
+            </div>
+            <div class="toolbar-field">
+              <label for="customer-status-filter">สถานะบัญชี</label>
+              <select id="customer-status-filter">
+                <option value="">ทั้งหมด</option>
+                <option value="active" ${filters.status === "active" ? "selected" : ""}>ใช้งาน</option>
+                <option value="inactive" ${filters.status === "inactive" ? "selected" : ""}>ไม่ใช้งาน</option>
+              </select>
+            </div>
+            <div class="toolbar-field">
+              <label for="customer-owner-filter">ผู้รับผิดชอบ</label>
+              <select id="customer-owner-filter">
+                <option value="">ทั้งหมด</option>
+                <option value="unassigned" ${filters.owner === "unassigned" ? "selected" : ""}>ยังไม่มีผู้รับผิดชอบ</option>
+                ${state.profiles.filter((profile) => profile.is_active).map((profile) => `
+                  <option value="${h(profile.id)}" ${filters.owner === profile.id ? "selected" : ""}>
+                    ${h(profile.display_name)}
+                  </option>
+                `).join("")}
+              </select>
+            </div>
+            <div class="toolbar-actions">
+              <button class="btn btn-secondary" data-action="reset-customer-filters">
+                ${icon("refresh")} ล้างตัวกรอง
+              </button>
+              <button class="btn btn-secondary" data-action="export-customers-excel">
+                ${icon("download")} Excel
+              </button>
+            </div>
           </div>
-          <div class="toolbar-field">
-            <label for="customer-status-filter">สถานะบัญชี</label>
-            <select id="customer-status-filter">
-              <option value="">ทั้งหมด</option>
-              <option value="active" ${filters.status === "active" ? "selected" : ""}>ใช้งาน</option>
-              <option value="inactive" ${filters.status === "inactive" ? "selected" : ""}>ไม่ใช้งาน</option>
-            </select>
-          </div>
-          <div class="toolbar-field">
-            <label for="customer-owner-filter">ผู้รับผิดชอบ</label>
-            <select id="customer-owner-filter">
-              <option value="">ทั้งหมด</option>
-              <option value="unassigned" ${filters.owner === "unassigned" ? "selected" : ""}>ยังไม่มีผู้รับผิดชอบ</option>
-              ${state.profiles.filter((profile) => profile.is_active).map((profile) => `
-                <option value="${h(profile.id)}" ${filters.owner === profile.id ? "selected" : ""}>${h(profile.display_name)}</option>
-              `).join("")}
-            </select>
-          </div>
-          <div class="toolbar-actions">
-            <button class="btn btn-secondary" data-action="reset-customer-filters">${icon("refresh")} ล้างตัวกรอง</button>
-            <button class="btn btn-secondary" data-action="export-customers-excel">${icon("download")} Excel</button>
-          </div>
+
+          <details id="customer-advanced-filters" class="advanced-filters" ${filters.advancedOpen ? "open" : ""}>
+            <summary>ตัวกรองเพิ่มเติม</summary>
+            <div class="advanced-filter-grid">
+              <label>
+                ขั้นตอนเริ่มใช้งาน
+                <select id="customer-onboarding-filter">
+                  <option value="">ทั้งหมด</option>
+                  <option value="none" ${filters.onboarding === "none" ? "selected" : ""}>ไม่ระบุ</option>
+                  ${masterOptions("onboarding_stage").map((item) => `
+                    <option value="${h(item.option_value)}" ${filters.onboarding === item.option_value ? "selected" : ""}>
+                      ${h(item.display_name)}
+                    </option>
+                  `).join("")}
+                </select>
+              </label>
+              <label>
+                สถานะการนำเข้าข้อมูล
+                <select id="customer-import-filter">
+                  <option value="">ทั้งหมด</option>
+                  ${masterOptions("import_status").map((item) => `
+                    <option value="${h(item.option_value)}" ${filters.importStatus === item.option_value ? "selected" : ""}>
+                      ${h(item.display_name)}
+                    </option>
+                  `).join("")}
+                </select>
+              </label>
+              <label>
+                ระดับความสนใจ
+                <select id="customer-engagement-filter">
+                  <option value="">ทั้งหมด</option>
+                  <option value="none" ${filters.engagement === "none" ? "selected" : ""}>ไม่ระบุ</option>
+                  ${masterOptions("engagement_level").map((item) => `
+                    <option value="${h(item.option_value)}" ${filters.engagement === item.option_value ? "selected" : ""}>
+                      ${h(item.display_name)}
+                    </option>
+                  `).join("")}
+                </select>
+              </label>
+              <label>
+                ประเภทสัญญา
+                <select id="customer-contract-filter">
+                  <option value="">ทั้งหมด</option>
+                  ${masterOptions("contract_type").map((item) => `
+                    <option value="${h(item.option_value)}" ${filters.contractType === item.option_value ? "selected" : ""}>
+                      ${h(item.display_name)}
+                    </option>
+                  `).join("")}
+                </select>
+              </label>
+              <label>
+                โมดูล
+                <select id="customer-module-filter">
+                  <option value="">ทั้งหมด</option>
+                  ${state.modules.filter((item) => item.is_active).map((item) => `
+                    <option value="${h(item.id)}" ${filters.moduleId === item.id ? "selected" : ""}>${h(item.name)}</option>
+                  `).join("")}
+                </select>
+              </label>
+              <label>
+                ฟังก์ชัน
+                <select id="customer-feature-filter">
+                  <option value="">ทั้งหมด</option>
+                  ${state.features.filter((item) => item.is_active).map((item) => `
+                    <option value="${h(item.id)}" ${filters.featureId === item.id ? "selected" : ""}>${h(item.name)}</option>
+                  `).join("")}
+                </select>
+              </label>
+              <label>
+                จำนวนรถขั้นต่ำ
+                <input id="customer-fleet-min" type="number" min="0" step="1" value="${h(filters.fleetMin)}">
+              </label>
+              <label>
+                จำนวนรถสูงสุด
+                <input id="customer-fleet-max" type="number" min="0" step="1" value="${h(filters.fleetMax)}">
+              </label>
+              <div class="date-range-filter-field">
+                <span class="field-label">วันที่เริ่มใช้งานจริง</span>
+                <button type="button" class="date-range-trigger" data-action="open-date-range-filter" data-kind="start">
+                  ${icon("calendar")}
+                  <span data-date-range-label="start">${h(dateRangeButtonText("start"))}</span>
+                </button>
+              </div>
+              <div class="date-range-filter-field">
+                <span class="field-label">วันที่เริ่มวางบิล</span>
+                <button type="button" class="date-range-trigger" data-action="open-date-range-filter" data-kind="billing">
+                  ${icon("calendar")}
+                  <span data-date-range-label="billing">${h(dateRangeButtonText("billing"))}</span>
+                </button>
+              </div>
+            </div>
+          </details>
         </div>
+        <div class="grid-status-row">
+          <span id="customer-grid-count" class="muted">กำลังเตรียมข้อมูล...</span>
+          <span class="muted">ปรับลำดับ ความกว้าง และตัวกรองในหัวตารางได้</span>
+        </div>
+        <div id="customer-grid" class="ag-grid-shell" aria-label="รายชื่อลูกค้า">
+          <div class="chart-loading"><span class="spinner"></span><span>กำลังสร้างตาราง...</span></div>
+        </div>
+      </section>`;
 
-        <details id="customer-advanced-filters" class="advanced-filters" ${filters.advancedOpen ? "open" : ""}>
-          <summary>ตัวกรองเพิ่มเติม</summary>
-          <div class="advanced-filter-grid">
-            <label>
-              ขั้นตอนเริ่มใช้งาน
-              <select id="customer-onboarding-filter">
-                <option value="">ทั้งหมด</option>
-                <option value="none" ${filters.onboarding === "none" ? "selected" : ""}>ไม่ระบุ</option>
-                ${masterOptions("onboarding_stage").map((item) => `
-                  <option value="${h(item.option_value)}" ${filters.onboarding === item.option_value ? "selected" : ""}>${h(item.display_name)}</option>
-                `).join("")}
-              </select>
-            </label>
-            <label>
-              สถานะการนำเข้าข้อมูล
-              <select id="customer-import-filter">
-                <option value="">ทั้งหมด</option>
-                ${masterOptions("import_status").map((item) => `
-                  <option value="${h(item.option_value)}" ${filters.importStatus === item.option_value ? "selected" : ""}>${h(item.display_name)}</option>
-                `).join("")}
-              </select>
-            </label>
-            <label>
-              ระดับความสนใจ
-              <select id="customer-engagement-filter">
-                <option value="">ทั้งหมด</option>
-                <option value="none" ${filters.engagement === "none" ? "selected" : ""}>ไม่ระบุ</option>
-                ${masterOptions("engagement_level").map((item) => `
-                  <option value="${h(item.option_value)}" ${filters.engagement === item.option_value ? "selected" : ""}>${h(item.display_name)}</option>
-                `).join("")}
-              </select>
-            </label>
-            <label>
-              โมดูล
-              <select id="customer-module-filter">
-                <option value="">ทั้งหมด</option>
-                ${state.modules.filter((item) => item.is_active).map((item) => `
-                  <option value="${h(item.id)}" ${filters.moduleId === item.id ? "selected" : ""}>${h(item.name)}</option>
-                `).join("")}
-              </select>
-            </label>
-            <label>
-              ฟังก์ชัน
-              <select id="customer-feature-filter">
-                <option value="">ทั้งหมด</option>
-                ${state.features.filter((item) => item.is_active).map((item) => `
-                  <option value="${h(item.id)}" ${filters.featureId === item.id ? "selected" : ""}>${h(item.name)}</option>
-                `).join("")}
-              </select>
-            </label>
-            <label>
-              จำนวนรถขั้นต่ำ
-              <input id="customer-fleet-min" type="number" min="0" step="1" value="${h(filters.fleetMin)}">
-            </label>
-            <label>
-              จำนวนรถสูงสุด
-              <input id="customer-fleet-max" type="number" min="0" step="1" value="${h(filters.fleetMax)}">
-            </label>
-            ${dateControlHtml({
-              id: "customer-start-from",
-              name: "customer_start_from",
-              label: "วันที่เริ่ม ตั้งแต่",
-              value: filters.startFrom || ""
-            })}
-            ${dateControlHtml({
-              id: "customer-start-to",
-              name: "customer_start_to",
-              label: "วันที่เริ่ม ถึง",
-              value: filters.startTo || ""
-            })}
-            ${dateControlHtml({
-              id: "customer-billing-from",
-              name: "customer_billing_from",
-              label: "วันที่เริ่มวางบิล ตั้งแต่",
-              value: filters.billingFrom || ""
-            })}
-            ${dateControlHtml({
-              id: "customer-billing-to",
-              name: "customer_billing_to",
-              label: "วันที่เริ่มวางบิล ถึง",
-              value: filters.billingTo || ""
-            })}
-          </div>
-        </details>
-      </div>
-      <div class="grid-status-row">
-        <span id="customer-grid-count" class="muted">กำลังเตรียมข้อมูล...</span>
-        <span class="muted">ปรับลำดับ ความกว้าง และตัวกรองในหัวตารางได้</span>
-      </div>
-      <div id="customer-grid" class="ag-grid-shell" aria-label="รายชื่อลูกค้า">
-        <div class="chart-loading"><span class="spinner"></span><span>กำลังสร้างตาราง...</span></div>
-      </div>
-    </section>`;
-  renderCustomerTable();
-}
+    renderCustomerTable();
+    renderDateRangeButtons();
+  }
+  function renderCustomerTable() {
+    const container = document.getElementById("customer-grid");
+    if (!container) return;
 
-function renderCustomerTable() {
-  const container = document.getElementById("customer-grid");
-  if (!container) return;
+    const filters = state.ui.customerFilters;
+    filters.search = document.getElementById("customer-search")?.value.trim() || filters.search || "";
+    filters.status = document.getElementById("customer-status-filter")?.value || "";
+    filters.owner = document.getElementById("customer-owner-filter")?.value || "";
+    filters.onboarding = document.getElementById("customer-onboarding-filter")?.value || "";
+    filters.importStatus = document.getElementById("customer-import-filter")?.value || "";
+    filters.engagement = document.getElementById("customer-engagement-filter")?.value || "";
+    filters.contractType = document.getElementById("customer-contract-filter")?.value || "";
+    filters.moduleId = document.getElementById("customer-module-filter")?.value || "";
+    filters.featureId = document.getElementById("customer-feature-filter")?.value || "";
+    filters.fleetMin = document.getElementById("customer-fleet-min")?.value || "";
+    filters.fleetMax = document.getElementById("customer-fleet-max")?.value || "";
+    filters.advancedOpen = Boolean(document.getElementById("customer-advanced-filters")?.open);
 
-  const filters = state.ui.customerFilters;
-  filters.search = document.getElementById("customer-search")?.value.trim() || "";
-  filters.status = document.getElementById("customer-status-filter")?.value || "";
-  filters.owner = document.getElementById("customer-owner-filter")?.value || "";
-  filters.onboarding = document.getElementById("customer-onboarding-filter")?.value || "";
-  filters.importStatus = document.getElementById("customer-import-filter")?.value || "";
-  filters.engagement = document.getElementById("customer-engagement-filter")?.value || "";
-  filters.moduleId = document.getElementById("customer-module-filter")?.value || "";
-  filters.featureId = document.getElementById("customer-feature-filter")?.value || "";
-  filters.fleetMin = document.getElementById("customer-fleet-min")?.value || "";
-  filters.fleetMax = document.getElementById("customer-fleet-max")?.value || "";
-  filters.startFrom = dateValue(document, "customer_start_from") || "";
-  filters.startTo = dateValue(document, "customer_start_to") || "";
-  filters.billingFrom = dateValue(document, "customer_billing_from") || "";
-  filters.billingTo = dateValue(document, "customer_billing_to") || "";
-  filters.advancedOpen = Boolean(document.getElementById("customer-advanced-filters")?.open);
+    const query = filters.search.toLowerCase();
+    const minimumFleet = filters.fleetMin === "" ? null : Number(filters.fleetMin);
+    const maximumFleet = filters.fleetMax === "" ? null : Number(filters.fleetMax);
 
-  const query = filters.search.toLowerCase();
-  const minimumFleet = filters.fleetMin === "" ? null : Number(filters.fleetMin);
-  const maximumFleet = filters.fleetMax === "" ? null : Number(filters.fleetMax);
+    const rows = state.customers
+      .filter((customer) => {
+        const owners = state.customerOwners.filter((item) => item.customer_id === customer.id);
+        const moduleIds = state.customerModules
+          .filter((item) => item.customer_id === customer.id)
+          .map((item) => item.module_id);
+        const featureIds = state.customerFeatures
+          .filter((item) => item.customer_id === customer.id)
+          .map((item) => item.feature_id);
+        const ownerText = owners.map((item) => profileName(item.profile_id)).join(" ");
+        const haystack = `${customer.legal_name} ${customer.short_name || ""} ${customer.tax_id} ${ownerText}`.toLowerCase();
+        const ownerMatch = !filters.owner
+          || (filters.owner === "unassigned" && owners.length === 0)
+          || owners.some((item) => item.profile_id === filters.owner);
+        const onboardingMatch = !filters.onboarding
+          || (filters.onboarding === "none"
+            ? !customer.onboarding_stage
+            : customer.onboarding_stage === filters.onboarding);
+        const engagementMatch = !filters.engagement
+          || (filters.engagement === "none"
+            ? !customer.engagement_level
+            : customer.engagement_level === filters.engagement);
+        const fleet = Number(customer.fleet_size || 0);
 
-  const rows = state.customers
-    .filter((customer) => {
-      const owners = state.customerOwners.filter((item) => item.customer_id === customer.id);
-      const moduleIds = state.customerModules.filter((item) => item.customer_id === customer.id).map((item) => item.module_id);
-      const featureIds = state.customerFeatures.filter((item) => item.customer_id === customer.id).map((item) => item.feature_id);
-      const ownerText = owners.map((item) => profileName(item.profile_id)).join(" ");
-      const haystack = `${customer.legal_name} ${customer.short_name || ""} ${customer.tax_id} ${ownerText}`.toLowerCase();
-      const ownerMatch = !filters.owner
-        || (filters.owner === "unassigned" && owners.length === 0)
-        || owners.some((item) => item.profile_id === filters.owner);
-      const onboardingMatch = !filters.onboarding
-        || (filters.onboarding === "none" ? !customer.onboarding_stage : customer.onboarding_stage === filters.onboarding);
-      const engagementMatch = !filters.engagement
-        || (filters.engagement === "none" ? !customer.engagement_level : customer.engagement_level === filters.engagement);
-      const fleet = Number(customer.fleet_size || 0);
-      return (
-        (!query || haystack.includes(query))
-        && (!filters.status || customer.account_status === filters.status)
-        && ownerMatch
-        && onboardingMatch
-        && (!filters.importStatus || customer.import_status === filters.importStatus)
-        && engagementMatch
-        && (!filters.moduleId || moduleIds.includes(filters.moduleId))
-        && (!filters.featureId || featureIds.includes(filters.featureId))
-        && (minimumFleet === null || fleet >= minimumFleet)
-        && (maximumFleet === null || fleet <= maximumFleet)
-        && (!filters.startFrom || (customer.start_date && customer.start_date >= filters.startFrom))
-        && (!filters.startTo || (customer.start_date && customer.start_date <= filters.startTo))
-        && (!filters.billingFrom || (customer.billing_date && customer.billing_date >= filters.billingFrom))
-        && (!filters.billingTo || (customer.billing_date && customer.billing_date <= filters.billingTo))
-      );
-    })
-    .map((customer) => {
-      const moduleNames = state.customerModules
-        .filter((item) => item.customer_id === customer.id)
-        .map((item) => state.modules.find((module) => module.id === item.module_id)?.name)
-        .filter(Boolean);
-      const featureNames = state.customerFeatures
-        .filter((item) => item.customer_id === customer.id)
-        .map((item) => state.features.find((feature) => feature.id === item.feature_id)?.name)
-        .filter(Boolean);
-      return {
-        ...customer,
-        owner_text: ownerNames(customer.id).join(", ") || "-",
-        module_text: moduleNames.join(", ") || "-",
-        feature_text: featureNames.join(", ") || "-",
-        onboarding_text: label("onboarding_stage", customer.onboarding_stage),
-        import_text: label("import_status", customer.import_status),
-        engagement_text: label("engagement_level", customer.engagement_level),
-        updated_by_name: profileName(customer.updated_by)
-      };
-    });
+        return (
+          (!query || haystack.includes(query))
+          && (!filters.status || customer.account_status === filters.status)
+          && ownerMatch
+          && onboardingMatch
+          && (!filters.importStatus || customer.import_status === filters.importStatus)
+          && engagementMatch
+          && (!filters.contractType || customer.contract_type === filters.contractType)
+          && (!filters.moduleId || moduleIds.includes(filters.moduleId))
+          && (!filters.featureId || featureIds.includes(filters.featureId))
+          && (minimumFleet === null || fleet >= minimumFleet)
+          && (maximumFleet === null || fleet <= maximumFleet)
+          && (!filters.startFrom || (customer.start_date && customer.start_date >= filters.startFrom))
+          && (!filters.startTo || (customer.start_date && customer.start_date <= filters.startTo))
+          && (!filters.billingFrom || (customer.billing_date && customer.billing_date >= filters.billingFrom))
+          && (!filters.billingTo || (customer.billing_date && customer.billing_date <= filters.billingTo))
+        );
+      })
+      .map((customer) => {
+        const moduleNames = state.customerModules
+          .filter((item) => item.customer_id === customer.id)
+          .map((item) => state.modules.find((module) => module.id === item.module_id)?.name)
+          .filter(Boolean);
+        const featureNames = state.customerFeatures
+          .filter((item) => item.customer_id === customer.id)
+          .map((item) => state.features.find((feature) => feature.id === item.feature_id)?.name)
+          .filter(Boolean);
+        return {
+          ...customer,
+          owner_text: ownerNames(customer.id).join(", ") || "-",
+          module_text: moduleNames.join(", ") || "-",
+          feature_text: featureNames.join(", ") || "-",
+          onboarding_text: label("onboarding_stage", customer.onboarding_stage),
+          import_text: label("import_status", customer.import_status),
+          engagement_text: label("engagement_level", customer.engagement_level),
+          contract_text: label("contract_type", customer.contract_type),
+          updated_by_name: profileName(customer.updated_by)
+        };
+      });
 
-  state.filteredCustomerRows = rows;
-  const countNode = document.getElementById("customer-grid-count");
-  if (countNode) countNode.textContent = `${rows.length.toLocaleString("th-TH")} รายการ`;
+    state.filteredCustomerRows = rows;
+    const countNode = document.getElementById("customer-grid-count");
+    if (countNode) countNode.textContent = `${rows.length.toLocaleString("th-TH")} รายการ`;
 
-  if (state.grids.customers) {
-    state.grids.customers.setGridOption("rowData", rows);
-    return;
+    if (state.grids.customers) {
+      state.grids.customers.setGridOption("rowData", rows);
+      return;
+    }
+
+    const mobile = window.innerWidth < 760;
+    createCommunityGrid(container, {
+      rowData: rows,
+      getRowId: (params) => params.data.id,
+      columnDefs: [
+        {
+          headerName: "ลูกค้า",
+          field: "legal_name",
+          pinned: mobile ? undefined : "left",
+          minWidth: 250,
+          flex: 1.5,
+          cellRenderer: (params) => {
+            const wrapper = document.createElement("div");
+            wrapper.className = "grid-primary-cell";
+            const title = document.createElement("strong");
+            title.textContent = params.data.legal_name || "-";
+            const secondary = document.createElement("span");
+            secondary.className = "grid-secondary";
+            secondary.textContent = params.data.short_name || "ไม่มีชื่อย่อ";
+            wrapper.append(title, secondary);
+            return wrapper;
+          }
+        },
+        {
+          headerName: "เลขประจำตัวผู้เสียภาษี",
+          field: "tax_id",
+          minWidth: 190,
+          filter: "agTextColumnFilter"
+        },
+        {
+          headerName: "จำนวนรถ",
+          field: "fleet_size",
+          minWidth: 115,
+          maxWidth: 130,
+          type: "numericColumn",
+          filter: "agNumberColumnFilter",
+          valueFormatter: (params) => Number(params.value || 0).toLocaleString("th-TH")
+        },
+        {
+          headerName: "ผู้รับผิดชอบ",
+          field: "owner_text",
+          minWidth: 190,
+          flex: 1
+        },
+        {
+          headerName: "ขั้นตอนเริ่มใช้งาน",
+          field: "onboarding_text",
+          minWidth: 170
+        },
+        {
+          headerName: "การนำเข้าข้อมูล",
+          field: "import_text",
+          minWidth: 155,
+          cellRenderer: (params) => statusBadgeNode(params.value, params.data.import_status)
+        },
+        {
+          headerName: "สัญญา",
+          field: "contract_text",
+          minWidth: 130
+        },
+        {
+          headerName: "อัปเดตล่าสุด",
+          field: "updated_at",
+          minWidth: 185,
+          sort: "desc",
+          cellRenderer: (params) => {
+            const wrapper = document.createElement("div");
+            wrapper.className = "grid-primary-cell";
+            const date = document.createElement("span");
+            date.textContent = formatDateTime(params.value);
+            const by = document.createElement("span");
+            by.className = "grid-secondary";
+            by.textContent = params.data.updated_by_name;
+            wrapper.append(date, by);
+            return wrapper;
+          }
+        },
+        {
+          headerName: "",
+          colId: "actions",
+          pinned: "right",
+          width: 142,
+          minWidth: 142,
+          maxWidth: 142,
+          sortable: false,
+          filter: false,
+          resizable: false,
+          suppressHeaderMenuButton: true,
+          cellRenderer: (params) => {
+            const wrapper = document.createElement("div");
+            wrapper.className = "grid-actions grid-actions-compact";
+            wrapper.append(
+              iconActionLinkNode({
+                label: "ดูรายละเอียดลูกค้า",
+                href: `#/customer/${params.data.id}`,
+                iconName: "eye"
+              }),
+              iconActionLinkNode({
+                label: "แก้ไขข้อมูลลูกค้า",
+                href: `#/customer/${params.data.id}/edit`,
+                iconName: "edit"
+              }),
+              iconActionButtonNode({
+                label: "ลบลูกค้า",
+                action: "delete-customer",
+                id: params.data.id,
+                iconName: "delete",
+                variant: "danger"
+              })
+            );
+            return wrapper;
+          }
+        }
+      ]
+    }, "customers");
   }
 
-  const mobile = window.innerWidth < 760;
-  createCommunityGrid(container, {
-    rowData: rows,
-    getRowId: (params) => params.data.id,
-    columnDefs: [
-      {
-        headerName: "ลูกค้า",
-        field: "legal_name",
-        pinned: mobile ? undefined : "left",
-        minWidth: 250,
-        flex: 1.5,
-        cellRenderer: (params) => {
-          const wrapper = document.createElement("div");
-          wrapper.className = "grid-primary-cell";
-          const title = document.createElement("strong");
-          title.textContent = params.data.legal_name || "-";
-          const secondary = document.createElement("span");
-          secondary.className = "grid-secondary";
-          secondary.textContent = params.data.short_name || "ไม่มีชื่อย่อ";
-          wrapper.append(title, secondary);
-          return wrapper;
-        }
-      },
-      {
-        headerName: "เลขประจำตัวผู้เสียภาษี",
-        field: "tax_id",
-        minWidth: 190,
-        filter: "agTextColumnFilter"
-      },
-      {
-        headerName: "จำนวนรถ",
-        field: "fleet_size",
-        minWidth: 115,
-        maxWidth: 130,
-        type: "numericColumn",
-        filter: "agNumberColumnFilter",
-        valueFormatter: (params) => Number(params.value || 0).toLocaleString("th-TH")
-      },
-      {
-        headerName: "ผู้รับผิดชอบ",
-        field: "owner_text",
-        minWidth: 190,
-        flex: 1
-      },
-      {
-        headerName: "ขั้นตอนเริ่มใช้งาน",
-        field: "onboarding_text",
-        minWidth: 170
-      },
-      {
-        headerName: "การนำเข้าข้อมูล",
-        field: "import_text",
-        minWidth: 155,
-        cellRenderer: (params) => statusBadgeNode(params.value, params.data.import_status)
-      },
-      {
-        headerName: "อัปเดตล่าสุด",
-        field: "updated_at",
-        minWidth: 185,
-        sort: "desc",
-        cellRenderer: (params) => {
-          const wrapper = document.createElement("div");
-          wrapper.className = "grid-primary-cell";
-          const date = document.createElement("span");
-          date.textContent = formatDateTime(params.value);
-          const by = document.createElement("span");
-          by.className = "grid-secondary";
-          by.textContent = params.data.updated_by_name;
-          wrapper.append(date, by);
-          return wrapper;
-        }
-      },
-      {
-        headerName: "",
-        colId: "actions",
-        pinned: "right",
-        width: 142,
-        minWidth: 142,
-        maxWidth: 142,
-        sortable: false,
-        filter: false,
-        resizable: false,
-        suppressHeaderMenuButton: true,
-        cellRenderer: (params) => {
-          const wrapper = document.createElement("div");
-          wrapper.className = "grid-actions grid-actions-compact";
-          wrapper.append(
-            iconActionLinkNode({
-              label: "ดูรายละเอียดลูกค้า",
-              href: `#/customer/${params.data.id}`,
-              iconName: "eye"
-            }),
-            iconActionLinkNode({
-              label: "แก้ไขข้อมูลลูกค้า",
-              href: `#/customer/${params.data.id}/edit`,
-              iconName: "edit"
-            }),
-            iconActionButtonNode({
-              label: "ลบลูกค้า",
-              action: "delete-customer",
-              id: params.data.id,
-              iconName: "delete",
-              variant: "danger"
-            })
-          );
-          return wrapper;
-        }
-      }
-    ]
-  }, "customers");
-}
+  function customerCoreFields(customer = null) {
+    const c = customer || {};
+    const defaultImportStatus = c.import_status
+      || masterOptions("import_status")[0]?.option_value
+      || "waiting";
+    return `
+      <section id="customer-basic-section" class="panel edit-section">
+        <div class="panel-header"><h2>1. ข้อมูลพื้นฐาน</h2></div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <label class="span-2">
+              <span class="field-label">ชื่อนิติบุคคล <span class="required">*</span></span>
+              <input name="legal_name" maxlength="500" value="${h(c.legal_name || "")}" required>
+            </label>
+            <label>
+              <span class="field-label">ชื่อย่อ</span>
+              <input name="short_name" maxlength="300" value="${h(c.short_name || "")}">
+            </label>
+            <label>
+              <span class="field-label">เลขประจำตัวผู้เสียภาษี <span class="required">*</span></span>
+              <input name="tax_id" inputmode="numeric" pattern="[0-9]{13}" minlength="13" maxlength="13"
+                     value="${h(c.tax_id || "")}" placeholder="ตัวเลข 13 หลัก" required>
+            </label>
+            <label>
+              <span class="field-label">จำนวนรถ <span class="required">*</span></span>
+              <input name="fleet_size" type="number" min="0" step="1" value="${h(c.fleet_size ?? 0)}" required>
+            </label>
+            <label>
+              <span class="field-label">สถานะบัญชี <span class="required">*</span></span>
+              <select name="account_status" required>
+                <option value="active" ${(c.account_status || "active") === "active" ? "selected" : ""}>ใช้งาน</option>
+                <option value="inactive" ${c.account_status === "inactive" ? "selected" : ""}>ไม่ใช้งาน</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </section>
 
-function customerCoreFields(customer = null) {
-  const c = customer || {};
-  const defaultImportStatus = c.import_status
-    || masterOptions("import_status")[0]?.option_value
-    || "waiting";
-  return `
-    <section class="form-section">
-      <div class="form-section-heading">
-        <h2>ข้อมูลบริษัท</h2>
-      </div>
-      <div class="form-grid">
-        <label class="span-2">
-          <span class="field-label">ชื่อนิติบุคคล <span class="required">*</span></span>
-          <input name="legal_name" maxlength="500" value="${h(c.legal_name || "")}" required>
-        </label>
-        <label>
-          <span class="field-label">ชื่อย่อ</span>
-          <input name="short_name" maxlength="300" value="${h(c.short_name || "")}">
-        </label>
-        <label>
-          <span class="field-label">เลขประจำตัวผู้เสียภาษี <span class="required">*</span></span>
-          <input name="tax_id" inputmode="numeric" pattern="[0-9]{13}" minlength="13" maxlength="13"
-                 value="${h(c.tax_id || "")}" placeholder="ตัวเลข 13 หลัก" required>
-        </label>
-        <label>
-          <span class="field-label">จำนวนรถ <span class="required">*</span></span>
-          <input name="fleet_size" type="number" min="0" step="1" value="${h(c.fleet_size ?? 0)}" required>
-        </label>
-        <label>
-          <span class="field-label">สถานะบัญชี <span class="required">*</span></span>
-          <select name="account_status" required>
-            <option value="active" ${(c.account_status || "active") === "active" ? "selected" : ""}>ใช้งาน</option>
-            <option value="inactive" ${c.account_status === "inactive" ? "selected" : ""}>ไม่ใช้งาน</option>
-          </select>
-        </label>
-      </div>
-    </section>
+      <section id="customer-status-section" class="panel edit-section">
+        <div class="panel-header"><h2>2. สถานะและวันที่</h2></div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <label>
+              <span class="field-label">สถานะการนำเข้าข้อมูล <span class="required">*</span></span>
+              <select name="import_status" required>
+                ${masterOptionHtml("import_status", defaultImportStatus, { allowBlank: false })}
+              </select>
+            </label>
+            <label>
+              <span class="field-label">ขั้นตอนเริ่มใช้งาน</span>
+              <select name="onboarding_stage">
+                ${masterOptionHtml("onboarding_stage", c.onboarding_stage || "")}
+              </select>
+            </label>
+            <label>
+              <span class="field-label">ระดับความสนใจ</span>
+              <select name="engagement_level">
+                ${masterOptionHtml("engagement_level", c.engagement_level || "")}
+              </select>
+            </label>
+            ${dateControlHtml({
+              id: "customer-start-date",
+              name: "start_date",
+              label: "วันที่เริ่มใช้งานจริง",
+              value: c.start_date || ""
+            })}
+            ${dateControlHtml({
+              id: "customer-billing-date",
+              name: "billing_date",
+              label: "วันที่เริ่มวางบิล",
+              value: c.billing_date || ""
+            })}
+          </div>
+        </div>
+      </section>
+    `;
+  }
 
-    <section class="form-section">
-      <div class="form-section-heading">
-        <h2>ความคืบหน้าและวันที่</h2>
-      </div>
-      <div class="form-grid">
-        <label>
-          <span class="field-label">ขั้นตอนเริ่มใช้งาน</span>
-          <select name="onboarding_stage">
-            ${masterOptionHtml("onboarding_stage", c.onboarding_stage || "")}
-          </select>
-        </label>
-        <label>
-          <span class="field-label">สถานะการนำเข้าข้อมูล <span class="required">*</span></span>
-          <select name="import_status" required>
-            ${masterOptionHtml("import_status", defaultImportStatus, { allowBlank: false })}
-          </select>
-        </label>
-        <label>
-          <span class="field-label">ระดับความสนใจ</span>
-          <select name="engagement_level">
-            ${masterOptionHtml("engagement_level", c.engagement_level || "")}
-          </select>
-        </label>
-        ${dateControlHtml({
-          id: "customer-start-date",
-          name: "start_date",
-          label: "วันที่เริ่ม",
-          value: c.start_date || ""
-        })}
-        ${dateControlHtml({
-          id: "customer-billing-date",
-          name: "billing_date",
-          label: "วันที่เริ่มวางบิล",
-          value: c.billing_date || ""
-        })}
-      </div>
-    </section>`;
-}
+  function customerContractSection(customer = null) {
+    const c = customer || {};
+    const defaultContractType = c.contract_type
+      || masterOptions("contract_type")[0]?.option_value
+      || "monthly";
+    return `
+      <section id="customer-contract-section" class="panel edit-section">
+        <div class="panel-header"><h2>6. สัญญาและการอบรม</h2></div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <label>
+              <span class="field-label">สัญญา <span class="required">*</span></span>
+              <select name="contract_type" required>
+                ${masterOptionHtml("contract_type", defaultContractType, { allowBlank: false })}
+              </select>
+            </label>
+            <label>
+              <span class="field-label">สอนใช้งานนอกสถานที่</span>
+              <input name="onsite_training_count" type="number" min="0" max="999999" step="1"
+                     value="${h(c.onsite_training_count ?? 0)}" required>
+              <small class="field-help">จำนวนครั้ง ตั้งแต่ 0 ขึ้นไป</small>
+            </label>
+          </div>
+        </div>
+      </section>`;
+  }
 
+  function customerOwnerSection(data = {}, customerId = "") {
+    const selectedOwnerIds = new Set((data.owners || []).map((row) => row.profile_id));
+    const primaryOwner = (data.owners || []).find((row) => row.is_primary)?.profile_id || "";
+    const profiles = state.profiles.filter((profile) => profile.is_active || selectedOwnerIds.has(profile.id));
+
+    return `
+      <section id="customer-owner-section" class="panel edit-section">
+        <div class="panel-header"><h2>3. ผู้รับผิดชอบ</h2></div>
+        <div class="panel-body">
+          <div class="owner-grid">
+            ${profiles.map((profile) => `
+              <label class="choice-card">
+                <input type="checkbox" name="owner_id" value="${h(profile.id)}"
+                       ${selectedOwnerIds.has(profile.id) ? "checked" : ""}>
+                <span>${h(profile.display_name)}<small>${h(profile.position || "ไม่ระบุตำแหน่ง")}</small></span>
+              </label>
+            `).join("") || '<p class="muted">ยังไม่มีผู้ใช้งานที่เปิดใช้งาน</p>'}
+          </div>
+          <label class="field-block">
+            <span class="field-label">ผู้รับผิดชอบหลัก</span>
+            <select name="primary_owner">
+              <option value="">ไม่ระบุ</option>
+              ${profiles.map((profile) => `
+                <option value="${h(profile.id)}" ${profile.id === primaryOwner ? "selected" : ""}>
+                  ${h(profile.display_name)}
+                </option>
+              `).join("")}
+            </select>
+          </label>
+        </div>
+      </section>`;
+  }
+
+  function customerContactSection(customerId = "") {
+    return `
+      <section id="customer-contact-section" class="panel edit-section">
+        <div class="panel-header">
+          <h2>4. ผู้ติดต่อ</h2>
+          <button type="button" class="btn btn-secondary btn-small"
+                  data-action="open-contact-create" data-customer-id="${h(customerId)}">
+            ${icon("plus")} เพิ่มผู้ติดต่อ
+          </button>
+        </div>
+        <div class="panel-body">
+          <div id="customer-contact-list" class="stack"></div>
+        </div>
+      </section>`;
+  }
+
+  function customerModuleFeatureSection(data = {}) {
+    const moduleIds = data.moduleIds || [];
+    const featureIds = data.featureIds || [];
+    const modules = state.modules.filter((item) => item.is_active || moduleIds.includes(item.id));
+    const features = state.features.filter((item) => item.is_active || featureIds.includes(item.id));
+
+    return `
+      <section id="customer-module-section" class="panel edit-section">
+        <div class="panel-header"><h2>5. โมดูลและฟังก์ชัน</h2></div>
+        <div class="panel-body">
+          <h3>โมดูล</h3>
+          <div class="choice-grid">
+            ${modules.map((item) => `
+              <label class="choice-card">
+                <input type="checkbox" name="module_id" value="${h(item.id)}"
+                       ${moduleIds.includes(item.id) ? "checked" : ""}>
+                <span>${h(item.name)}${!item.is_active ? "<small>ปิดใช้งาน</small>" : ""}</span>
+              </label>
+            `).join("") || '<p class="muted">ยังไม่มีโมดูลที่เปิดใช้งาน</p>'}
+          </div>
+          <h3 class="section-subtitle">ฟังก์ชัน</h3>
+          <div class="choice-grid">
+            ${features.map((item) => `
+              <label class="choice-card">
+                <input type="checkbox" name="feature_id" value="${h(item.id)}"
+                       ${featureIds.includes(item.id) ? "checked" : ""}>
+                <span>${h(item.name)}${!item.is_active ? "<small>ปิดใช้งาน</small>" : ""}</span>
+              </label>
+            `).join("") || '<p class="muted">ยังไม่มีฟังก์ชันที่เปิดใช้งาน</p>'}
+          </div>
+        </div>
+      </section>`;
+  }
+
+  function customerFormSections(data = {}) {
+    const customer = data.customer || {};
+    return `
+      ${customerCoreFields(customer)}
+      ${customerOwnerSection(data, customer.id || "")}
+      ${customerContactSection(customer.id || "")}
+      ${customerModuleFeatureSection(data)}
+      ${customerContractSection(customer)}
+    `;
+  }
   async function renderCustomerCreatePage() {
+    await loadCommonData();
+    const data = {
+      customer: {
+        id: null,
+        account_status: "active",
+        fleet_size: 0,
+        onsite_training_count: 0
+      },
+      owners: [],
+      contacts: [],
+      moduleIds: [],
+      featureIds: []
+    };
+    state.currentCustomer = null;
+    state.currentCustomerData = data;
+    state.customerEditDraft = createCustomerEditDraft(data);
+
     el.mainContent.innerHTML = `
       ${pageHeader(
         "เพิ่มลูกค้า",
-        "สร้างข้อมูลหลักก่อน แล้วระบบจะพาไปหน้าจัดการข้อมูลทั้งหมด",
+        "กรอกข้อมูลลูกค้าให้ครบทุกส่วนก่อนบันทึก",
         "",
         [{ label: "ข้อมูลลูกค้า", href: "#/customers" }, { label: "เพิ่มลูกค้า" }]
       )}
       <form id="customer-core-form" data-mode="create" class="customer-form-page" novalidate>
-        <section class="panel form-page-panel">
-          <div class="panel-body">
-            ${customerCoreFields()}
-          </div>
-        </section>
+        <div class="edit-sections">
+          ${customerFormSections(data)}
+        </div>
         <div class="sticky-form-actions">
           <a class="btn btn-secondary" href="#/customers">ยกเลิก</a>
-          <button id="customer-save-button" class="btn btn-primary" type="submit">${icon("save")} บันทึกและกรอกข้อมูลต่อ</button>
+          <button id="customer-save-button" class="btn btn-primary" type="submit">
+            ${icon("save")} บันทึก
+          </button>
         </div>
       </form>`;
+
+    renderCustomerDraftContacts();
   }
-
-
-function createCustomerEditDraft(data) {
-  return {
-    customerId: data.customer.id,
-    original: data,
-    contacts: data.contacts.map((contact) => ({
-      ...contact,
-      _key: contact.id,
-      _isNew: false
-    })),
-    deletedContactIds: new Set(),
-    dirty: false
-  };
-}
+  function createCustomerEditDraft(data) {
+    return {
+      customerId: data.customer?.id || null,
+      original: {
+        ...data,
+        moduleIds: [...(data.moduleIds || [])],
+        featureIds: [...(data.featureIds || [])]
+      },
+      contacts: (data.contacts || []).map((contact) => ({
+        ...contact,
+        _key: contact.id || `new-${crypto.randomUUID()}`,
+        _isNew: !contact.id
+      })),
+      deletedContactIds: new Set(),
+      dirty: false
+    };
+  }
 
 function markCustomerEditDirty() {
   if (state.customerEditDraft) state.customerEditDraft.dirty = true;
@@ -3197,192 +3285,148 @@ function renderCustomerDraftContacts() {
     </article>
   `).join("") || '<div class="empty-state compact"><strong>ยังไม่มีผู้ติดต่อ</strong></div>';
 }
+  async function renderCustomerEditPage(customerId) {
+    const data = await loadCustomerDetail(customerId);
+    state.currentCustomer = data.customer;
+    state.currentCustomerData = data;
+    state.customerEditDraft = createCustomerEditDraft(data);
+    const c = data.customer;
 
-async function renderCustomerEditPage(customerId) {
-  const data = await loadCustomerDetail(customerId);
-  state.currentCustomer = data.customer;
-  state.currentCustomerData = data;
-  state.customerEditDraft = createCustomerEditDraft(data);
-  const c = data.customer;
+    el.mainContent.innerHTML = `
+      ${pageHeader(
+        `แก้ไข: ${c.legal_name}`,
+        "",
+        "",
+        [
+          { label: "ข้อมูลลูกค้า", href: "#/customers" },
+          { label: c.short_name || c.legal_name, href: `#/customer/${h(c.id)}` },
+          { label: "แก้ไข" }
+        ]
+      )}
 
-  const allProfiles = state.profiles.filter((profile) => profile.is_active);
-  const selectedOwnerIds = new Set(data.owners.map((row) => row.profile_id));
-  const primaryOwner = data.owners.find((row) => row.is_primary)?.profile_id || "";
+      <form id="customer-edit-form" data-customer-id="${h(c.id)}" class="customer-form-page" novalidate>
+        <div class="edit-sections">
+          ${customerFormSections(data)}
+        </div>
+        <div class="sticky-form-actions">
+          <a class="btn btn-secondary" href="#/customer/${h(c.id)}">ยกเลิก</a>
+          <button id="customer-save-button" class="btn btn-primary" type="submit">
+            ${icon("save")} บันทึก
+          </button>
+        </div>
+      </form>`;
 
-  el.mainContent.innerHTML = `
-    ${pageHeader(
-      `แก้ไข: ${c.legal_name}`,
-      "",
-      "",
-      [{ label: "ข้อมูลลูกค้า", href: "#/customers" }, { label: c.short_name || c.legal_name, href: `#/customer/${h(c.id)}` }, { label: "แก้ไข" }]
-    )}
-
-    <form id="customer-edit-form" data-customer-id="${h(c.id)}" class="customer-form-page" novalidate>
-      <div class="edit-sections">
-        <section id="customer-core-section" class="panel edit-section">
-          <div class="panel-header"><h2>ข้อมูลหลัก</h2></div>
-          <div class="panel-body">${customerCoreFields(c)}</div>
-        </section>
-
-        <section id="customer-owner-section" class="panel edit-section">
-          <div class="panel-header"><h2>ผู้รับผิดชอบ</h2></div>
-          <div class="panel-body">
-            <div class="owner-grid">
-              ${allProfiles.map((profile) => `
-                <label class="choice-card">
-                  <input type="checkbox" name="owner_id" value="${h(profile.id)}" ${selectedOwnerIds.has(profile.id) ? "checked" : ""}>
-                  <span>${h(profile.display_name)}<small>${h(label("role", profile.role))}</small></span>
-                </label>
-              `).join("") || '<p class="muted">ยังไม่มีผู้ใช้งานที่เปิดใช้งาน</p>'}
-            </div>
-            <label class="field-block">
-              <span class="field-label">ผู้รับผิดชอบหลัก</span>
-              <select name="primary_owner">
-                <option value="">ไม่ระบุ</option>
-                ${allProfiles.map((profile) => `<option value="${h(profile.id)}" ${profile.id === primaryOwner ? "selected" : ""}>${h(profile.display_name)}</option>`).join("")}
-              </select>
-            </label>
-          </div>
-        </section>
-
-        <section id="customer-contact-section" class="panel edit-section">
-          <div class="panel-header">
-            <h2>ผู้ติดต่อ</h2>
-            <button type="button" class="btn btn-secondary btn-small" data-action="open-contact-create" data-customer-id="${h(c.id)}">${icon("plus")} เพิ่มผู้ติดต่อ</button>
-          </div>
-          <div class="panel-body">
-            <div id="customer-contact-list" class="stack"></div>
-          </div>
-        </section>
-
-        <section id="customer-module-section" class="panel edit-section">
-          <div class="panel-header"><h2>โมดูลและฟังก์ชัน</h2></div>
-          <div class="panel-body">
-            <h3>โมดูล</h3>
-            <div class="choice-grid">
-              ${state.modules.filter((item) => item.is_active).map((item) => `
-                <label class="choice-card">
-                  <input type="checkbox" name="module_id" value="${h(item.id)}" ${data.moduleIds.includes(item.id) ? "checked" : ""}>
-                  <span>${h(item.name)}</span>
-                </label>`).join("")}
-            </div>
-            <h3 class="section-subtitle">ฟังก์ชัน</h3>
-            <div class="choice-grid">
-              ${state.features.filter((item) => item.is_active).map((item) => `
-                <label class="choice-card">
-                  <input type="checkbox" name="feature_id" value="${h(item.id)}" ${data.featureIds.includes(item.id) ? "checked" : ""}>
-                  <span>${h(item.name)}</span>
-                </label>`).join("")}
-            </div>
-          </div>
-        </section>
-
-        <section id="customer-operation-section" class="panel edit-section">
-          <div class="panel-header"><h2>รูปแบบการดำเนินงาน</h2></div>
-          <div class="panel-body">
-            <label>
-              <span class="field-label">วิธีจ่ายพนักงานขับรถ</span>
-              <select name="driver_payment_method">
-                ${masterOptionHtml("driver_payment_method", data.operations?.driver_payment_method || "")}
-              </select>
-            </label>
-            <label>
-              <span class="field-label">การจัดการค่าใช้จ่ายเที่ยว</span>
-              <select name="trip_expense_management">
-                ${masterOptionHtml("trip_expense_management", data.operations?.trip_expense_management || "")}
-              </select>
-            </label>
-          </div>
-        </section>
-
-        <section id="customer-timeline-section" class="panel edit-section">
-          <div class="panel-header"><h2>ประวัติการติดตาม</h2></div>
-          <div class="panel-body">
-            <div class="form-grid">
-              <label>
-                <span class="field-label">ประเภท</span>
-                <select name="activity_type">
-                  ${masterOptionHtml("activity_type", masterOptions("activity_type")[0]?.option_value || "note", { allowBlank: false })}
-                </select>
-              </label>
-              ${dateControlHtml({
-                id: "activity-date",
-                name: "activity_date",
-                label: "วันที่",
-                value: bangkokDate()
-              })}
-              <label class="span-2">
-                <span class="field-label">รายละเอียดใหม่</span>
-                <textarea name="activity_detail" maxlength="10000" placeholder="เว้นว่างได้ หากไม่ต้องการเพิ่มรายการใหม่"></textarea>
-              </label>
-            </div>
-            <div class="section-divider"></div>
-            <div class="timeline-list">
-              ${data.activities.map((activity) => `
-                <article class="activity-item">
-                  <strong>${h(label("activity_type", activity.activity_type))} · ${h(formatDate(activity.activity_date))}</strong>
-                  <p>${h(activity.detail).replaceAll("\n", "<br>")}</p>
-                  <small class="muted">${h(profileName(activity.created_by))} · ${h(formatDateTime(activity.created_at))}</small>
-                </article>`).join("") || '<div class="empty-state compact"><strong>ยังไม่มีประวัติการติดตาม</strong></div>'}
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div class="sticky-form-actions">
-        <a class="btn btn-secondary" href="#/customer/${h(c.id)}">ยกเลิก</a>
-        <button id="customer-save-button" class="btn btn-primary" type="submit">${icon("save")} บันทึก</button>
-      </div>
-    </form>`;
-
-  renderCustomerDraftContacts();
-}
+    renderCustomerDraftContacts();
+  }
 
   function openCustomerForm(customer = null) {
     location.hash = customer?.id ? `#/customer/${customer.id}/edit` : "#/customers/new";
   }
 
-async function saveCustomer(event) {
-  event.preventDefault();
-  const formElement = event.target;
-  if (!validateDateControls(formElement) || !formElement.reportValidity()) return;
+  function collectCustomerFormState(formElement) {
+    const draft = state.customerEditDraft;
+    if (!draft) {
+      showToast("ไม่พบแบบร่างข้อมูลลูกค้า", "error");
+      return null;
+    }
 
-  const button = formElement.querySelector('button[type="submit"]');
-  setButtonBusy(button, true, "กำลังบันทึก...");
-  setLoading(true, "กำลังสร้างข้อมูลลูกค้า...");
-
-  try {
     const form = new FormData(formElement);
-    const payload = {
-      legal_name: String(form.get("legal_name") || "").trim(),
-      short_name: nullable(form.get("short_name")),
-      tax_id: String(form.get("tax_id") || "").trim(),
-      fleet_size: Number(form.get("fleet_size") || 0),
-      account_status: form.get("account_status"),
-      onboarding_stage: nullable(form.get("onboarding_stage")),
-      import_status: form.get("import_status"),
-      engagement_level: nullable(form.get("engagement_level")),
-      start_date: dateValue(formElement, "start_date"),
-      billing_date: dateValue(formElement, "billing_date")
+    const ownerIds = form.getAll("owner_id").map(String);
+    const primaryOwnerId = nullable(form.get("primary_owner"));
+    if (primaryOwnerId && !ownerIds.includes(primaryOwnerId)) {
+      showToast("ผู้รับผิดชอบหลักต้องอยู่ในรายชื่อผู้รับผิดชอบที่เลือก", "error");
+      return null;
+    }
+
+    const primaryContacts = draft.contacts.filter((contact) => contact.is_primary && contact.is_active);
+    if (primaryContacts.length > 1) {
+      showToast("กำหนดผู้ติดต่อหลักที่เปิดใช้งานได้เพียงหนึ่งคน", "error");
+      return null;
+    }
+
+    const onsiteTrainingCount = Number(form.get("onsite_training_count") || 0);
+    if (!Number.isInteger(onsiteTrainingCount) || onsiteTrainingCount < 0) {
+      showToast("จำนวนครั้งสอนใช้งานนอกสถานที่ต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป", "error");
+      return null;
+    }
+
+    return {
+      core: {
+        legal_name: String(form.get("legal_name") || "").trim(),
+        short_name: nullable(form.get("short_name")),
+        tax_id: String(form.get("tax_id") || "").trim(),
+        fleet_size: Number(form.get("fleet_size") || 0),
+        account_status: form.get("account_status"),
+        onboarding_stage: nullable(form.get("onboarding_stage")),
+        import_status: form.get("import_status"),
+        engagement_level: nullable(form.get("engagement_level")),
+        start_date: dateValue(formElement, "start_date"),
+        billing_date: dateValue(formElement, "billing_date"),
+        contract_type: form.get("contract_type"),
+        onsite_training_count: onsiteTrainingCount
+      },
+      ownerIds,
+      primaryOwnerId,
+      moduleIds: form.getAll("module_id").map(String),
+      featureIds: form.getAll("feature_id").map(String),
+      contacts: draft.contacts.map((contact) => ({
+        id: contact._isNew ? null : contact.id,
+        contact_name: String(contact.contact_name || "").trim(),
+        position: nullable(contact.position),
+        phone: nullable(contact.phone),
+        email: nullable(contact.email),
+        line_id: nullable(contact.line_id),
+        is_primary: Boolean(contact.is_primary),
+        is_active: Boolean(contact.is_active)
+      }))
     };
+  }
 
-    const result = await state.client.from("customers").insert(payload).select().single();
-    if (result.error) throw result.error;
-
+  function clearCustomerCaches() {
     state.customers = [];
     state.customerOwners = [];
     state.customerModules = [];
     state.customerFeatures = [];
-    showToast("สร้างข้อมูลลูกค้าแล้ว");
-    location.hash = `#/customer/${result.data.id}/edit`;
-  } catch (error) {
-    showError(error, "สร้างข้อมูลลูกค้าไม่สำเร็จ");
-  } finally {
-    setLoading(false);
-    setButtonBusy(button, false);
+    state.currentCustomer = null;
+    state.currentCustomerData = null;
+    state.customerEditDraft = null;
   }
-}
+  async function saveCustomer(event) {
+    event.preventDefault();
+    const formElement = event.target;
+    if (!validateDateControls(formElement) || !formElement.reportValidity()) return;
 
+    const collected = collectCustomerFormState(formElement);
+    if (!collected) return;
+
+    const button = formElement.querySelector('button[type="submit"]');
+    setButtonBusy(button, true, "กำลังบันทึก...");
+    setLoading(true, "กำลังสร้างข้อมูลลูกค้า...");
+
+    try {
+      const { data, error } = await state.client.rpc("create_customer_complete", {
+        p_customer: collected.core,
+        p_owner_ids: collected.ownerIds,
+        p_primary_owner_id: collected.primaryOwnerId,
+        p_module_ids: collected.moduleIds,
+        p_feature_ids: collected.featureIds,
+        p_contacts: collected.contacts
+      });
+      if (error) throw error;
+
+      const created = Array.isArray(data) ? data[0] : data;
+      if (!created?.id) throw new Error("ฐานข้อมูลไม่ส่งข้อมูลลูกค้าที่สร้างกลับมา");
+
+      clearCustomerCaches();
+      showToast("สร้างข้อมูลลูกค้าแล้ว");
+      location.hash = `#/customer/${created.id}`;
+    } catch (error) {
+      showError(error, "สร้างข้อมูลลูกค้าไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+      setButtonBusy(button, false);
+    }
+  }
 
 async function saveCustomerRelations(table, key, customerId, originalIds, nextIds) {
   const original = new Set(originalIds);
@@ -3403,301 +3447,261 @@ async function saveCustomerRelations(table, key, customerId, originalIds, nextId
     if (result.error) throw result.error;
   }
 }
+  async function saveCustomerEdit(event) {
+    event.preventDefault();
+    const formElement = event.target;
+    const draft = state.customerEditDraft;
+    if (!draft || !validateDateControls(formElement) || !formElement.reportValidity()) return;
 
-async function saveCustomerEdit(event) {
-  event.preventDefault();
-  const formElement = event.target;
-  const draft = state.customerEditDraft;
-  if (!draft || !validateDateControls(formElement) || !formElement.reportValidity()) return;
+    const collected = collectCustomerFormState(formElement);
+    if (!collected) return;
 
-  const customerId = formElement.dataset.customerId;
-  const button = formElement.querySelector('button[type="submit"]');
-  const form = new FormData(formElement);
-  const selectedOwnerIds = form.getAll("owner_id").map(String);
-  const primaryOwnerId = nullable(form.get("primary_owner"));
-  if (primaryOwnerId && !selectedOwnerIds.includes(primaryOwnerId)) {
-    showToast("ผู้รับผิดชอบหลักต้องอยู่ในรายชื่อผู้รับผิดชอบที่เลือก", "error");
-    return;
-  }
+    const customerId = formElement.dataset.customerId;
+    const button = formElement.querySelector('button[type="submit"]');
+    setButtonBusy(button, true, "กำลังบันทึก...");
+    setLoading(true, "กำลังบันทึกข้อมูลลูกค้า...");
+    let currentStep = "ข้อมูลพื้นฐาน สถานะ และสัญญา";
+    let completedSteps = 0;
 
-  const primaryContacts = draft.contacts.filter((contact) => contact.is_primary && contact.is_active);
-  if (primaryContacts.length > 1) {
-    showToast("กำหนดผู้ติดต่อหลักที่เปิดใช้งานได้เพียงหนึ่งคน", "error");
-    return;
-  }
-
-  setButtonBusy(button, true, "กำลังบันทึก...");
-  setLoading(true, "กำลังบันทึกข้อมูลลูกค้า...");
-  let currentStep = "ข้อมูลหลัก";
-  let completedSteps = 0;
-
-  try {
-    const payload = {
-      legal_name: String(form.get("legal_name") || "").trim(),
-      short_name: nullable(form.get("short_name")),
-      tax_id: String(form.get("tax_id") || "").trim(),
-      fleet_size: Number(form.get("fleet_size") || 0),
-      account_status: form.get("account_status"),
-      onboarding_stage: nullable(form.get("onboarding_stage")),
-      import_status: form.get("import_status"),
-      engagement_level: nullable(form.get("engagement_level")),
-      start_date: dateValue(formElement, "start_date"),
-      billing_date: dateValue(formElement, "billing_date")
-    };
-    let result = await state.client.from("customers").update(payload).eq("id", customerId).select().single();
-    if (result.error) throw result.error;
-    completedSteps += 1;
-
-    currentStep = "ผู้รับผิดชอบ";
-    result = await state.client.rpc("save_customer_owners", {
-      p_customer_id: customerId,
-      p_owner_ids: selectedOwnerIds,
-      p_primary_owner_id: primaryOwnerId
-    });
-    if (result.error) throw result.error;
-    completedSteps += 1;
-
-    currentStep = "โมดูลและฟังก์ชัน";
-    const nextModuleIds = form.getAll("module_id").map(String);
-    const nextFeatureIds = form.getAll("feature_id").map(String);
-    await saveCustomerRelations(
-      "customer_modules",
-      "module_id",
-      customerId,
-      draft.original.moduleIds,
-      nextModuleIds
-    );
-    await saveCustomerRelations(
-      "customer_features",
-      "feature_id",
-      customerId,
-      draft.original.featureIds,
-      nextFeatureIds
-    );
-    draft.original.moduleIds = [...nextModuleIds];
-    draft.original.featureIds = [...nextFeatureIds];
-    completedSteps += 1;
-
-    currentStep = "รูปแบบการดำเนินงาน";
-    result = await state.client.from("customer_operations").upsert({
-      customer_id: customerId,
-      driver_payment_method: nullable(form.get("driver_payment_method")),
-      trip_expense_management: nullable(form.get("trip_expense_management"))
-    }, { onConflict: "customer_id" });
-    if (result.error) throw result.error;
-    completedSteps += 1;
-
-    currentStep = "ผู้ติดต่อ";
-    for (const contactId of [...draft.deletedContactIds]) {
-      result = await state.client.from("customer_contacts").delete().eq("id", contactId).eq("customer_id", customerId);
+    try {
+      let result = await state.client
+        .from("customers")
+        .update(collected.core)
+        .eq("id", customerId)
+        .select()
+        .single();
       if (result.error) throw result.error;
-      draft.deletedContactIds.delete(contactId);
-    }
-    for (const contact of draft.contacts) {
-      result = await state.client.rpc("save_customer_contact", {
+      completedSteps += 1;
+
+      currentStep = "ผู้รับผิดชอบ";
+      result = await state.client.rpc("save_customer_owners", {
         p_customer_id: customerId,
-        p_contact_id: contact._isNew ? null : contact.id,
-        p_contact_name: String(contact.contact_name || "").trim(),
-        p_position: nullable(contact.position),
-        p_phone: nullable(contact.phone),
-        p_email: nullable(contact.email),
-        p_line_id: nullable(contact.line_id),
-        p_is_primary: Boolean(contact.is_primary),
-        p_is_active: Boolean(contact.is_active)
-      });
-      if (result.error) throw result.error;
-      const savedContact = Array.isArray(result.data) ? result.data[0] : result.data;
-      if (contact._isNew && savedContact?.id) {
-        contact.id = savedContact.id;
-        contact._key = savedContact.id;
-        contact._isNew = false;
-      }
-    }
-    completedSteps += 1;
-
-    const activityDetail = String(form.get("activity_detail") || "").trim();
-    if (activityDetail) {
-      currentStep = "ประวัติการติดตาม";
-      result = await state.client.from("customer_activities").insert({
-        customer_id: customerId,
-        activity_type: form.get("activity_type"),
-        activity_date: dateValue(formElement, "activity_date") || bangkokDate(),
-        detail: activityDetail
+        p_owner_ids: collected.ownerIds,
+        p_primary_owner_id: collected.primaryOwnerId
       });
       if (result.error) throw result.error;
       completedSteps += 1;
+
+      currentStep = "โมดูลและฟังก์ชัน";
+      await saveCustomerRelations(
+        "customer_modules",
+        "module_id",
+        customerId,
+        draft.original.moduleIds,
+        collected.moduleIds
+      );
+      await saveCustomerRelations(
+        "customer_features",
+        "feature_id",
+        customerId,
+        draft.original.featureIds,
+        collected.featureIds
+      );
+      draft.original.moduleIds = [...collected.moduleIds];
+      draft.original.featureIds = [...collected.featureIds];
+      completedSteps += 1;
+
+      currentStep = "ผู้ติดต่อ";
+      for (const contactId of [...draft.deletedContactIds]) {
+        result = await state.client
+          .from("customer_contacts")
+          .delete()
+          .eq("id", contactId)
+          .eq("customer_id", customerId);
+        if (result.error) throw result.error;
+        draft.deletedContactIds.delete(contactId);
+      }
+
+      for (const contact of draft.contacts) {
+        result = await state.client.rpc("save_customer_contact", {
+          p_customer_id: customerId,
+          p_contact_id: contact._isNew ? null : contact.id,
+          p_contact_name: String(contact.contact_name || "").trim(),
+          p_position: nullable(contact.position),
+          p_phone: nullable(contact.phone),
+          p_email: nullable(contact.email),
+          p_line_id: nullable(contact.line_id),
+          p_is_primary: Boolean(contact.is_primary),
+          p_is_active: Boolean(contact.is_active)
+        });
+        if (result.error) throw result.error;
+        const savedContact = Array.isArray(result.data) ? result.data[0] : result.data;
+        if (contact._isNew && savedContact?.id) {
+          contact.id = savedContact.id;
+          contact._key = savedContact.id;
+          contact._isNew = false;
+        }
+      }
+      completedSteps += 1;
+
+      clearCustomerCaches();
+      showToast("บันทึกข้อมูลลูกค้าครบแล้ว");
+      location.hash = `#/customer/${customerId}`;
+    } catch (error) {
+      console.error(error);
+      renderCustomerDraftContacts();
+      const note = completedSteps > 0 ? " ข้อมูลส่วนก่อนหน้าอาจถูกบันทึกแล้ว" : "";
+      showToast(`บันทึกส่วน “${currentStep}” ไม่สำเร็จ: ${normalizeError(error)}${note}`, "error");
+    } finally {
+      setLoading(false);
+      setButtonBusy(button, false);
     }
-
-    state.customers = [];
-    state.customerOwners = [];
-    state.customerModules = [];
-    state.customerFeatures = [];
-    state.customerEditDraft = null;
-    showToast("บันทึกข้อมูลลูกค้าครบแล้ว");
-    location.hash = `#/customer/${customerId}`;
-  } catch (error) {
-    console.error(error);
-    renderCustomerDraftContacts();
-    const note = completedSteps > 0 ? " ข้อมูลส่วนก่อนหน้าอาจถูกบันทึกแล้ว" : "";
-    showToast(`บันทึกส่วน “${currentStep}” ไม่สำเร็จ: ${normalizeError(error)}${note}`, "error");
-  } finally {
-    setLoading(false);
-    setButtonBusy(button, false);
   }
-}
-
   async function loadCustomerDetail(customerId) {
     await Promise.all([loadCommonData(), loadCustomers()]);
     let customer = state.customers.find((item) => item.id === customerId) || null;
     if (!customer) {
-      const customerResult = await state.client.from("customers").select("*").eq("id", customerId).eq("is_archived", false).single();
+      const customerResult = await state.client
+        .from("customers")
+        .select("*")
+        .eq("id", customerId)
+        .eq("is_archived", false)
+        .single();
       if (customerResult.error) throw customerResult.error;
       customer = customerResult.data;
     }
     if (!customer) throw new Error("ไม่พบข้อมูลลูกค้า");
 
-    const [
-      ownersResult,
-      contactsResult,
-      modulesResult,
-      featuresResult,
-      operationsResult,
-      activitiesResult
-    ] = await Promise.all([
+    const [ownersResult, contactsResult, modulesResult, featuresResult] = await Promise.all([
       state.client.from("customer_owners").select("*").eq("customer_id", customerId),
-      state.client.from("customer_contacts").select("*").eq("customer_id", customerId).order("is_primary", { ascending: false }).order("contact_name"),
+      state.client.from("customer_contacts").select("*").eq("customer_id", customerId)
+        .order("is_primary", { ascending: false })
+        .order("contact_name"),
       state.client.from("customer_modules").select("customer_id,module_id").eq("customer_id", customerId),
-      state.client.from("customer_features").select("customer_id,feature_id").eq("customer_id", customerId),
-      state.client.from("customer_operations").select("*").eq("customer_id", customerId).maybeSingle(),
-      state.client.from("customer_activities").select("*").eq("customer_id", customerId)
-        .order("activity_date", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(100)
+      state.client.from("customer_features").select("customer_id,feature_id").eq("customer_id", customerId)
     ]);
 
-    [ownersResult, contactsResult, modulesResult, featuresResult, operationsResult, activitiesResult]
-      .forEach((result) => {
-        if (result.error) throw result.error;
-      });
+    [ownersResult, contactsResult, modulesResult, featuresResult].forEach((result) => {
+      if (result.error) throw result.error;
+    });
 
     return {
       customer,
       owners: ownersResult.data || [],
       contacts: contactsResult.data || [],
       moduleIds: (modulesResult.data || []).map((row) => row.module_id),
-      featureIds: (featuresResult.data || []).map((row) => row.feature_id),
-      operations: operationsResult.data || null,
-      activities: activitiesResult.data || []
+      featureIds: (featuresResult.data || []).map((row) => row.feature_id)
     };
   }
+  async function renderCustomerDetail(customerId) {
+    const data = await loadCustomerDetail(customerId);
+    state.currentCustomer = data.customer;
+    state.currentCustomerData = data;
+    state.customerEditDraft = null;
+    const c = data.customer;
+    const ownerList = data.owners
+      .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
+      .map((owner) => ({
+        name: profileName(owner.profile_id),
+        isPrimary: Boolean(owner.is_primary)
+      }));
+    const moduleNames = state.modules
+      .filter((item) => data.moduleIds.includes(item.id))
+      .map((item) => item.name);
+    const featureNames = state.features
+      .filter((item) => data.featureIds.includes(item.id))
+      .map((item) => item.name);
 
-async function renderCustomerDetail(customerId) {
-  const data = await loadCustomerDetail(customerId);
-  state.currentCustomer = data.customer;
-  state.currentCustomerData = data;
-  state.customerEditDraft = null;
-  const c = data.customer;
-  const ownerList = data.owners
-    .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
-    .map((owner) => `${profileName(owner.profile_id)}${owner.is_primary ? " (ผู้รับผิดชอบหลัก)" : ""}`);
-  const moduleNames = state.modules.filter((item) => data.moduleIds.includes(item.id)).map((item) => item.name);
-  const featureNames = state.features.filter((item) => data.featureIds.includes(item.id)).map((item) => item.name);
+    el.mainContent.innerHTML = `
+      ${pageHeader(
+        c.legal_name,
+        c.short_name || c.tax_id,
+        `<a class="btn btn-primary" href="#/customer/${h(c.id)}/edit">${icon("edit")} แก้ไข</a>
+         <button class="btn btn-danger" data-action="delete-customer" data-id="${h(c.id)}">${icon("delete")} ลบ</button>`,
+        [{ label: "ข้อมูลลูกค้า", href: "#/customers" }, { label: c.short_name || c.legal_name }]
+      )}
 
-  el.mainContent.innerHTML = `
-    ${pageHeader(
-      c.legal_name,
-      c.short_name || c.tax_id,
-      `<a class="btn btn-primary" href="#/customer/${h(c.id)}/edit">${icon("edit")} แก้ไข</a>
-       <button class="btn btn-danger" data-action="delete-customer" data-id="${h(c.id)}">${icon("delete")} ลบ</button>`,
-      [{ label: "ข้อมูลลูกค้า", href: "#/customers" }, { label: c.short_name || c.legal_name }]
-    )}
-
-    <div class="edit-sections detail-sections">
-      <section class="panel edit-section">
-        <div class="panel-header"><h2>ข้อมูลหลัก</h2></div>
-        <div class="panel-body">
-          <dl class="meta-list meta-list-2">
-            <dt>เลขประจำตัวผู้เสียภาษี</dt><dd>${h(c.tax_id)}</dd>
-            <dt>จำนวนรถ</dt><dd>${Number(c.fleet_size || 0).toLocaleString("th-TH")}</dd>
-            <dt>สถานะบัญชี</dt><dd><span class="status-badge" data-status="${h(c.account_status)}">${h(label("account_status", c.account_status))}</span></dd>
-            <dt>ขั้นตอนเริ่มใช้งาน</dt><dd>${h(label("onboarding_stage", c.onboarding_stage))}</dd>
-            <dt>สถานะการนำเข้าข้อมูล</dt><dd><span class="status-badge" data-status="${h(c.import_status)}">${h(label("import_status", c.import_status))}</span></dd>
-            <dt>ระดับความสนใจ</dt><dd>${h(label("engagement_level", c.engagement_level))}</dd>
-            <dt>วันที่เริ่ม</dt><dd>${h(formatDate(c.start_date))}</dd>
-            <dt>วันที่เริ่มวางบิล</dt><dd>${h(formatDate(c.billing_date))}</dd>
-            <dt>สร้างโดย</dt><dd>${h(profileName(c.created_by))} · ${h(formatDateTime(c.created_at))}</dd>
-            <dt>แก้ไขล่าสุดโดย</dt><dd>${h(profileName(c.updated_by))} · ${h(formatDateTime(c.updated_at))}</dd>
-          </dl>
-        </div>
-      </section>
-
-      <section class="panel edit-section">
-        <div class="panel-header"><h2>ผู้รับผิดชอบ</h2></div>
-        <div class="panel-body">
-          ${ownerList.length
-            ? `<ul class="plain-list">${ownerList.map((name) => `<li>${h(name)}</li>`).join("")}</ul>`
-            : '<p class="muted">ยังไม่มีผู้รับผิดชอบ</p>'}
-        </div>
-      </section>
-
-      <section class="panel edit-section">
-        <div class="panel-header"><h2>ผู้ติดต่อ</h2></div>
-        <div class="panel-body">
-          <div class="detail-card-grid">
-            ${data.contacts.map((contact) => `
-              <article class="list-card">
-                <strong>${h(contact.contact_name)}</strong>
-                ${contact.is_primary ? '<span class="tag">ผู้ติดต่อหลัก</span>' : ""}
-                ${!contact.is_active ? '<span class="status-badge" data-status="inactive">ปิดใช้งาน</span>' : ""}
-                <div class="muted">${h(contact.position || "-")}</div>
-                <div>${h(contact.phone || "-")}</div>
-                <div>${h(contact.email || "-")}</div>
-                <div>ไอดีไลน์: ${h(contact.line_id || "-")}</div>
-              </article>
-            `).join("") || '<div class="empty-state compact"><strong>ยังไม่มีผู้ติดต่อ</strong></div>'}
+      <div class="edit-sections detail-sections">
+        <section class="panel edit-section">
+          <div class="panel-header"><h2>1. ข้อมูลพื้นฐาน</h2></div>
+          <div class="panel-body">
+            <dl class="meta-list meta-list-2">
+              <dt>ชื่อนิติบุคคล</dt><dd>${h(c.legal_name)}</dd>
+              <dt>ชื่อย่อ</dt><dd>${h(c.short_name || "-")}</dd>
+              <dt>เลขประจำตัวผู้เสียภาษี</dt><dd>${h(c.tax_id)}</dd>
+              <dt>จำนวนรถ</dt><dd>${Number(c.fleet_size || 0).toLocaleString("th-TH")}</dd>
+              <dt>สถานะบัญชี</dt>
+              <dd><span class="status-badge" data-status="${h(c.account_status)}">${h(label("account_status", c.account_status))}</span></dd>
+              <dt>สร้างโดย</dt><dd>${h(profileName(c.created_by))} · ${h(formatDateTime(c.created_at))}</dd>
+              <dt>แก้ไขล่าสุดโดย</dt><dd>${h(profileName(c.updated_by))} · ${h(formatDateTime(c.updated_at))}</dd>
+            </dl>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="panel edit-section">
-        <div class="panel-header"><h2>โมดูลและฟังก์ชัน</h2></div>
-        <div class="panel-body">
-          <h3>โมดูล</h3>
-          <div class="tag-list">${moduleNames.length ? moduleNames.map((name) => `<span class="tag">${h(name)}</span>`).join("") : '<span class="muted">-</span>'}</div>
-          <h3 class="section-subtitle">ฟังก์ชัน</h3>
-          <div class="tag-list">${featureNames.length ? featureNames.map((name) => `<span class="tag">${h(name)}</span>`).join("") : '<span class="muted">-</span>'}</div>
-        </div>
-      </section>
-
-      <section class="panel edit-section">
-        <div class="panel-header"><h2>รูปแบบการดำเนินงาน</h2></div>
-        <div class="panel-body">
-          <dl class="meta-list">
-            <dt>วิธีจ่ายพนักงานขับรถ</dt><dd>${h(label("driver_payment_method", data.operations?.driver_payment_method))}</dd>
-            <dt>การจัดการค่าใช้จ่ายเที่ยว</dt><dd>${h(label("trip_expense_management", data.operations?.trip_expense_management))}</dd>
-          </dl>
-        </div>
-      </section>
-
-      <section class="panel edit-section">
-        <div class="panel-header"><h2>ประวัติการติดตาม</h2></div>
-        <div class="panel-body">
-          <div class="timeline-list">
-            ${data.activities.map((activity) => `
-              <article class="activity-item">
-                <strong>${h(label("activity_type", activity.activity_type))} · ${h(formatDate(activity.activity_date))}</strong>
-                <p>${h(activity.detail).replaceAll("\n", "<br>")}</p>
-                <small class="muted">${h(profileName(activity.created_by))} · ${h(formatDateTime(activity.created_at))}</small>
-              </article>
-            `).join("") || '<div class="empty-state compact"><strong>ยังไม่มีประวัติการติดตาม</strong></div>'}
+        <section class="panel edit-section">
+          <div class="panel-header"><h2>2. สถานะและวันที่</h2></div>
+          <div class="panel-body">
+            <dl class="meta-list meta-list-2">
+              <dt>สถานะการนำเข้าข้อมูล</dt>
+              <dd><span class="status-badge" data-status="${h(c.import_status)}">${h(label("import_status", c.import_status))}</span></dd>
+              <dt>ขั้นตอนเริ่มใช้งาน</dt><dd>${h(label("onboarding_stage", c.onboarding_stage))}</dd>
+              <dt>ระดับความสนใจ</dt><dd>${h(label("engagement_level", c.engagement_level))}</dd>
+              <dt>วันที่เริ่มใช้งานจริง</dt><dd>${h(formatDate(c.start_date))}</dd>
+              <dt>วันที่เริ่มวางบิล</dt><dd>${h(formatDate(c.billing_date))}</dd>
+            </dl>
           </div>
-        </div>
-      </section>
-    </div>`;
-}
+        </section>
 
+        <section class="panel edit-section">
+          <div class="panel-header"><h2>3. ผู้รับผิดชอบ</h2></div>
+          <div class="panel-body">
+            ${ownerList.length
+              ? `<ul class="plain-list">${ownerList.map((owner) => `
+                  <li>${h(owner.name)}${owner.isPrimary ? ' <span class="tag">ผู้รับผิดชอบหลัก</span>' : ""}</li>
+                `).join("")}</ul>`
+              : '<p class="muted">ยังไม่มีผู้รับผิดชอบ</p>'}
+          </div>
+        </section>
 
+        <section class="panel edit-section">
+          <div class="panel-header"><h2>4. ผู้ติดต่อ</h2></div>
+          <div class="panel-body">
+            <div class="detail-card-grid">
+              ${data.contacts.map((contact) => `
+                <article class="list-card">
+                  <strong>${h(contact.contact_name)}</strong>
+                  ${contact.is_primary ? '<span class="tag">ผู้ติดต่อหลัก</span>' : ""}
+                  ${!contact.is_active ? '<span class="status-badge" data-status="inactive">ปิดใช้งาน</span>' : ""}
+                  <div class="muted">${h(contact.position || "-")}</div>
+                  <div>${h(contact.phone || "-")}</div>
+                  <div>${h(contact.email || "-")}</div>
+                  <div>ไอดีไลน์: ${h(contact.line_id || "-")}</div>
+                </article>
+              `).join("") || '<div class="empty-state compact"><strong>ยังไม่มีผู้ติดต่อ</strong></div>'}
+            </div>
+          </div>
+        </section>
 
+        <section class="panel edit-section">
+          <div class="panel-header"><h2>5. โมดูลและฟังก์ชัน</h2></div>
+          <div class="panel-body">
+            <h3>โมดูล</h3>
+            <div class="tag-list">
+              ${moduleNames.length
+                ? moduleNames.map((name) => `<span class="tag">${h(name)}</span>`).join("")
+                : '<span class="muted">-</span>'}
+            </div>
+            <h3 class="section-subtitle">ฟังก์ชัน</h3>
+            <div class="tag-list">
+              ${featureNames.length
+                ? featureNames.map((name) => `<span class="tag">${h(name)}</span>`).join("")
+                : '<span class="muted">-</span>'}
+            </div>
+          </div>
+        </section>
+
+        <section class="panel edit-section">
+          <div class="panel-header"><h2>6. สัญญาและการอบรม</h2></div>
+          <div class="panel-body">
+            <dl class="meta-list">
+              <dt>สัญญา</dt><dd>${h(label("contract_type", c.contract_type))}</dd>
+              <dt>สอนใช้งานนอกสถานที่</dt>
+              <dd>${Number(c.onsite_training_count || 0).toLocaleString("th-TH")} ครั้ง</dd>
+            </dl>
+          </div>
+        </section>
+      </div>`;
+  }
 
 function openContactForm(contact = null, customerId = null) {
   el.contactForm.reset();
@@ -3755,115 +3759,175 @@ async function saveContact(event) {
   renderCustomerDraftContacts();
   showToast("เพิ่มการเปลี่ยนแปลงผู้ติดต่อแล้ว กรุณากดบันทึก");
 }
+  async function renderProfilePage() {
+    const profile = state.profile;
+    const accent = normalizeHex(profile.theme_accent || "#2f68e6");
+    const presets = [
+      "#2563eb", "#2f68e6", "#0ea5e9", "#0891b2", "#0d9488", "#059669",
+      "#16a34a", "#65a30d", "#ca8a04", "#ea580c", "#dc2626", "#e11d48",
+      "#db2777", "#c026d3", "#9333ea", "#7c3aed", "#4f46e5", "#4338ca",
+      "#334155", "#475569", "#0f766e", "#0369a1", "#1d4ed8", "#6d28d9"
+    ];
 
+    el.mainContent.innerHTML = `
+      ${pageHeader(
+        "ข้อมูลส่วนตัวและรูปแบบสี",
+        "",
+        "",
+        [{ label: "ข้อมูลส่วนตัวและรูปแบบสี" }]
+      )}
 
-
-
-
-
-
-
-
-async function renderProfilePage() {
-  const profile = state.profile;
-  const accent = normalizeHex(profile.theme_accent || "#2f68e6");
-  const presets = [
-    "#2563eb", "#2f68e6", "#0ea5e9", "#0891b2", "#0d9488", "#059669",
-    "#16a34a", "#65a30d", "#ca8a04", "#ea580c", "#dc2626", "#e11d48",
-    "#db2777", "#c026d3", "#9333ea", "#7c3aed", "#4f46e5", "#4338ca",
-    "#334155", "#475569", "#0f766e", "#0369a1", "#1d4ed8", "#6d28d9"
-  ];
-
-  el.mainContent.innerHTML = `
-    ${pageHeader(
-      "ข้อมูลส่วนตัวและรูปแบบสี",
-      "",
-      "",
-      [{ label: "ข้อมูลส่วนตัวและรูปแบบสี" }]
-    )}
-
-    <div class="profile-layout">
-      <section class="panel profile-summary-card">
-        <div class="profile-hero">
-          ${avatarMarkup(profile, "profile-avatar-large")}
-          <div class="profile-hero-copy">
-            <h2>${h(profile.display_name)}</h2>
-            <p>${h(profile.email)}</p>
-            <span class="role-badge">${h(label("role", profile.role))}</span>
-            <button type="button" class="btn btn-secondary btn-small" data-action="open-avatar-editor" data-id="${h(profile.id)}">${icon("camera")} เปลี่ยนรูปโปรไฟล์</button>
-          </div>
-        </div>
-        <div class="panel-body">
-          <dl class="meta-list">
-            <dt>ชื่อที่แสดง</dt><dd>${h(profile.display_name)}</dd>
-            <dt>อีเมล</dt><dd>${h(profile.email)}</dd>
-            <dt>สิทธิ์การใช้งาน</dt><dd>${h(label("role", profile.role))}</dd>
-            <dt>สถานะ</dt><dd><span class="status-badge" data-status="${profile.is_active ? "active" : "inactive"}">${profile.is_active ? "เปิดใช้งาน" : "ปิดใช้งาน"}</span></dd>
-            <dt>สร้างบัญชี</dt><dd>${h(formatDateTime(profile.created_at))}</dd>
-            <dt>อัปเดตล่าสุด</dt><dd>${h(formatDateTime(profile.updated_at))}</dd>
-          </dl>
-        </div>
-      </section>
-
-      <form id="profile-theme-form" class="panel theme-settings-card" novalidate>
-        <div class="panel-header">
-          <h2>ตั้งค่ารูปแบบสี</h2>
-          <span class="theme-preview-dot" style="--preview-color:${h(accent)}" aria-hidden="true"></span>
-        </div>
-        <div class="panel-body">
-          <fieldset class="theme-mode-group">
-            <legend>โหมดการแสดงผล</legend>
-            ${[
-              ["light", "สว่าง", "พื้นหลังสว่าง"],
-              ["dark", "มืด", "พื้นหลังสีเข้ม"],
-              ["system", "ตามอุปกรณ์", "ปรับตามค่าของอุปกรณ์"]
-            ].map(([value, title, desc]) => `
-              <label class="theme-mode-card">
-                <input type="radio" name="theme_mode" value="${value}" ${(profile.theme_mode || "light") === value ? "checked" : ""}>
-                <span><strong>${title}</strong><small>${desc}</small></span>
-              </label>
-            `).join("")}
-          </fieldset>
-
-          <div class="form-section">
-            <div class="form-section-heading">
-              <h3>สีหลัก</h3>
+      <div class="profile-layout">
+        <section class="panel profile-summary-card">
+          <div class="profile-hero">
+            ${avatarMarkup(profile, "profile-avatar-large")}
+            <div class="profile-hero-copy">
+              <h2>${h(profile.display_name)}</h2>
+              <p>${h(profile.email)}</p>
+              <span class="role-badge">${h(profile.position || "ไม่ระบุตำแหน่ง")}</span>
+              <button type="button" class="btn btn-secondary btn-small"
+                      data-action="open-avatar-editor" data-id="${h(profile.id)}">
+                ${icon("camera")} เปลี่ยนรูปโปรไฟล์
+              </button>
             </div>
+          </div>
+          <div class="panel-body">
+            <dl class="meta-list">
+              <dt>ชื่อที่แสดง</dt><dd>${h(profile.display_name)}</dd>
+              <dt>อีเมล</dt><dd>${h(profile.email)}</dd>
+              <dt>ตำแหน่ง</dt><dd>${h(profile.position || "-")}</dd>
+              <dt>สถานะ</dt>
+              <dd><span class="status-badge" data-status="${profile.is_active ? "active" : "inactive"}">
+                ${profile.is_active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+              </span></dd>
+              <dt>สร้างบัญชี</dt><dd>${h(formatDateTime(profile.created_at))}</dd>
+              <dt>อัปเดตล่าสุด</dt><dd>${h(formatDateTime(profile.updated_at))}</dd>
+            </dl>
+          </div>
+        </section>
 
-            <div class="theme-color-editor">
-              <label class="native-color-label">
-                <span>เลือกสี</span>
-                <input id="theme-accent-picker" type="color" value="${h(accent)}" aria-label="เลือกสีหลัก">
+        <div class="profile-settings-stack">
+          <form id="profile-details-form" class="panel" novalidate>
+            <div class="panel-header"><h2>ข้อมูลส่วนตัว</h2></div>
+            <div class="panel-body">
+              <label>
+                <span class="field-label">ชื่อที่แสดง <span class="required">*</span></span>
+                <input name="display_name" maxlength="200" value="${h(profile.display_name)}" required>
               </label>
               <label>
-                <span class="field-label">รหัสสี <span class="required">*</span></span>
-                <input id="theme-accent-hex" name="theme_accent" type="text" value="${h(accent)}"
-                       pattern="^#[0-9A-Fa-f]{6}$" maxlength="7" placeholder="#2f68e6" required>
+                <span class="field-label">ตำแหน่ง</span>
+                <input name="position" maxlength="200" value="${h(profile.position || "")}"
+                       placeholder="เช่น ผู้จัดการฝ่ายขาย">
               </label>
-              <div class="theme-live-preview" style="--preview-accent:${h(accent)}">
-                <span class="theme-preview-swatch"></span>
-                <div><strong>ตัวอย่างสีหลัก</strong></div>
+              <label>
+                <span class="field-label">อีเมล</span>
+                <input value="${h(profile.email)}" disabled>
+              </label>
+            </div>
+            <div class="panel-footer-actions">
+              <button id="profile-details-save" type="submit" class="btn btn-primary">
+                ${icon("save")} บันทึกข้อมูลส่วนตัว
+              </button>
+            </div>
+          </form>
+
+          <form id="profile-theme-form" class="panel theme-settings-card" novalidate>
+            <div class="panel-header">
+              <h2>ตั้งค่ารูปแบบสี</h2>
+              <span class="theme-preview-dot" style="--preview-color:${h(accent)}" aria-hidden="true"></span>
+            </div>
+            <div class="panel-body">
+              <fieldset class="theme-mode-group">
+                <legend>โหมดการแสดงผล</legend>
+                ${[
+                  ["light", "สว่าง", "พื้นหลังสว่าง"],
+                  ["dark", "มืด", "พื้นหลังสีเข้ม"],
+                  ["system", "ตามอุปกรณ์", "ปรับตามค่าของอุปกรณ์"]
+                ].map(([value, title, desc]) => `
+                  <label class="theme-mode-card">
+                    <input type="radio" name="theme_mode" value="${value}"
+                           ${(profile.theme_mode || "light") === value ? "checked" : ""}>
+                    <span><strong>${title}</strong><small>${desc}</small></span>
+                  </label>
+                `).join("")}
+              </fieldset>
+
+              <div class="form-section">
+                <div class="form-section-heading"><h3>สีหลัก</h3></div>
+                <div class="theme-color-editor">
+                  <label class="native-color-label">
+                    <span>เลือกสี</span>
+                    <input id="theme-accent-picker" type="color" value="${h(accent)}" aria-label="เลือกสีหลัก">
+                  </label>
+                  <label>
+                    <span class="field-label">รหัสสี <span class="required">*</span></span>
+                    <input id="theme-accent-hex" name="theme_accent" type="text" value="${h(accent)}"
+                           pattern="^#[0-9A-Fa-f]{6}$" maxlength="7" placeholder="#2f68e6" required>
+                  </label>
+                  <div class="theme-live-preview" style="--preview-accent:${h(accent)}">
+                    <span class="theme-preview-swatch"></span>
+                    <div><strong>ตัวอย่างสีหลัก</strong></div>
+                  </div>
+                </div>
+
+                <div class="color-preset-grid" aria-label="สีสำเร็จรูป">
+                  ${presets.map((color) => `
+                    <button type="button" class="color-preset ${color === accent ? "active" : ""}"
+                            style="--preset-color:${color}" data-action="select-theme-color"
+                            data-color="${color}" aria-label="เลือกสี ${color}" title="${color}">
+                      <span></span>
+                    </button>
+                  `).join("")}
+                </div>
               </div>
             </div>
-
-            <div class="color-preset-grid" aria-label="สีสำเร็จรูป">
-              ${presets.map((color) => `
-                <button type="button" class="color-preset ${color === accent ? "active" : ""}"
-                        style="--preset-color:${color}" data-action="select-theme-color"
-                        data-color="${color}" aria-label="เลือกสี ${color}" title="${color}">
-                  <span></span>
-                </button>
-              `).join("")}
+            <div class="panel-footer-actions">
+              <button type="button" class="btn btn-secondary" data-action="reset-theme-preview">
+                ${icon("refresh")} คืนค่าที่บันทึกไว้
+              </button>
+              <button id="profile-theme-save" type="submit" class="btn btn-primary">
+                ${icon("save")} บันทึกรูปแบบสี
+              </button>
             </div>
-          </div>
+          </form>
         </div>
-        <div class="panel-footer-actions">
-          <button type="button" class="btn btn-secondary" data-action="reset-theme-preview">${icon("refresh")} คืนค่าที่บันทึกไว้</button>
-          <button id="profile-theme-save" type="submit" class="btn btn-primary">${icon("save")} บันทึกรูปแบบสี</button>
-        </div>
-      </form>
-    </div>`;
-}
+      </div>`;
+  }
+
+  async function saveMyProfileDetails(event) {
+    event.preventDefault();
+    const form = event.target;
+    if (!form.reportValidity()) return;
+
+    const button = document.getElementById("profile-details-save");
+    const data = new FormData(form);
+    setButtonBusy(button, true, "กำลังบันทึก...");
+    setElementBusy(form, true, "กำลังบันทึกข้อมูลส่วนตัว...");
+
+    try {
+      const { data: updated, error } = await state.client.rpc("update_my_profile_details", {
+        p_display_name: String(data.get("display_name") || "").trim(),
+        p_position: nullable(data.get("position"))
+      });
+      if (error) throw error;
+
+      const row = Array.isArray(updated) ? updated[0] : updated;
+      state.profile = { ...state.profile, ...(row || {}) };
+      state.profiles = state.profiles.map((profile) =>
+        profile.id === state.profile.id ? { ...profile, ...(row || {}) } : profile
+      );
+      el.currentUserName.textContent = state.profile.display_name || "-";
+      el.currentUserRole.textContent = state.profile.position || "ไม่ระบุตำแหน่ง";
+      renderAvatarInto(el.currentUserAvatar, state.profile);
+      showToast("บันทึกข้อมูลส่วนตัวแล้ว");
+      await renderProfilePage();
+    } catch (error) {
+      showError(error, "บันทึกข้อมูลส่วนตัวไม่สำเร็จ");
+    } finally {
+      setElementBusy(form, false);
+      setButtonBusy(button, false);
+    }
+  }
 
   function previewThemeFromProfileForm() {
     const form = document.getElementById("profile-theme-form");
@@ -4463,6 +4527,17 @@ function renderManagerReportTable() {
     }
   }
 
+  function getProfileDraft(profile) {
+    if (!state.ui.profileDrafts.has(profile.id)) {
+      state.ui.profileDrafts.set(profile.id, {
+        display_name: profile.display_name,
+        position: profile.position || "",
+        role: profile.role,
+        is_active: Boolean(profile.is_active)
+      });
+    }
+    return state.ui.profileDrafts.get(profile.id);
+  }
   async function renderAdminUsersPage() {
     try { state.grids.users?.destroy?.(); } catch (error) { console.warn(error); }
     state.grids.users = null;
@@ -4472,7 +4547,7 @@ function renderManagerReportTable() {
     el.mainContent.innerHTML = `
       ${pageHeader(
         "จัดการผู้ใช้",
-        "กำหนดสิทธิ์และสถานะบัญชีผู้ใช้งาน",
+        "แก้ไขชื่อที่แสดง ตำแหน่ง สิทธิ์ และสถานะบัญชี",
         "",
         [{ label: "จัดการผู้ใช้" }]
       )}
@@ -4481,7 +4556,8 @@ function renderManagerReportTable() {
           <div class="toolbar-row">
             <div class="toolbar-field toolbar-search">
               <label for="admin-user-search">ค้นหาผู้ใช้</label>
-              <input id="admin-user-search" type="search" placeholder="ชื่อ อีเมล หรือสิทธิ์" autocomplete="off">
+              <input id="admin-user-search" type="search"
+                     placeholder="ชื่อ ตำแหน่ง อีเมล หรือสิทธิ์" autocomplete="off">
             </div>
             <div class="toolbar-summary toolbar-summary-end">
               <span>${state.profiles.length.toLocaleString("th-TH")} บัญชี · มีผู้จัดการที่เปิดใช้งานได้หนึ่งคน</span>
@@ -4533,17 +4609,23 @@ function renderManagerReportTable() {
           }
         },
         {
-          headerName: "ชื่อ",
+          headerName: "ชื่อที่แสดง",
           field: "display_name",
-          pinned: window.innerWidth >= 760 ? "left" : undefined,
-          minWidth: 210,
+          pinned: window.innerWidth >= 900 ? "left" : undefined,
+          minWidth: 220,
           flex: 1,
           cellRenderer: (params) => {
             const wrapper = document.createElement("div");
-            wrapper.className = "grid-primary-cell";
-            const title = document.createElement("strong");
-            title.textContent = params.value || "-";
-            wrapper.append(title);
+            wrapper.className = "grid-edit-cell";
+            const input = document.createElement("input");
+            input.className = "grid-control";
+            input.maxLength = 200;
+            input.value = getProfileDraft(params.data).display_name;
+            input.setAttribute("aria-label", `ชื่อที่แสดงของ ${params.data.display_name}`);
+            input.addEventListener("input", () => {
+              getProfileDraft(params.data).display_name = input.value;
+            });
+            wrapper.append(input);
             if (params.data.id === state.profile.id) {
               const tag = document.createElement("span");
               tag.className = "tag";
@@ -4554,10 +4636,28 @@ function renderManagerReportTable() {
           }
         },
         {
+          headerName: "ตำแหน่ง",
+          field: "position",
+          minWidth: 200,
+          flex: 0.9,
+          cellRenderer: (params) => {
+            const input = document.createElement("input");
+            input.className = "grid-control";
+            input.maxLength = 200;
+            input.placeholder = "ไม่ระบุ";
+            input.value = getProfileDraft(params.data).position;
+            input.setAttribute("aria-label", `ตำแหน่งของ ${params.data.display_name}`);
+            input.addEventListener("input", () => {
+              getProfileDraft(params.data).position = input.value;
+            });
+            return input;
+          }
+        },
+        {
           headerName: "อีเมล",
           field: "email",
           minWidth: 240,
-          flex: 1.2
+          flex: 1.1
         },
         {
           headerName: "สิทธิ์",
@@ -4577,16 +4677,11 @@ function renderManagerReportTable() {
               const option = document.createElement("option");
               option.value = role;
               option.textContent = label("role", role);
-              option.selected = params.data.role === role;
+              option.selected = getProfileDraft(params.data).role === role;
               select.append(option);
             });
             select.addEventListener("change", () => {
-              const draft = state.ui.profileDrafts.get(params.data.id) || {
-                role: params.data.role,
-                is_active: params.data.is_active
-              };
-              draft.role = select.value;
-              state.ui.profileDrafts.set(params.data.id, draft);
+              getProfileDraft(params.data).role = select.value;
             });
             return select;
           }
@@ -4597,42 +4692,25 @@ function renderManagerReportTable() {
           minWidth: 150,
           cellRenderer: (params) => {
             if (params.data.id === state.profile.id) {
-              return statusBadgeNode(params.data.is_active ? "เปิดใช้งาน" : "ปิดใช้งาน", params.data.is_active ? "active" : "inactive");
+              return statusBadgeNode(
+                params.data.is_active ? "เปิดใช้งาน" : "ปิดใช้งาน",
+                params.data.is_active ? "active" : "inactive"
+              );
             }
             const labelNode = document.createElement("label");
             labelNode.className = "grid-switch";
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
-            checkbox.checked = Boolean(params.data.is_active);
+            checkbox.checked = getProfileDraft(params.data).is_active;
             checkbox.setAttribute("aria-label", `สถานะของ ${params.data.display_name}`);
             const text = document.createElement("span");
             text.textContent = checkbox.checked ? "เปิดใช้งาน" : "ปิดใช้งาน";
             checkbox.addEventListener("change", () => {
               text.textContent = checkbox.checked ? "เปิดใช้งาน" : "ปิดใช้งาน";
-              const draft = state.ui.profileDrafts.get(params.data.id) || {
-                role: params.data.role,
-                is_active: params.data.is_active
-              };
-              draft.is_active = checkbox.checked;
-              state.ui.profileDrafts.set(params.data.id, draft);
+              getProfileDraft(params.data).is_active = checkbox.checked;
             });
             labelNode.append(checkbox, text);
             return labelNode;
-          }
-        },
-        {
-          headerName: "รูปแบบสี",
-          field: "theme_accent",
-          minWidth: 120,
-          cellRenderer: (params) => {
-            const wrapper = document.createElement("div");
-            wrapper.className = "grid-theme-chip";
-            const dot = document.createElement("span");
-            dot.style.background = normalizeHex(params.value || "#2f68e6");
-            const text = document.createElement("span");
-            text.textContent = ({ light: "สว่าง", dark: "มืด", system: "ตามอุปกรณ์" })[params.data.theme_mode] || "สว่าง";
-            wrapper.append(dot, text);
-            return wrapper;
           }
         },
         {
@@ -4649,47 +4727,54 @@ function renderManagerReportTable() {
           cellRenderer: (params) => {
             const wrapper = document.createElement("div");
             wrapper.className = "grid-actions grid-actions-compact";
-            if (params.data.id === state.profile.id) {
-              const placeholder = document.createElement("span");
-              placeholder.className = "grid-action-placeholder";
-              placeholder.textContent = "—";
-              placeholder.title = "บัญชีของคุณ";
-              wrapper.append(placeholder);
-            } else {
-              wrapper.append(iconActionButtonNode({
-                label: "บันทึกการเปลี่ยนแปลงผู้ใช้",
-                action: "save-profile",
-                id: params.data.id,
-                iconName: "save",
-                variant: "primary"
-              }));
-            }
+            wrapper.append(iconActionButtonNode({
+              label: "บันทึกการเปลี่ยนแปลงผู้ใช้",
+              action: "save-profile",
+              id: params.data.id,
+              iconName: "save",
+              variant: "primary"
+            }));
             return wrapper;
           }
         }
       ]
     }, "users");
   }
-
   async function saveProfile(profileId, button) {
     const original = state.profiles.find((profile) => profile.id === profileId);
     if (!original) {
       showToast("ไม่พบข้อมูลผู้ใช้", "error");
       return;
     }
-    const draft = state.ui.profileDrafts.get(profileId) || {
-      role: original.role,
-      is_active: original.is_active
-    };
+    const draft = getProfileDraft(original);
+    const displayName = String(draft.display_name || "").trim();
+    if (!displayName) {
+      showToast("ชื่อที่แสดงห้ามว่าง", "error");
+      return;
+    }
 
     setButtonBusy(button, true, "กำลังบันทึก...");
     try {
-      const { error } = await state.client.rpc("admin_update_profile", {
+      const { data, error } = await state.client.rpc("admin_update_profile_full", {
         p_profile_id: profileId,
+        p_display_name: displayName,
+        p_position: nullable(draft.position),
         p_role: draft.role,
         p_is_active: Boolean(draft.is_active)
       });
       if (error) throw error;
+
+      const updated = Array.isArray(data) ? data[0] : data;
+      if (updated?.id) {
+        state.profiles = state.profiles.map((profile) =>
+          profile.id === updated.id ? { ...profile, ...updated } : profile
+        );
+        if (updated.id === state.profile.id) {
+          state.profile = { ...state.profile, ...updated };
+          el.currentUserName.textContent = state.profile.display_name || "-";
+          el.currentUserRole.textContent = state.profile.position || "ไม่ระบุตำแหน่ง";
+        }
+      }
       showToast("บันทึกผู้ใช้แล้ว");
       await renderAdminUsersPage();
     } catch (error) {
@@ -4698,7 +4783,6 @@ function renderManagerReportTable() {
       setButtonBusy(button, false);
     }
   }
-
 
   function buildPrintReport(report, items) {
     const owner = profileName(report.user_id);
@@ -4746,32 +4830,38 @@ async function deleteContact(contactKey) {
   renderCustomerDraftContacts();
   showToast("นำผู้ติดต่อออกจากแบบร่างแล้ว กรุณากดบันทึก");
 }
+  async function deleteCustomer(customerId) {
+    const customer = state.customers.find((item) => item.id === customerId) || state.currentCustomer;
+    const ok = await confirmAction(
+      `ลบ “${customer?.legal_name || "ลูกค้ารายนี้"}” ออกจากระบบหรือไม่?`,
+      "ลบข้อมูลลูกค้า",
+      "ลบ"
+    );
+    if (!ok) return;
 
-async function deleteCustomer(customerId) {
-  const customer = state.customers.find((item) => item.id === customerId) || state.currentCustomer;
-  const ok = await confirmAction(
-    `ลบ “${customer?.legal_name || "ลูกค้ารายนี้"}” ออกจากระบบหรือไม่?`,
-    "ลบข้อมูลลูกค้า",
-    "ลบ"
-  );
-  if (!ok) return;
+    await withGlobalLoading("กำลังลบข้อมูลลูกค้า...", async () => {
+      const { error } = await state.client.rpc("archive_customer", { p_customer_id: customerId });
+      if (error) throw error;
 
-  await withGlobalLoading("กำลังลบข้อมูลลูกค้า...", async () => {
-    const { error } = await state.client.rpc("archive_customer", { p_customer_id: customerId });
-    if (error) throw error;
-    state.customers = [];
-    state.customerOwners = [];
-    state.customerModules = [];
-    state.customerFeatures = [];
-    state.currentCustomer = null;
-    state.currentCustomerData = null;
-    state.customerEditDraft = null;
-    showToast("ลบข้อมูลลูกค้าแล้ว");
-    location.hash = "#/customers";
-  });
-}
+      state.customers = state.customers.filter((item) => item.id !== customerId);
+      state.customerOwners = state.customerOwners.filter((item) => item.customer_id !== customerId);
+      state.customerModules = state.customerModules.filter((item) => item.customer_id !== customerId);
+      state.customerFeatures = state.customerFeatures.filter((item) => item.customer_id !== customerId);
+      state.filteredCustomerRows = state.filteredCustomerRows.filter((item) => item.id !== customerId);
+      state.currentCustomer = null;
+      state.currentCustomerData = null;
+      state.customerEditDraft = null;
 
+      if (parseRoute().name === "customers") {
+        state.grids.customers?.applyTransaction?.({ remove: [{ id: customerId }] });
+        renderCustomerTable();
+      } else {
+        location.hash = "#/customers";
+      }
 
+      showToast("ลบข้อมูลลูกค้าแล้ว");
+    });
+  }
 
   async function deleteDailyItem(itemId) {
     const ok = await confirmAction("ลบรายการนี้หรือไม่?", "ลบรายการรายงาน", "ลบ");
@@ -4806,6 +4896,7 @@ async function deleteCustomer(customerId) {
     el.contactForm.addEventListener("submit", saveContact);
     el.revisionForm.addEventListener("submit", requestRevision);
     el.avatarForm.addEventListener("submit", saveAvatar);
+    el.dateRangeForm?.addEventListener("submit", saveDateRange);
 
     window.addEventListener("hashchange", renderRoute);
     window.addEventListener("resize", () => {
@@ -4839,8 +4930,8 @@ async function deleteCustomer(customerId) {
       try {
         if (event.target.id === "customer-core-form") await saveCustomer(event);
         else if (event.target.id === "customer-edit-form") await saveCustomerEdit(event);
+        else if (event.target.id === "profile-details-form") await saveMyProfileDetails(event);
         else if (event.target.id === "profile-theme-form") await saveMyProfilePreferences(event);
-        else if (event.target.id === "external-link-form") await saveExternalLink(event);
         else if (event.target.id === "master-option-form") await saveMasterOption(event);
         else if (event.target.classList.contains("new-report-item-form")) await addDailyReportItem(event);
       } catch (error) {
@@ -4867,7 +4958,7 @@ async function deleteCustomer(customerId) {
         return;
       }
 
-      if (target.closest("#customer-edit-form")) {
+      if (target.closest("#customer-edit-form, #customer-core-form")) {
         markCustomerEditDirty();
       }
 
@@ -4907,8 +4998,6 @@ async function deleteCustomer(customerId) {
         } else if (target.id === "manager-report-date" && target.value) {
           state.ui.managerFilters.date = target.value;
           renderManagerReportTable();
-        } else if (["customer-start-from", "customer-start-to", "customer-billing-from", "customer-billing-to"].includes(target.id)) {
-          renderCustomerTable();
         }
       } catch (error) {
         showError(error, "เปลี่ยนวันที่ไม่สำเร็จ");
@@ -4926,6 +5015,7 @@ async function deleteCustomer(customerId) {
           "customer-onboarding-filter",
           "customer-import-filter",
           "customer-engagement-filter",
+          "customer-contract-filter",
           "customer-module-filter",
           "customer-feature-filter"
         ].includes(target.id)) {
@@ -4954,12 +5044,12 @@ async function deleteCustomer(customerId) {
             allowedTypes: isLogin
               ? ["image/png", "image/jpeg", "image/webp"]
               : ["image/png", "image/webp", "image/x-icon", "image/vnd.microsoft.icon"],
-            requireSquare: true
+            requireSquare: !isLogin
           });
           const preview = document.getElementById(isLogin ? "login-image-preview" : "favicon-image-preview");
           const objectUrl = URL.createObjectURL(target.files[0]);
           if (preview) preview.innerHTML = `<img src="${h(objectUrl)}" alt="ตัวอย่างรูปภาพ">`;
-        } else if (target.closest("#customer-edit-form")) {
+        } else if (target.closest("#customer-edit-form, #customer-core-form")) {
           markCustomerEditDirty();
         }
       } catch (error) {
@@ -5016,10 +5106,19 @@ async function deleteCustomer(customerId) {
             }
             break;
           }
+          case "open-date-range-filter":
+            openDateRangeDialog(target.dataset.kind);
+            break;
+          case "select-date-range-preset":
+            selectDateRangePreset(target.dataset.preset);
+            break;
+          case "clear-date-range":
+            clearDateRangeDraft();
+            break;
           case "reset-customer-filters": {
             state.ui.customerFilters = {
               search: "", status: "", owner: "", onboarding: "", importStatus: "",
-              engagement: "", moduleId: "", featureId: "", fleetMin: "", fleetMax: "",
+              engagement: "", contractType: "", moduleId: "", featureId: "", fleetMin: "", fleetMax: "",
               startFrom: "", startTo: "", billingFrom: "", billingTo: "", advancedOpen: false
             };
             await withGlobalLoading("กำลังล้างตัวกรอง...", () => renderCustomersPage());
@@ -5120,15 +5219,6 @@ async function deleteCustomer(customerId) {
             break;
           case "remove-branding-image":
             await removeBrandingImage(target.dataset.kind, target);
-            break;
-          case "reset-external-link-form":
-            resetExternalLinkForm();
-            break;
-          case "edit-external-link":
-            editExternalLink(target.dataset.id);
-            break;
-          case "delete-external-link":
-            await deleteExternalLink(target.dataset.id, target);
             break;
           case "reset-master-option-form":
             resetMasterOptionForm();
