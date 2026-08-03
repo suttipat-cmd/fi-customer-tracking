@@ -1,52 +1,51 @@
 # FI Customer Tracking Web App
 
-> **Current version:** `0.9.0-customer-accounts-report-groups`  
-> **Base version:** `0.8.0-customer-data-restructure`  
+> **Current version:** `0.10.0-sales-notes-profile-theme`  
+> **Base version:** `0.9.0-customer-accounts-report-groups`  
 > **Runtime:** GitHub Pages + Plain HTML/CSS/JavaScript + Supabase Auth/PostgreSQL/Storage  
 > **Repository runtime files:** `README.md`, `index.html`, `script.js`, `style.css`
 
 ## Release status
 
-เวอร์ชันนี้เพิ่มบัญชีผู้ใช้งานของลูกค้าแบบหลายรายการ, ปรับ Customer List, แก้ Master Module ให้บันทึกผ่าน RPC รุ่นใหม่โดยไม่เกิด Native Form Refresh, เก็บแบบร่างฟอร์มลูกค้าใน `sessionStorage` และปรับ Daily Report ให้รองรับหลายลูกค้าต่อรายการพร้อมกลุ่มลูกค้าระดับรายงาน
+เวอร์ชันนี้เพิ่ม Master Data `เซลล์`, จำนวนผู้ใช้งานลูกค้าแบบกรอกเอง, โน้ตลูกค้าหลายรายการ, ขยายการแสดงรูปโปรไฟล์และผลของสี Accent, จำกัดการแก้ตำแหน่งให้เฉพาะ Admin และปรับหน้า Master Data เป็น Compact List
 
-ต้องรัน Migration `007_customer_accounts_report_groups` ก่อน Deploy Frontend ชุดนี้
+ต้องรัน Migration `008_sales_notes_profile_theme` และ Verify ให้ผ่านก่อน Deploy Frontend ชุดนี้
 
-> **คำเตือนด้านข้อมูลลับ:** ตาม Business Requirement ที่ยืนยันแล้ว `customer_user_accounts.password_text` และ `pin_text` เก็บเป็นข้อความปกติในฐานข้อมูล ไม่เข้ารหัสและไม่ Hash ข้อมูลดังกล่าวจึงต้องถูกจำกัดด้วย RLS, การควบคุมบัญชีฐานข้อมูล, Backup Access และ Operational Policy ห้ามนำสองคอลัมน์นี้ไปใส่ใน Excel Export, Log หรือ Screenshot
+Migration จะกำหนด `customer_user_count = 1` ให้ลูกค้าเดิมทั้งหมดที่ยังไม่มีค่า ส่วน `sales_code` จะเริ่มเป็นค่าว่างจนกว่าจะสร้าง Master เซลล์และเลือกให้ลูกค้า
+
+> **คำเตือนด้านข้อมูลลับ:** `customer_user_accounts.password_text` และ `pin_text` ยังคงเก็บเป็นข้อความปกติตาม Business Requirement เดิม ห้ามนำสองคอลัมน์นี้ไปใส่ใน Excel, Log, Toast, Screenshot หรือระบบวิเคราะห์ภายนอก และต้องจำกัดสิทธิ์ฐานข้อมูลกับ Backup อย่างเข้มงวด
 
 ## Changelog
 
+### 0.10.0-sales-notes-profile-theme
+
+- เพิ่ม Master Data `sales` สำหรับเก็บรายชื่อเซลล์
+- ลูกค้าหนึ่งรายเลือกเซลล์ได้ไม่เกินหนึ่งรายการผ่าน `customers.sales_code`
+- เพิ่ม `customers.customer_user_count` เป็นจำนวนเต็มบังคับกรอก `1–999999`
+- จำนวนผู้ใช้งานลูกค้าเป็นข้อมูลอิสระ ไม่คำนวณจากจำนวนแถวใน `customer_user_accounts`
+- หน้า List และ Excel แสดงจำนวนผู้ใช้งานที่กรอกกับจำนวนบัญชีที่บันทึกไว้แยกกัน
+- เพิ่ม `customer_notes` รองรับหลายโน้ตต่อหนึ่งลูกค้า
+- Active Admin, Manager และ User สามารถอ่าน เพิ่ม แก้ไข และลบโน้ตของลูกค้าที่ยังแก้ไขได้
+- หน้า Create บันทึกลูกค้า บัญชีผู้ใช้งาน และโน้ตผ่าน `create_customer_complete_v3` ใน Transaction เดียว
+- หน้า Edit รองรับเพิ่ม แก้ไข และลบโน้ต พร้อมเก็บแบบร่างใน `sessionStorage`
+- รูปโปรไฟล์แสดงใน Topbar, Profile, Owner Picker, Customer List/Detail, Daily Report, Manager Review และ Admin User List
+- ไฟล์รูปโปรไฟล์ไม่บังคับอัตราส่วน 1:1; UI ครอบภาพด้วย `object-fit: cover`
+- สี Accent มีผลกับ Navigation, Topbar, ปุ่ม, Panel, Card, Badge, Tag, Form Selection, AG Grid, Pagination, Loading และ Chart Palette
+- สี Success, Warning และ Danger ยังคงแยกจาก Accent เพื่อรักษาความหมายของสถานะ
+- ผู้ใช้แก้ชื่อที่แสดง Theme และ Avatar ของตนเองได้ แต่ `position` แก้ได้เฉพาะ Admin
+- Hardening RPC เดิม `update_my_profile_details` ไม่ให้ Client รุ่นเก่าเปลี่ยนตำแหน่ง
+- เพิ่ม `update_my_profile_display_name` สำหรับแก้ชื่อที่แสดงของตนเอง
+- เพิ่ม `admin_save_master_item_v3` รองรับกลุ่ม `sales`
+- ปรับหน้า Master Data เป็น Compact List บน Desktop และ Compact Card Row บน Mobile
+- เพิ่ม Migration, Verify, Rollback และ Operational Reset สำหรับเวอร์ชันนี้
+- Cache Busting และ Internal Version Stamp เป็น `0.10.0-sales-notes-profile-theme`
+
 ### 0.9.0-customer-accounts-report-groups
 
-- เพิ่ม Section ย่อย `ผู้ใช้งานลูกค้า` ภายใต้ส่วน `ผู้ติดต่อและผู้ใช้งาน`
-- ลูกค้าหนึ่งรายมีผู้ใช้งานได้หลายบัญชี แต่ละบัญชีมีอีเมล รหัสผ่าน PIN และหมายเหตุ
-- อีเมลผู้ใช้งานลูกค้าห้ามซ้ำภายในลูกค้ารายเดียวกัน
-- หน้า Create บันทึกบัญชีผู้ใช้งานลูกค้าร่วมกับข้อมูลลูกค้าผ่าน `create_customer_complete_v2` ใน Transaction เดียว
-- หน้า Edit รองรับเพิ่ม แก้ และลบบัญชีผู้ใช้งานลูกค้า
-- Customer List แสดงคอลัมน์หลัก: ลูกค้า, สถานะบัญชี, ขั้นตอนเริ่มใช้งาน, สถานะนำเข้า, สัญญา, จำนวนรถ, ผู้รับผิดชอบหลัก, จำนวนผู้ใช้งานลูกค้า, วันที่เริ่มใช้งานจริง, อัปเดตล่าสุด และการกระทำ
-- Excel Export เพิ่มผู้รับผิดชอบหลักและจำนวนผู้ใช้งานลูกค้า โดยไม่ Export รหัสผ่านหรือ PIN
-- แก้ Master `โมดูล` และกลุ่มอื่นให้บันทึกผ่าน `admin_save_master_item_v2`
-- แก้ Root Cause ที่ Hidden Field ชื่อ `id` บดบัง Property `form.id` จน Global Submit Handler ไม่รู้จักฟอร์มและ Browser ส่งฟอร์มแบบ Native
-- เปลี่ยน Hidden Field เป็น `item_id`; Global Submit Handler อ่าน ID ด้วย `getAttribute("id")` และเรียก `preventDefault()` ก่อนเริ่มงาน Async จึงไม่ Refresh หน้า
-- การบันทึก Master อัปเดตเฉพาะ State และรายการปัจจุบัน ไม่ Render หน้าทั้งหน้าใหม่
-- แก้ Auth `TOKEN_REFRESHED` ไม่ให้ Render Route ใหม่ จึงไม่ล้างข้อมูลฟอร์มเมื่อสลับ Browser Tab
-- ฟอร์ม Create/Edit ลูกค้าเก็บแบบร่างใน `sessionStorage` ของ Browser Tab ปัจจุบัน
-- กู้คืนข้อมูลฟอร์ม ผู้ติดต่อ และผู้ใช้งานลูกค้าหลัง Route ถูก Render ใหม่
-- ล้างแบบร่างเมื่อบันทึกสำเร็จ กดยกเลิก หรือ Logout
-- Daily Report แต่ละรายการเลือกลูกค้าได้หลายราย
-- เพิ่มกลุ่มลูกค้าระดับรายงาน เลือกครั้งเดียวแล้วให้หลายรายการใช้ร่วมกัน
-- รายการรายงานเลือกได้ว่าจะใช้กลุ่มรายงานหรือเลือกลูกค้าเฉพาะรายการ
-- อัปเดตหน้ารายงานของผู้ใช้, Manager Review, Print/PDF และ Content Version
-- เพิ่ม Migration, Verify และ Rollback `007_customer_accounts_report_groups`
-- Cache Busting และ Internal Version Stamp เป็น `0.9.0-customer-accounts-report-groups`
-
-### 0.8.0-customer-data-restructure
-
-- ปรับข้อมูลลูกค้าเป็น 6 ส่วน
-- เพิ่มประเภทสัญญาและจำนวนครั้งสอนใช้งานนอกสถานที่
-- เพิ่มตำแหน่งและชื่อที่แสดงของ Profile
-- เพิ่ม Date-range Modal
-- ลบ External Links, Customer Operations และ Customer Activities
-- บังคับลำดับ Master เป็น `1–9999` และห้ามซ้ำในกลุ่ม
+- เพิ่มบัญชีผู้ใช้งานลูกค้าหลายรายการ
+- เพิ่ม Draft ผ่าน `sessionStorage`
+- เพิ่มหลายลูกค้าต่อ Daily Report Item และกลุ่มลูกค้าระดับรายงาน
+- แก้ Master Save ไม่ให้ Native Refresh
 
 ## 1. Current system scope
 
@@ -56,20 +55,23 @@
 2. Role `admin`, `manager`, `user`
 3. Customer CRUD แบบ Soft Delete
 4. Customer Create/Detail/Edit ตามโครงสร้าง 6 ส่วน
-5. ผู้รับผิดชอบหลายคนและผู้รับผิดชอบหลักหนึ่งคน
-6. ผู้ติดต่อหลายคนและผู้ติดต่อหลักหนึ่งคน
-7. ผู้ใช้งานลูกค้าหลายบัญชีต่อหนึ่งลูกค้า
-8. Module และ Feature หลายรายการต่อลูกค้า
-9. Daily Report หนึ่งฉบับต่อผู้ใช้ต่อวัน
-10. หลายลูกค้าต่อ Daily Report Item
-11. กลุ่มลูกค้าระดับรายงานสำหรับใช้ซ้ำหลายข้อ
-12. Manager Acknowledge / Request Revision
-13. Profile avatar, display name, position และ Theme
-14. Admin Branding และ Master Data
-15. Excel Export เฉพาะข้อมูลที่ผ่านตัวกรองและไม่รวม Credential
-16. Customer Audit จาก Database Trigger โดยไม่ทำสำเนา Credential
+5. เซลล์หนึ่งรายการต่อลูกค้า
+6. จำนวนผู้ใช้งานลูกค้าแบบกรอกเอง ตั้งแต่ 1 ขึ้นไป
+7. ผู้รับผิดชอบหลายคนและผู้รับผิดชอบหลักหนึ่งคน
+8. ผู้ติดต่อหลายคนและผู้ติดต่อหลักหนึ่งคน
+9. บัญชีผู้ใช้งานลูกค้าหลายรายการ
+10. โน้ตลูกค้าหลายรายการ
+11. Module และ Feature หลายรายการต่อลูกค้า
+12. Daily Report หนึ่งฉบับต่อผู้ใช้ต่อวัน
+13. หลายลูกค้าต่อ Daily Report Item
+14. กลุ่มลูกค้าระดับรายงานสำหรับใช้ซ้ำหลายข้อ
+15. Manager Acknowledge / Request Revision
+16. Profile avatar, display name, admin-managed position และ Theme
+17. Admin Branding และ Master Data
+18. Excel Export เฉพาะข้อมูลที่ผ่านตัวกรอง โดยไม่รวม Credential
+19. Customer Audit จาก Database Trigger โดยไม่ทำสำเนา Credential
 
-ทรัพยากรที่ถูกยกเลิกและไม่มีในระบบ:
+ทรัพยากรที่ยกเลิกและไม่มีในระบบ:
 
 - External website links
 - Customer operations
@@ -108,6 +110,10 @@ style.css
 007_customer_accounts_report_groups.sql
 007_customer_accounts_report_groups_verify.sql
 007_customer_accounts_report_groups_rollback.sql
+008_sales_notes_profile_theme.sql
+008_sales_notes_profile_theme_verify.sql
+008_sales_notes_profile_theme_rollback.sql
+reset_usage_data_scope_a_v0.10.0.sql
 ```
 
 ## 3. Roles and permissions
@@ -118,22 +124,25 @@ style.css
 | สร้าง/แก้ไขลูกค้า | Yes | Yes | Yes |
 | Soft Delete ลูกค้า | Yes | Yes | Yes |
 | อ่าน/แก้บัญชีผู้ใช้งานลูกค้า | Yes | Yes | Yes |
+| อ่าน/เพิ่ม/แก้/ลบโน้ตลูกค้า | Yes | Yes | Yes |
 | อ่านรายงานของตนเอง | Yes | Yes | Yes |
 | อ่านรายงานทั้งหมด | Yes | Yes | No |
 | Acknowledge / Request revision | Yes | Yes | No |
-| จัดการ Role/Active ของบัญชีอื่น | Yes | No | No |
-| แก้ชื่อที่แสดง/ตำแหน่งตนเอง | Yes | Yes | Yes |
-| แก้ชื่อที่แสดง/ตำแหน่งผู้อื่น | Yes | No | No |
+| แก้ชื่อที่แสดงของตนเอง | Yes | Yes | Yes |
+| แก้ Theme/Avatar ของตนเอง | Yes | Yes | Yes |
+| แก้ตำแหน่งของตนเอง | Yes | No | No |
+| แก้ชื่อ/ตำแหน่ง/Role/Active ของผู้อื่น | Yes | No | No |
 | จัดการ Branding | Yes | No | No |
 | จัดการ Master Data | Yes | No | No |
 
 กฎสำคัญ:
 
 - `profiles.id` หรือ `user_id` เป็น Source of Truth
-- บัญชีต้องมี `is_active = true`
+- บัญชีต้องมี `profiles.is_active = true`
 - มี Active Manager ได้ไม่เกินหนึ่งบัญชี
-- ทุก Active Role มีสิทธิ์ดูและแก้ลูกค้าที่ยังไม่ถูกลบ รวมถึงบัญชีผู้ใช้งานลูกค้า
-- ไม่มี `service_role` key ใน Frontend
+- Admin เปลี่ยน Role หรือปิดบัญชีตัวเองผ่าน Admin RPC ไม่ได้
+- ทุก Active Role เห็นลูกค้าทั้งหมดและแก้ลูกค้าที่ยังไม่ถูกลบได้
+- Browser ใช้ Publishable/Anon Key เท่านั้น ไม่มี `service_role` ใน Frontend
 
 ## 4. Customer model
 
@@ -144,7 +153,9 @@ style.css
    - ชื่อย่อ
    - เลขประจำตัวผู้เสียภาษี *
    - จำนวนรถ *
+   - จำนวนผู้ใช้งานลูกค้า * — จำนวนเต็ม `1–999999`
    - สถานะบัญชี *
+   - เซลล์ — เลือกได้หนึ่งรายการจาก Master `sales`
 
 2. **สถานะและวันที่**
    - สถานะการนำเข้าข้อมูล
@@ -156,11 +167,12 @@ style.css
 3. **ผู้รับผิดชอบ**
    - ผู้รับผิดชอบ 0 คนขึ้นไป
    - ผู้รับผิดชอบหลักไม่เกินหนึ่งคน
+   - UI แสดง Avatar, ชื่อและตำแหน่ง
 
 4. **ผู้ติดต่อและผู้ใช้งาน**
    - ผู้ติดต่อ 0 คนขึ้นไป
-   - ผู้ใช้งานลูกค้า 0 บัญชีขึ้นไป
-   - บัญชีผู้ใช้งานประกอบด้วยอีเมล รหัสผ่าน PIN และหมายเหตุ
+   - บัญชีผู้ใช้งานลูกค้า 0 บัญชีขึ้นไป
+   - บัญชีประกอบด้วยอีเมล รหัสผ่าน PIN และหมายเหตุ
 
 5. **โมดูลและฟังก์ชัน**
    - Module 0 รายการขึ้นไป
@@ -170,25 +182,27 @@ style.css
    - ประเภทสัญญา *
    - จำนวนครั้งสอนใช้งานนอกสถานที่
 
+หลัง 6 ส่วนมี Section **โน้ตลูกค้า** รองรับหลายรายการ พร้อมผู้สร้าง ผู้แก้ไข และเวลาแก้ไขล่าสุด
+
 ### 4.2 Save behavior
 
-- Create ใช้ `create_customer_complete_v2` บันทึก Core, Owners, Contacts, Customer Accounts, Modules และ Features ใน Transaction เดียว
-- Edit บันทึกตามลำดับ Core → Owners → Modules/Features → Contacts → Customer Accounts
-- Edit เป็น Sequential Save หากส่วนหลังล้มเหลวส่วนก่อนหน้าอาจบันทึกแล้ว
+- Create ใช้ `create_customer_complete_v3` บันทึก Core, Owners, Contacts, Customer Accounts, Modules, Features และ Notes ใน Transaction เดียว
+- Edit บันทึกตามลำดับ Core → Owners → Modules/Features → Contacts → Customer Accounts → Notes
+- Edit เป็น Sequential Save หากส่วนหลังล้มเหลว ส่วนก่อนหน้าอาจบันทึกแล้ว
 - Soft Delete ใช้ `archive_customer`
-- หลัง Soft Delete สำเร็จ Frontend ลบข้อมูลออกจาก State และ Grid ทันที
+- หลัง Soft Delete สำเร็จ Frontend ลบข้อมูลจาก State และ Grid ทันที
 - Credential ไม่ถูก Export และไม่ถูกบันทึกใน Customer Audit Log
 
 ### 4.3 Draft persistence
 
 - ใช้ `sessionStorage` แยกตาม Browser Tab, User และ Customer
-- เก็บค่าฟอร์ม Owner/Module/Feature, ผู้ติดต่อ และบัญชีผู้ใช้งานลูกค้า
-- แบบร่างอาจมีรหัสผ่านและ PIN แบบข้อความปกติตามค่าที่ผู้ใช้กรอก
-- ล้างเมื่อ Save สำเร็จ, Cancel หรือ Logout
+- เก็บค่าฟอร์ม Owner/Module/Feature, ผู้ติดต่อ, บัญชีผู้ใช้งาน และโน้ต
+- Draft อาจมี Password/PIN แบบข้อความปกติตามข้อมูลที่ผู้ใช้กรอก
+- ล้าง Draft เมื่อ Save สำเร็จ, Cancel หรือ Logout
 - Auth Token Refresh ไม่ Render Route ใหม่
-- ปิด Browser Tab แล้ว `sessionStorage` จะถูกล้างโดย Browser
+- ปิด Browser Tab แล้ว Browser จะล้าง `sessionStorage`
 
-## 5. Customer List and Excel
+## 5. Customer List, filters and Excel
 
 คอลัมน์เริ่มต้น:
 
@@ -198,13 +212,17 @@ style.css
 4. สถานะการนำเข้าข้อมูล
 5. ประเภทสัญญา
 6. จำนวนรถ
-7. ผู้รับผิดชอบหลัก
-8. จำนวนผู้ใช้งานลูกค้า
-9. วันที่เริ่มใช้งานจริง
-10. อัปเดตล่าสุด
-11. การกระทำ
+7. ผู้รับผิดชอบหลักพร้อม Avatar
+8. เซลล์
+9. จำนวนผู้ใช้งานลูกค้าที่กรอก
+10. จำนวนบัญชีผู้ใช้งานที่บันทึกไว้
+11. วันที่เริ่มใช้งานจริง
+12. อัปเดตล่าสุด
+13. การกระทำ
 
-Excel ประกอบด้วยข้อมูลลูกค้า, ผู้รับผิดชอบ, Module/Feature, สัญญา และจำนวนผู้ใช้งานลูกค้า แต่ไม่รวม `password_text` และ `pin_text`
+ตัวกรองรองรับ Search, Account Status, Owner, Onboarding, Import, Engagement, Contract, Sales, Module, Feature, Fleet Range และ Date Range
+
+Excel รวม Sales, จำนวนผู้ใช้งานที่กรอก และจำนวนบัญชีที่สร้าง แต่ไม่รวม `password_text` หรือ `pin_text`
 
 ## 6. Daily Report model
 
@@ -212,35 +230,36 @@ Excel ประกอบด้วยข้อมูลลูกค้า, ผู
 - Report Item อยู่ใน Section `today` หรือ `tomorrow`
 - Item หนึ่งข้อเชื่อมลูกค้าได้ 0 คนขึ้นไป
 - Report หนึ่งฉบับมีกลุ่มลูกค้าระดับรายงานได้หนึ่งชุด
-- Item เลือกได้:
-  - ใช้กลุ่มลูกค้าของรายงาน หรือ
-  - เลือกลูกค้าเฉพาะ Item หลายราย
+- Item เลือกใช้กลุ่มรายงานหรือเลือกลูกค้าเฉพาะ Item ได้
 - การเปลี่ยนกลุ่มหรือ Item เพิ่ม `daily_reports.content_version`
 - Manager ต้องส่ง `expected_content_version` เมื่อ Acknowledge หรือ Request Revision
 - Report ที่ `acknowledged` ถูกล็อก
+- หน้า Daily Report, Manager List และ Manager Review แสดง Avatar ของผู้จัดทำ
 
 ## 7. Master Data
 
-กลุ่มปัจจุบัน:
-
-| Group | Storage |
-|---|---|
-| `modules` | `modules` |
-| `features` | `features` |
-| `onboarding_stage` | `master_options` |
-| `import_status` | `master_options` |
-| `engagement_level` | `master_options` |
-| `contract_type` | `master_options` |
+| Group | Storage | Used by |
+|---|---|---|
+| `modules` | `modules` | Customer modules |
+| `features` | `features` | Customer features |
+| `onboarding_stage` | `master_options` | Customer onboarding |
+| `import_status` | `master_options` | Customer import status |
+| `engagement_level` | `master_options` | Customer engagement |
+| `contract_type` | `master_options` | Customer contract |
+| `sales` | `master_options` | Customer sales assignment |
 
 กฎ:
 
 - Module/Feature Code ใช้ `a-z`, `0-9`, `_`
+- Master Value ห้ามว่างและยาวไม่เกิน 100 ตัวอักษร
 - `sort_order` เป็นจำนวนเต็ม `1–9999`
 - `sort_order` ห้ามซ้ำภายในกลุ่ม
-- Code/Value ห้ามซ้ำ
-- รายการที่ถูกใช้งานแล้วให้ปิดใช้งานแทนการลบ
-- Frontend เขียนผ่าน `admin_save_master_item_v2`
-- Submit Handler ป้องกัน Native Browser Submit ก่อนเริ่ม Async
+- Code/Value ห้ามซ้ำภายในกลุ่ม
+- รายการที่ถูกใช้งานแล้วให้ปิด `is_active` แทนการลบ
+- Frontend เขียนผ่าน `admin_save_master_item_v3`
+- หน้า Master Data เป็น Compact List และไม่ Render ทั้ง Route หลังบันทึก
+
+Migration 008 ไม่สร้าง Sales Seed เนื่องจากรายชื่อเซลล์เป็นข้อมูลเฉพาะองค์กร Admin ต้องเพิ่มรายการก่อนนำไปเลือกให้ลูกค้า
 
 ## 8. Current database schema
 
@@ -248,10 +267,10 @@ Excel ประกอบด้วยข้อมูลลูกค้า, ผู
 
 | Column | Type | Null | Notes |
 |---|---|---:|---|
-| `id` | `uuid` | No | PK, FK → auth.users |
-| `display_name` | `text` | No | 1–200 |
+| `id` | `uuid` | No | PK, FK → `auth.users.id` |
+| `display_name` | `text` | No | 1–200; เจ้าของบัญชีแก้ได้ |
 | `email` | `text` | No | Unique lowercase |
-| `position` | `text` | Yes | 1–200 |
+| `position` | `text` | Yes | 1–200; Admin แก้ได้เท่านั้น |
 | `role` | `text` | No | admin/manager/user |
 | `is_active` | `boolean` | No | |
 | `theme_mode` | `text` | No | light/dark/system |
@@ -264,11 +283,14 @@ Excel ประกอบด้วยข้อมูลลูกค้า, ผู
 | Column | Type | Null | Notes |
 |---|---|---:|---|
 | `id` | `uuid` | No | PK |
+| `legacy_customer_id` | `text` | Yes | Partial unique |
 | `legal_name` | `text` | No | |
 | `short_name` | `text` | Yes | |
-| `tax_id` | `text` | No | Unique 13 digits |
+| `tax_id` | `text` | No | Unique, 13 digits |
 | `fleet_size` | `integer` | No | ≥ 0 |
+| `customer_user_count` | `integer` | No | default 1, `1–999999` |
 | `account_status` | `text` | No | active/inactive |
+| `sales_code` | `text` | Yes | Active Master `sales` |
 | `onboarding_stage` | `text` | Yes | Master |
 | `import_status` | `text` | No | Master |
 | `engagement_level` | `text` | Yes | Master |
@@ -276,7 +298,12 @@ Excel ประกอบด้วยข้อมูลลูกค้า, ผู
 | `billing_date` | `date` | Yes | |
 | `contract_type` | `text` | No | Master |
 | `onsite_training_count` | `integer` | No | 0–999999 |
-| archive and audit metadata | | | |
+| archive/audit metadata | | | |
+
+Indexes เพิ่มใน Migration 008:
+
+- `customers_sales_code_idx`
+- `customers_customer_user_count_idx`
 
 ### 8.3 Customer relation tables
 
@@ -295,51 +322,37 @@ Excel ประกอบด้วยข้อมูลลูกค้า, ผู
 | `password_text` | `text` | No | Plaintext, max 500 |
 | `pin_text` | `text` | No | Plaintext, max 100 |
 | `notes` | `text` | Yes | max 2000 |
-| `created_at` / `updated_at` | `timestamptz` | No | |
-| `created_by` / `updated_by` | `uuid` | No | FK → profiles |
+| metadata | | | |
+
+`customer_user_accounts` เป็นรายการบัญชีที่บันทึกไว้ ส่วน `customers.customer_user_count` เป็นจำนวนผู้ใช้งานจริงที่กรอกเอง ทั้งสองค่าไม่จำเป็นต้องเท่ากัน
+
+### 8.5 `customer_notes`
+
+| Column | Type | Null | Notes |
+|---|---|---:|---|
+| `id` | `uuid` | No | PK, default `gen_random_uuid()` |
+| `customer_id` | `uuid` | No | FK → customers, cascade |
+| `note_text` | `text` | No | Trimmed length 1–5000 |
+| `created_at` | `timestamptz` | No | |
+| `created_by` | `uuid` | No | FK → profiles |
+| `updated_at` | `timestamptz` | No | |
+| `updated_by` | `uuid` | No | FK → profiles |
 
 RLS:
 
-- Active Role อ่านได้
-- Insert/Update/Delete ต้องผ่าน `app_private.can_edit_customer(customer_id)`
-- ไม่มี Audit Trigger เพื่อหลีกเลี่ยงการทำสำเนา Credential เพิ่มใน Audit Table
+- Select: Active authenticated users
+- Insert/Update/Delete: `app_private.can_edit_customer(customer_id)`
+- Actor/timestamp ตั้งผ่าน `app_private.set_actor_timestamps()`
 
-### 8.5 Daily Report tables
+### 8.6 Daily Report tables
 
-`daily_reports`
+- `daily_reports`: Unique `(user_id, work_date)`, status workflow, `content_version`
+- `daily_report_items`: today/tomorrow, detail, sort order, shared-group flag
+- `daily_report_group_customers`: shared customer group
+- `daily_report_item_customers`: explicit customers per item
+- `daily_report_events`: immutable workflow events
 
-- Unique `(user_id, work_date)`
-- Status: `draft`, `submitted`, `acknowledged`, `revision_required`
-- `content_version` สำหรับ Concurrency
-
-`daily_report_items`
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `report_id` | `uuid` | FK → daily_reports |
-| `section` | `text` | today/tomorrow |
-| `detail` | `text` | 1–5000 |
-| `sort_order` | `integer` | ≥ 0 |
-| `use_report_customer_group` | `boolean` | default false |
-| timestamps | `timestamptz` | |
-
-`daily_report_group_customers`
-
-- PK `(report_id, customer_id)`
-- Shared group for a report
-
-`daily_report_item_customers`
-
-- PK `(item_id, customer_id)`
-- Explicit customers for an item
-- Used only when `use_report_customer_group = false`
-
-`daily_report_events`
-
-- Immutable workflow events
-
-### 8.6 Other current tables
+### 8.7 Other tables
 
 - `modules`
 - `features`
@@ -351,7 +364,7 @@ RLS:
 
 Current RPCs used by this release:
 
-- `create_customer_complete_v2`
+- `create_customer_complete_v3`
 - `save_customer_owners`
 - `save_customer_contact`
 - `archive_customer`
@@ -360,22 +373,35 @@ Current RPCs used by this release:
 - `submit_daily_report`
 - `acknowledge_daily_report`
 - `request_daily_report_revision`
-- `update_my_profile_details`
+- `update_my_profile_display_name`
+- `update_my_profile_details` — compatibility RPC; rejects position changes
 - `update_my_profile_preferences`
 - `update_my_avatar_path`
 - `admin_update_profile_full`
 - `admin_update_profile_avatar`
-- `admin_save_master_item_v2`
+- `admin_save_master_item_v3`
 
 Security rules:
 
 - RLS เปิดทุกตารางที่ Frontend เข้าถึง
-- Security-definer RPC ตรวจ Active User/Role ภายใน
+- Security-definer RPC ตรวจ Active User/Role ภายในและกำหนด `search_path`
 - Browser ใช้ Publishable/Anon Key เท่านั้น
-- Credential ไม่แสดงใน Customer List, Excel, Toast หรือ Console โดยตั้งใจ
-- Error Message ไม่ควรเปิดเผย Payload หรือ Secret
+- Position เปลี่ยนผ่าน Admin RPC เท่านั้น
+- Credential ไม่แสดงใน List, Excel, Toast หรือ Console โดยตั้งใจ
+- Customer Notes ไม่บันทึก Password/PIN
 
-## 10. Environment
+## 10. Profile avatar and theme
+
+- Avatar เก็บใน Private Bucket `app-profile-media`
+- File upload รองรับ PNG, JPEG, WebP ไม่เกิน 3 MB
+- ไม่ตรวจบังคับอัตราส่วนของไฟล์
+- Signed URL ใช้สำหรับแสดงภาพตามสิทธิ์
+- พื้นที่แสดงภาพใช้ `object-fit: cover`
+- เมื่อไม่มีรูป ใช้อักษรย่อจากชื่อที่แสดง
+- Accent สร้างตัวแปรสีเข้ม อ่อน Border, Shadow และ Contrast อัตโนมัติ
+- Success/Warning/Danger ไม่ถูกเปลี่ยนตาม Accent
+
+## 11. Environment
 
 `script.js` มีเฉพาะ Public Browser Configuration:
 
@@ -384,31 +410,34 @@ const SUPABASE_URL = "https://<project-ref>.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "<publishable-or-anon-key>";
 ```
 
-ห้ามใส่ใน Frontend หรือ README:
+ห้ามใส่ใน Frontend, README, Log หรือ Screenshot:
 
 - Database password
 - `service_role` key
 - Access token / Refresh token
 - Private API key
 
-## 11. Installation and deployment
+## 12. Installation and deployment
 
 ### Required order
 
 1. สำรองฐานข้อมูล
-2. รัน `007_customer_accounts_report_groups.sql`
-3. รัน `007_customer_accounts_report_groups_verify.sql`
+2. รัน `008_sales_notes_profile_theme.sql`
+3. รัน `008_sales_notes_profile_theme_verify.sql`
 4. Deploy Runtime Files ทั้ง 4 ไฟล์พร้อมกัน
 5. Hard Refresh Browser
-6. Smoke Test ด้วย Admin, Manager และ User
+6. เพิ่ม Sales Master อย่างน้อยหนึ่งรายการตามข้อมูลจริงขององค์กร
+7. Smoke Test ด้วย Admin, Manager และ User
 
-### Static local run
+### Local static run
 
 ```bash
 python3 -m http.server 8080
 ```
 
-### Git push
+เปิด `http://localhost:8080` ห้ามใช้ `file://` เป็นผลทดสอบ Production
+
+### Git deployment
 
 ```bash
 git switch main
@@ -416,67 +445,62 @@ git pull --rebase origin main
 git diff --check
 
 git add README.md index.html script.js style.css
-git commit -m "release: v0.9.0 customer accounts and report groups"
+git commit -m "release: v0.10.0 sales notes profile theme"
 git push origin main
 
-git tag -a v0.9.0-customer-accounts-report-groups \
-  -m "FI Customer Tracking v0.9.0"
-git push origin v0.9.0-customer-accounts-report-groups
+git tag -a v0.10.0-sales-notes-profile-theme \
+  -m "FI Customer Tracking v0.10.0 sales notes profile theme"
+git push origin v0.10.0-sales-notes-profile-theme
 ```
 
-## 12. Rollback
+### Post-deploy smoke test
 
-1. Deploy Frontend `0.8.0-customer-data-restructure`
-2. สำรอง:
-   - `customer_user_accounts`
-   - `daily_report_group_customers`
-   - `daily_report_item_customers`
-3. รัน `007_customer_accounts_report_groups_rollback.sql`
+Admin:
 
-Rollback:
+- สร้าง/แก้ Master เซลล์และตรวจว่าไม่ Refresh ทั้งหน้า
+- แก้ตำแหน่งผู้ใช้
+- เปลี่ยน Accent และตรวจ Navigation, Card, Grid, Pagination และ Chart
+- เปลี่ยน Avatar รูปแนวนอน/แนวตั้ง
 
-- ลบบัญชีผู้ใช้งานลูกค้าทั้งหมด
-- ลบกลุ่มลูกค้าระดับรายงาน
-- Item ที่มีหลายลูกค้าจะเหลือลูกค้าเพียงหนึ่งราย โดยเลือก UUID แรกตามลำดับ
-- ไม่สามารถคืนข้อมูลใหม่ทั้งหมดได้หากไม่มี Backup
+ทุก Role:
 
-## 13. Test checklist
+- สร้างลูกค้าด้วยจำนวนผู้ใช้งานอย่างน้อย 1
+- เลือกเซลล์
+- เพิ่ม แก้ และลบโน้ต
+- ตรวจ Draft หลังสลับ Browser Tab
+- ตรวจ Customer List, Detail และ Excel
+- ตรวจ Avatar ใน Owner และ Daily Report
 
-### Static checks
+## 13. Rollback
 
-- `node --check script.js`
-- HTML ID uniqueness
-- HTML label/field targets
-- CSS brace balance
-- Version/Cache Busting consistency
-- ZIP integrity
-- SQL quote/dollar-quote/parenthesis balance
-- ตรวจว่าไม่มี `service_role`
+1. Deploy Frontend `v0.9.0-customer-accounts-report-groups`
+2. รัน `008_sales_notes_profile_theme_rollback.sql`
+3. Hard Refresh
 
-### Mocked browser smoke tests
+Rollback ลบถาวร:
 
-- Master Module Add/Edit เรียก `admin_save_master_item_v2` โดย Route เดิมไม่เปลี่ยนและไม่มี Native Refresh
-- Customer User Account เพิ่มเข้า Draft ได้ พร้อม Password/PIN/หมายเหตุ
-- Customer Create ส่ง `p_customer_accounts` ไป `create_customer_complete_v2`
-- Token Refresh ไม่ล้างค่าฟอร์มและ Draft ยังคงอยู่ใน `sessionStorage`
-- Daily Report ส่งลูกค้าหลายรายต่อ Item และส่ง Shared Report Group ผ่าน RPC ที่ถูกต้อง
+- Customer Notes ทั้งหมด
+- Sales Master และการเลือกเซลล์ของลูกค้า
+- ค่า `customer_user_count`
 
-### Runtime checks required on real Supabase
+Rollback คืนการแก้ตำแหน่งของตนเองตามพฤติกรรม v0.9.0 เพื่อให้ตรงกับ Frontend รุ่นเดิม ข้อมูลที่ถูกลบต้องกู้จาก Backup เท่านั้น
 
-- Admin เพิ่ม/แก้ Module และ Master ทุกกลุ่ม
-- Create Customer พร้อมผู้ติดต่อและผู้ใช้งานหลายบัญชี
-- Edit/Delete Customer Account
-- สลับ Browser Tab แล้วแบบร่างไม่หาย
-- Cancel/Logout แล้วแบบร่างถูกล้าง
-- Daily Report Item เลือกลูกค้าหลายราย
-- Shared Report Customer Group ใช้กับหลายข้อ
-- Manager Review และ Print แสดงลูกค้าครบ
-- Acknowledge/Revision Content Version
-- RLS ด้วย Admin/Manager/User
+## 14. Operational reset
 
-## 14. Known limitations
+`reset_usage_data_scope_a_v0.10.0.sql` ล้าง Customer, Notes, Accounts, Audit และ Daily Reports แต่เก็บ:
 
-- Credential ถูกเก็บเป็น Plaintext ตาม Requirement จึงมีความเสี่ยงสูงกว่าการใช้ Secret Manager หรือ Encryption
-- `sessionStorage` เก็บ Draft เฉพาะ Browser Tab ปัจจุบันและไม่ Sync ข้ามอุปกรณ์
-- Customer Edit เป็น Sequential Save ไม่ใช่ Transaction รวม
-- Runtime ต้องทดสอบกับ Supabase Project จริงหลังรัน Migration
+- `auth.users`
+- `profiles`
+- Modules, Features และ Master Data รวม Sales
+- Branding, `app_settings`
+- Storage files
+- Migration history
+
+## 15. Known limitations
+
+- Edit Customer เป็น Sequential Save ไม่ใช่ Transaction รวม
+- `sales_code` เป็นค่าว่างได้ เพื่อรองรับลูกค้าเดิมและกรณียังไม่สร้าง Sales Master
+- จำนวนผู้ใช้งานลูกค้าที่กรอกอาจต่างจากจำนวนบัญชีที่สร้างไว้โดยตั้งใจ
+- Password/PIN ของบัญชีผู้ใช้งานลูกค้าเป็น Plaintext ตาม Requirement
+- Signed Avatar URL มีอายุจำกัดและต้องสร้างใหม่เมื่อโหลดข้อมูล
+- SQL/RLS ต้องทดสอบกับ Supabase Project จริงหลัง Deploy

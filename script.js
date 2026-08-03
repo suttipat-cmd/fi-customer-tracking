@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.9.0-customer-accounts-report-groups";
+  const APP_VERSION = "0.10.0-sales-notes-profile-theme";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -18,7 +18,8 @@
     onboarding_stage: { label: "ขั้นตอนเริ่มใช้งาน", source: "master_options" },
     import_status: { label: "สถานะการนำเข้าข้อมูล", source: "master_options" },
     engagement_level: { label: "ระดับความสนใจ", source: "master_options" },
-    contract_type: { label: "ประเภทสัญญา", source: "master_options" }
+    contract_type: { label: "ประเภทสัญญา", source: "master_options" },
+    sales: { label: "เซลล์", source: "master_options" }
   };
 
   const LABELS = {
@@ -59,6 +60,7 @@
     customerModules: [],
     customerFeatures: [],
     customerAccounts: [],
+    customerNotes: [],
     modules: [],
     features: [],
     masterOptions: [],
@@ -102,6 +104,7 @@
         importStatus: "",
         engagement: "",
         contractType: "",
+        salesCode: "",
         moduleId: "",
         featureId: "",
         fleetMin: "",
@@ -165,6 +168,9 @@
     customerUserDialog: document.getElementById("customer-user-dialog"),
     customerUserForm: document.getElementById("customer-user-form"),
     customerUserDialogTitle: document.getElementById("customer-user-dialog-title"),
+    customerNoteDialog: document.getElementById("customer-note-dialog"),
+    customerNoteForm: document.getElementById("customer-note-form"),
+    customerNoteDialogTitle: document.getElementById("customer-note-dialog-title"),
     reportDialog: document.getElementById("report-dialog"),
     reportDialogContent: document.getElementById("report-dialog-content"),
     revisionDialog: document.getElementById("revision-dialog"),
@@ -200,7 +206,7 @@
   }
   function label(group, value) {
     if (value === null || value === undefined || value === "") return "-";
-    const masterGroup = ["onboarding_stage", "import_status", "engagement_level", "contract_type"].includes(group)
+    const masterGroup = ["onboarding_stage", "import_status", "engagement_level", "contract_type", "sales"].includes(group)
       ? group
       : null;
     if (masterGroup) {
@@ -320,6 +326,10 @@
       ["customer_user_accounts_customer_email_uq", "อีเมลผู้ใช้งานลูกค้านี้มีอยู่แล้ว"],
       ["Customer account emails are required and must be unique", "อีเมลผู้ใช้งานลูกค้าต้องไม่ว่างและห้ามซ้ำ"],
       ["Customer account email is invalid", "รูปแบบอีเมลผู้ใช้งานลูกค้าไม่ถูกต้อง"],
+      ["Customer user count must be between 1 and 999999", "จำนวนผู้ใช้งานลูกค้าต้องเป็นจำนวนเต็มตั้งแต่ 1 ถึง 999999"],
+      ["Invalid sales master", "เซลล์ที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน"],
+      ["Customer note text is required", "กรุณาระบุรายละเอียดโน้ตลูกค้า"],
+      ["Only admin can update profile position", "ตำแหน่งแก้ไขได้เฉพาะผู้ดูแลระบบ"],
       ["Every selected customer must be active", "ลูกค้าที่เลือกบางรายการไม่พร้อมใช้งาน กรุณาโหลดข้อมูลใหม่"],
       ["customers_tax_id", "เลขประจำตัวผู้เสียภาษีนี้มีอยู่แล้ว"],
       ["master_options_group_sort_order_uq", "ลำดับการแสดงนี้ถูกใช้งานแล้วในหมวดเดียวกัน"],
@@ -466,6 +476,18 @@
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
+  function contrastTextForHex(value) {
+    const { r, g, b } = hexToRgb(value);
+    const channels = [r, g, b].map((channel) => {
+      const normalized = channel / 255;
+      return normalized <= 0.03928
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+    const luminance = 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    return luminance > 0.52 ? "#111827" : "#ffffff";
+  }
+
   function resolvedThemeMode(mode = state.profile?.theme_mode || "light") {
     if (mode === "system") {
       return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -480,15 +502,27 @@
     const root = document.documentElement;
     const surface = resolved === "dark" ? "#161c28" : "#ffffff";
     const background = resolved === "dark" ? "#0f141d" : "#f5f7fb";
+    const textOnAccent = contrastTextForHex(accent);
+    const hover = mixHex(accent, resolved === "dark" ? "#ffffff" : "#000000", 0.16);
+    const strong = mixHex(accent, resolved === "dark" ? "#ffffff" : "#000000", 0.28);
+    const soft = mixHex(accent, surface, resolved === "dark" ? 0.80 : 0.90);
+    const softer = mixHex(accent, surface, resolved === "dark" ? 0.90 : 0.96);
+    const border = mixHex(accent, surface, resolved === "dark" ? 0.58 : 0.72);
 
     root.dataset.theme = resolved;
     document.body.dataset.agThemeMode = resolved;
     root.style.setProperty("--primary", accent);
-    root.style.setProperty("--primary-hover", mixHex(accent, resolved === "dark" ? "#ffffff" : "#000000", 0.16));
-    root.style.setProperty("--primary-soft", mixHex(accent, surface, resolved === "dark" ? 0.82 : 0.91));
+    root.style.setProperty("--primary-hover", hover);
+    root.style.setProperty("--primary-strong", strong);
+    root.style.setProperty("--primary-soft", soft);
+    root.style.setProperty("--primary-softer", softer);
+    root.style.setProperty("--primary-border", border);
+    root.style.setProperty("--primary-contrast", textOnAccent);
+    root.style.setProperty("--primary-shadow", rgbaFromHex(accent, resolved === "dark" ? 0.34 : 0.22));
+    root.style.setProperty("--primary-glow", rgbaFromHex(accent, resolved === "dark" ? 0.24 : 0.13));
     root.style.setProperty("--focus", rgbaFromHex(accent, resolved === "dark" ? 0.34 : 0.22));
     root.style.setProperty("--brand-blue", accent);
-    root.style.setProperty("--brand-blue-strong", mixHex(accent, resolved === "dark" ? "#ffffff" : "#000000", 0.18));
+    root.style.setProperty("--brand-blue-strong", strong);
     root.style.setProperty("--brand-cyan", mixHex(accent, "#2dcfc6", 0.48));
     root.style.setProperty("--brand-mint", mixHex(accent, "#35dfa0", 0.58));
     root.style.setProperty("--theme-surface", surface);
@@ -1177,7 +1211,9 @@ function exportRowsToExcel(rows, columns, fileName, sheetName) {
       { header: "วันที่เริ่มวางบิล", value: (row) => formatDate(row.billing_date), width: 18 },
       { header: "ผู้รับผิดชอบ", value: (row) => row.owner_text || "-", width: 28 },
       { header: "ผู้รับผิดชอบหลัก", value: (row) => row.primary_owner_text || "-", width: 22 },
-      { header: "จำนวนผู้ใช้งานลูกค้า", value: (row) => Number(row.customer_user_count || 0), width: 22 },
+      { header: "เซลล์", value: (row) => row.sales_text || "-", width: 20 },
+      { header: "จำนวนผู้ใช้งานลูกค้า", value: (row) => Number(row.customer_user_count || 1), width: 22 },
+      { header: "จำนวนบัญชีผู้ใช้งานที่สร้าง", value: (row) => Number(row.customer_account_count || 0), width: 26 },
       { header: "โมดูล", value: (row) => row.module_text || "-", width: 26 },
       { header: "ฟังก์ชัน", value: (row) => row.feature_text || "-", width: 26 },
       { header: "สัญญา", value: (row) => row.contract_text || "-", width: 16 },
@@ -1256,6 +1292,59 @@ async function runExcelExport(button, exporter) {
       return `<span class="${h(className)} has-image"><img src="${h(url)}" alt="รูปโปรไฟล์ของ ${h(profile?.display_name || fallbackName || "ผู้ใช้งาน")}"></span>`;
     }
     return `<span class="${h(className)}">${h(initials)}</span>`;
+  }
+
+  function profileById(profileId) {
+    return state.profiles.find((profile) => profile.id === profileId) || null;
+  }
+function profileIdentityMarkup(profile, options = {}) {
+    const {
+      avatarClass = "profile-avatar-small",
+      showPosition = true,
+      subtitle = null,
+      fallbackName = "ไม่พบผู้ใช้งาน",
+      extraClass = ""
+    } = options;
+    const displayName = profile?.display_name || fallbackName;
+    const secondary = subtitle ?? (showPosition ? (profile?.position || "ไม่ระบุตำแหน่ง") : "");
+    return `
+      <span class="profile-identity ${h(extraClass)}">
+        ${avatarMarkup(profile, avatarClass, displayName)}
+        <span class="profile-identity-copy">
+          <strong>${h(displayName)}</strong>
+          ${secondary ? `<small>${h(secondary)}</small>` : ""}
+        </span>
+      </span>`;
+  }
+
+  function profileIdentityNode(profile, options = {}) {
+    const {
+      avatarClass = "profile-avatar-small",
+      showPosition = true,
+      subtitle = null,
+      fallbackName = "ไม่พบผู้ใช้งาน",
+      extraClass = ""
+    } = options;
+    const wrapper = document.createElement("span");
+    wrapper.className = `profile-identity ${extraClass}`.trim();
+
+    const avatar = document.createElement("span");
+    avatar.className = avatarClass;
+    renderAvatarInto(avatar, profile, profile?.display_name || fallbackName);
+
+    const copy = document.createElement("span");
+    copy.className = "profile-identity-copy";
+    const name = document.createElement("strong");
+    name.textContent = profile?.display_name || fallbackName;
+    copy.append(name);
+    const secondary = subtitle ?? (showPosition ? (profile?.position || "ไม่ระบุตำแหน่ง") : "");
+    if (secondary) {
+      const detail = document.createElement("small");
+      detail.textContent = secondary;
+      copy.append(detail);
+    }
+    wrapper.append(avatar, copy);
+    return wrapper;
   }
 
   function renderAvatarInto(node, profile, fallbackName = "") {
@@ -1456,7 +1545,7 @@ function applySystemBranding() {
       await validateImageFile(file, {
         maxBytes: 3 * 1024 * 1024,
         allowedTypes: ["image/png", "image/jpeg", "image/webp"],
-        requireSquare: true
+        requireSquare: false
       });
       const nextPath = await uploadMedia(file, `avatars/${profileId}`, AVATAR_BUCKET);
       const nextSignedUrl = await createAvatarSignedUrl(nextPath);
@@ -1778,29 +1867,39 @@ function applySystemBranding() {
       item.id !== excludedId && Number(item.sort_order) === Number(sortOrder)
     );
   }
-
-  function masterListHtml(groupKey) {
+function masterListHtml(groupKey) {
     const rows = masterRows(groupKey).sort((a, b) =>
       Number(a.sort_order || 0) - Number(b.sort_order || 0)
       || String(a.display_name).localeCompare(String(b.display_name), "th")
     );
     if (!rows.length) return '<div class="empty-state compact"><strong>ยังไม่มีรายการ</strong></div>';
-    return rows.map((item) => `
-      <article class="list-card master-option-card">
-        <div class="list-card-header">
-          <div>
-            <strong>${h(item.display_name)}</strong>
-            <div class="muted"><code>${h(item.option_value)}</code></div>
-            <div class="tag-list">
-              <span class="status-badge" data-status="${item.is_active ? "active" : "inactive"}">${item.is_active ? "เปิดใช้งาน" : "ปิดใช้งาน"}</span>
-              <span class="tag">ลำดับ ${Number(item.sort_order || 0)}</span>
-            </div>
-          </div>
-          <button type="button" class="btn btn-secondary btn-small"
-                  data-action="edit-master-option" data-id="${h(item.id)}" data-group="${h(groupKey)}">แก้ไข</button>
+    return `
+      <div class="master-compact-list" role="table" aria-label="รายการ ${h(MASTER_GROUPS[groupKey]?.label || "ข้อมูลตัวเลือกกลาง")}">
+        <div class="master-compact-header" role="row">
+          <span role="columnheader">รายการ</span>
+          <span role="columnheader">รหัส</span>
+          <span role="columnheader">สถานะ</span>
+          <span role="columnheader">ลำดับ</span>
+          <span role="columnheader" class="text-right">จัดการ</span>
         </div>
-      </article>
-    `).join("");
+        ${rows.map((item) => `
+          <div class="master-compact-row" role="row">
+            <strong class="master-compact-name" role="cell">${h(item.display_name)}</strong>
+            <code class="master-compact-code" role="cell">${h(item.option_value)}</code>
+            <span role="cell">
+              <span class="status-badge" data-status="${item.is_active ? "active" : "inactive"}">
+                ${item.is_active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+              </span>
+            </span>
+            <span role="cell"><span class="tag">ลำดับ ${Number(item.sort_order || 0)}</span></span>
+            <span role="cell" class="master-compact-action">
+              <button type="button" class="btn btn-secondary btn-small"
+                      data-action="edit-master-option" data-id="${h(item.id)}"
+                      data-group="${h(groupKey)}">${icon("edit")} แก้ไข</button>
+            </span>
+          </div>
+        `).join("")}
+      </div>`;
   }
 
   function renderMasterDataList(groupKey) {
@@ -1817,10 +1916,10 @@ function applySystemBranding() {
     const config = MASTER_GROUPS[selectedGroup];
     const rows = masterRows(selectedGroup);
     const isCodeGroup = config.source === "modules" || config.source === "features";
-    const codePattern = isCodeGroup ? "[A-Za-z0-9_]+" : "[A-Za-z0-9_\\-ก-๙ .()/]+";
+    const codePattern = isCodeGroup ? "[A-Za-z0-9_]+" : ".+";
     const codeTitle = isCodeGroup
       ? "ใช้ตัวอักษรอังกฤษ ตัวเลข และขีดล่างเท่านั้น"
-      : "ใช้ตัวอักษร ตัวเลข และสัญลักษณ์พื้นฐาน";
+      : "ระบุรหัสค่าความยาวไม่เกิน 100 ตัวอักษร";
     const nextOrder = nextMasterSortOrder(selectedGroup);
 
     el.mainContent.innerHTML = `
@@ -1877,7 +1976,7 @@ function applySystemBranding() {
             <h2>รายการ ${h(config.label)}</h2>
             <span id="master-option-count" class="muted">${rows.length.toLocaleString("th-TH")} รายการ</span>
           </div>
-          <div id="master-option-list" class="panel-body stack" aria-live="polite">${masterListHtml(selectedGroup)}</div>
+          <div id="master-option-list" class="panel-body master-list-panel-body" aria-live="polite">${masterListHtml(selectedGroup)}</div>
         </section>
       </div>`;
   }
@@ -1934,7 +2033,7 @@ function applySystemBranding() {
 
     setButtonBusy(button, true, "กำลังบันทึก...");
     try {
-      const { data: saved, error } = await state.client.rpc("admin_save_master_item_v2", {
+      const { data: saved, error } = await state.client.rpc("admin_save_master_item_v3", {
         p_group_key: groupKey,
         p_item_id: id || null,
         p_option_value: optionValue,
@@ -2466,7 +2565,7 @@ async function loadCustomers(force = false) {
   const [customersResult, ownersResult, modulesResult, featuresResult, accountsResult] = await Promise.all([
     state.client
       .from("customers")
-      .select("id,legacy_customer_id,legal_name,short_name,tax_id,fleet_size,account_status,onboarding_stage,import_status,engagement_level,start_date,billing_date,contract_type,onsite_training_count,is_archived,archived_at,archived_by,created_at,created_by,updated_at,updated_by")
+      .select("id,legacy_customer_id,legal_name,short_name,tax_id,fleet_size,customer_user_count,account_status,onboarding_stage,import_status,engagement_level,sales_code,start_date,billing_date,contract_type,onsite_training_count,is_archived,archived_at,archived_by,created_at,created_by,updated_at,updated_by")
       .eq("is_archived", false)
       .order("updated_at", { ascending: false })
       .limit(1000),
@@ -2499,7 +2598,7 @@ async function loadCustomers(force = false) {
 }
 
   function profileName(id) {
-    return state.profiles.find((profile) => profile.id === id)?.display_name || "-";
+    return profileById(id)?.display_name || "-";
   }
 
   function ownerNames(customerId) {
@@ -2776,6 +2875,18 @@ async function renderDashboard() {
                 </select>
               </label>
               <label>
+                เซลล์
+                <select id="customer-sales-filter">
+                  <option value="">ทั้งหมด</option>
+                  <option value="none" ${filters.salesCode === "none" ? "selected" : ""}>ไม่ระบุ</option>
+                  ${masterOptions("sales").map((item) => `
+                    <option value="${h(item.option_value)}" ${filters.salesCode === item.option_value ? "selected" : ""}>
+                      ${h(item.display_name)}
+                    </option>
+                  `).join("")}
+                </select>
+              </label>
+              <label>
                 โมดูล
                 <select id="customer-module-filter">
                   <option value="">ทั้งหมด</option>
@@ -2843,6 +2954,7 @@ function renderCustomerTable() {
   filters.importStatus = document.getElementById("customer-import-filter")?.value || "";
   filters.engagement = document.getElementById("customer-engagement-filter")?.value || "";
   filters.contractType = document.getElementById("customer-contract-filter")?.value || "";
+  filters.salesCode = document.getElementById("customer-sales-filter")?.value || "";
   filters.moduleId = document.getElementById("customer-module-filter")?.value || "";
   filters.featureId = document.getElementById("customer-feature-filter")?.value || "";
   filters.fleetMin = document.getElementById("customer-fleet-min")?.value || "";
@@ -2863,7 +2975,8 @@ function renderCustomerTable() {
         .filter((item) => item.customer_id === customer.id)
         .map((item) => item.feature_id);
       const ownerText = owners.map((item) => profileName(item.profile_id)).join(" ");
-      const haystack = `${customer.legal_name} ${customer.short_name || ""} ${customer.tax_id} ${ownerText}`.toLowerCase();
+      const salesText = label("sales", customer.sales_code);
+      const haystack = `${customer.legal_name} ${customer.short_name || ""} ${customer.tax_id} ${ownerText} ${salesText}`.toLowerCase();
       const ownerMatch = !filters.owner
         || (filters.owner === "unassigned" && owners.length === 0)
         || owners.some((item) => item.profile_id === filters.owner);
@@ -2875,6 +2988,10 @@ function renderCustomerTable() {
         || (filters.engagement === "none"
           ? !customer.engagement_level
           : customer.engagement_level === filters.engagement);
+      const salesMatch = !filters.salesCode
+        || (filters.salesCode === "none"
+          ? !customer.sales_code
+          : customer.sales_code === filters.salesCode);
       const fleet = Number(customer.fleet_size || 0);
 
       return (
@@ -2885,6 +3002,7 @@ function renderCustomerTable() {
         && (!filters.importStatus || customer.import_status === filters.importStatus)
         && engagementMatch
         && (!filters.contractType || customer.contract_type === filters.contractType)
+        && salesMatch
         && (!filters.moduleId || moduleIds.includes(filters.moduleId))
         && (!filters.featureId || featureIds.includes(filters.featureId))
         && (minimumFleet === null || fleet >= minimumFleet)
@@ -2910,7 +3028,10 @@ function renderCustomerTable() {
         ...customer,
         owner_text: ownerNames(customer.id).join(", ") || "-",
         primary_owner_text: primaryOwner ? profileName(primaryOwner.profile_id) : "-",
-        customer_user_count: state.customerAccounts.filter((item) => item.customer_id === customer.id).length,
+        primary_owner_profile: primaryOwner ? profileById(primaryOwner.profile_id) : null,
+        sales_text: label("sales", customer.sales_code),
+        customer_user_count: Number(customer.customer_user_count || 1),
+        customer_account_count: state.customerAccounts.filter((item) => item.customer_id === customer.id).length,
         module_text: moduleNames.join(", ") || "-",
         feature_text: featureNames.join(", ") || "-",
         onboarding_text: label("onboarding_stage", customer.onboarding_stage),
@@ -2987,13 +3108,33 @@ function renderCustomerTable() {
       {
         headerName: "ผู้รับผิดชอบหลัก",
         field: "primary_owner_text",
-        minWidth: 175
+        minWidth: 210,
+        cellRenderer: (params) => params.data.primary_owner_profile
+          ? profileIdentityNode(params.data.primary_owner_profile, {
+              avatarClass: "profile-avatar-grid",
+              showPosition: false
+            })
+          : "-"
       },
       {
-        headerName: "ผู้ใช้งานลูกค้า",
+        headerName: "เซลล์",
+        field: "sales_text",
+        minWidth: 150
+      },
+      {
+        headerName: "จำนวนผู้ใช้งาน",
         field: "customer_user_count",
-        minWidth: 145,
+        minWidth: 140,
         maxWidth: 155,
+        type: "numericColumn",
+        filter: "agNumberColumnFilter",
+        valueFormatter: (params) => `${Number(params.value || 1).toLocaleString("th-TH")} คน`
+      },
+      {
+        headerName: "บัญชีที่สร้าง",
+        field: "customer_account_count",
+        minWidth: 130,
+        maxWidth: 145,
         type: "numericColumn",
         filter: "agNumberColumnFilter",
         valueFormatter: (params) => `${Number(params.value || 0).toLocaleString("th-TH")} บัญชี`
@@ -3089,10 +3230,22 @@ function renderCustomerTable() {
               <input name="fleet_size" type="number" min="0" step="1" value="${h(c.fleet_size ?? 0)}" required>
             </label>
             <label>
+              <span class="field-label">จำนวนผู้ใช้งานลูกค้า <span class="required">*</span></span>
+              <input name="customer_user_count" type="number" min="1" max="999999" step="1"
+                     value="${h(c.customer_user_count ?? 1)}" required>
+              <small class="field-help">จำนวนผู้ใช้งานจริงที่ลูกค้าแจ้ง ต้องตั้งแต่ 1 ขึ้นไป และไม่ผูกกับจำนวนบัญชีที่สร้าง</small>
+            </label>
+            <label>
               <span class="field-label">สถานะบัญชี <span class="required">*</span></span>
               <select name="account_status" required>
                 <option value="active" ${(c.account_status || "active") === "active" ? "selected" : ""}>ใช้งาน</option>
                 <option value="inactive" ${c.account_status === "inactive" ? "selected" : ""}>ไม่ใช้งาน</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">เซลล์</span>
+              <select name="sales_code">
+                ${masterOptionHtml("sales", c.sales_code || "")}
               </select>
             </label>
           </div>
@@ -3177,10 +3330,14 @@ function renderCustomerTable() {
         <div class="panel-body">
           <div class="owner-grid">
             ${profiles.map((profile) => `
-              <label class="choice-card">
+              <label class="choice-card owner-choice-card">
                 <input type="checkbox" name="owner_id" value="${h(profile.id)}"
                        ${selectedOwnerIds.has(profile.id) ? "checked" : ""}>
-                <span>${h(profile.display_name)}<small>${h(profile.position || "ไม่ระบุตำแหน่ง")}</small></span>
+                ${avatarMarkup(profile, "choice-avatar", profile.display_name)}
+                <span class="choice-card-copy">
+                  <strong>${h(profile.display_name)}</strong>
+                  <small>${h(profile.position || "ไม่ระบุตำแหน่ง")}</small>
+                </span>
               </label>
             `).join("") || '<p class="muted">ยังไม่มีผู้ใช้งานที่เปิดใช้งาน</p>'}
           </div>
@@ -3235,6 +3392,25 @@ function customerContactSection(customerId = "") {
     </section>`;
 }
 
+function customerNotesSection(customerId = "") {
+  return `
+    <section id="customer-notes-section" class="panel edit-section customer-notes-panel">
+      <div class="panel-header">
+        <div>
+          <h2>โน้ตลูกค้า</h2>
+          <p class="muted">บันทึกได้หลายรายการ พร้อมผู้บันทึกและเวลาที่แก้ไขล่าสุด</p>
+        </div>
+        <button type="button" class="btn btn-secondary btn-small"
+                data-action="open-customer-note-create" data-customer-id="${h(customerId)}">
+          ${icon("plus")} เพิ่มโน้ต
+        </button>
+      </div>
+      <div class="panel-body">
+        <div id="customer-note-list" class="customer-note-list"></div>
+      </div>
+    </section>`;
+}
+
   function customerModuleFeatureSection(data = {}) {
     const moduleIds = data.moduleIds || [];
     const featureIds = data.featureIds || [];
@@ -3277,6 +3453,7 @@ function customerContactSection(customerId = "") {
       ${customerContactSection(customer.id || "")}
       ${customerModuleFeatureSection(data)}
       ${customerContractSection(customer)}
+      ${customerNotesSection(customer.id || "")}
     `;
   }
 
@@ -3287,11 +3464,14 @@ async function renderCustomerCreatePage() {
       id: null,
       account_status: "active",
       fleet_size: 0,
+      customer_user_count: 1,
+      sales_code: null,
       onsite_training_count: 0
     },
     owners: [],
     contacts: [],
     accounts: [],
+    notes: [],
     moduleIds: [],
     featureIds: []
   };
@@ -3321,6 +3501,7 @@ async function renderCustomerCreatePage() {
 
   renderCustomerDraftContacts();
   renderCustomerDraftAccounts();
+  renderCustomerDraftNotes();
   const restored = restoreCustomerDraft(document.getElementById("customer-core-form"));
   if (restored) showToast("กู้คืนแบบร่างที่ยังไม่ได้บันทึกแล้ว", "warning");
 }
@@ -3343,8 +3524,15 @@ function createCustomerEditDraft(data) {
       _key: account.id || createDraftKey(),
       _isNew: !account.id
     })),
+    notes: (data.notes || []).map((note) => ({
+      ...note,
+      _key: note.id || createDraftKey(),
+      _isNew: !note.id,
+      _dirty: false
+    })),
     deletedContactIds: new Set(),
     deletedAccountIds: new Set(),
+    deletedNoteIds: new Set(),
     dirty: false
   };
 }
@@ -3404,6 +3592,113 @@ function renderCustomerDraftAccounts() {
       </div>
     </article>
   `).join("") || '<div class="empty-state compact"><strong>ยังไม่มีผู้ใช้งานลูกค้า</strong></div>';
+}
+
+
+function noteAuthorProfile(note) {
+  return profileById(note?.updated_by || note?.created_by) || state.profile || null;
+}
+
+function renderCustomerDraftNotes() {
+  const container = document.getElementById("customer-note-list");
+  const draft = state.customerEditDraft;
+  if (!container || !draft) return;
+  const rows = [...draft.notes].sort((a, b) =>
+    String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || ""))
+  );
+  container.innerHTML = rows.map((note) => {
+    const author = noteAuthorProfile(note);
+    const timestamp = note.updated_at || note.created_at;
+    return `
+      <article class="customer-note-card">
+        <div class="customer-note-meta">
+          ${profileIdentityMarkup(author, {
+            avatarClass: "profile-avatar-note",
+            fallbackName: state.profile?.display_name || "ผู้ใช้งาน"
+          })}
+          <span class="muted">${timestamp ? h(formatDateTime(timestamp)) : "ยังไม่บันทึก"}</span>
+        </div>
+        <div class="customer-note-text">${h(note.note_text || "").replaceAll("\n", "<br>")}</div>
+        <div class="customer-note-actions">
+          <button type="button" class="btn btn-secondary btn-small"
+                  data-action="edit-customer-note" data-id="${h(note._key)}">แก้ไข</button>
+          <button type="button" class="btn btn-danger btn-small"
+                  data-action="delete-customer-note" data-id="${h(note._key)}">ลบ</button>
+        </div>
+      </article>`;
+  }).join("") || '<div class="empty-state compact"><strong>ยังไม่มีโน้ตลูกค้า</strong></div>';
+}
+
+function openCustomerNoteForm(note = null, customerId = "") {
+  const form = el.customerNoteForm;
+  if (!form) return;
+  form.reset();
+  form.elements.id.value = note?._key || "";
+  form.elements.customer_id.value = customerId || state.customerEditDraft?.customerId || "";
+  form.elements.note_text.value = note?.note_text || "";
+  if (el.customerNoteDialogTitle) {
+    el.customerNoteDialogTitle.textContent = note ? "แก้ไขโน้ตลูกค้า" : "เพิ่มโน้ตลูกค้า";
+  }
+  openDialog(el.customerNoteDialog);
+  window.setTimeout(() => form.elements.note_text.focus(), 0);
+}
+
+function saveCustomerNoteDraft(event) {
+  event.preventDefault();
+  const form = event.target;
+  const draft = state.customerEditDraft;
+  if (!draft || !form.reportValidity()) return;
+
+  const data = new FormData(form);
+  const key = String(data.get("id") || "");
+  const noteText = String(data.get("note_text") || "").trim();
+  if (!noteText) {
+    form.elements.note_text.setCustomValidity("กรุณาระบุรายละเอียดโน้ต");
+    form.elements.note_text.reportValidity();
+    return;
+  }
+  form.elements.note_text.setCustomValidity("");
+
+  const existing = draft.notes.find((note) => note._key === key);
+  const now = new Date().toISOString();
+  const next = {
+    id: key && !key.startsWith("new-") ? key : null,
+    customer_id: String(data.get("customer_id") || draft.customerId || ""),
+    note_text: noteText,
+    created_at: existing?.created_at || now,
+    created_by: existing?.created_by || state.profile?.id || null,
+    updated_at: now,
+    updated_by: state.profile?.id || null,
+    _key: key || createDraftKey(),
+    _isNew: !key || key.startsWith("new-"),
+    _dirty: true
+  };
+
+  if (key) {
+    draft.notes = draft.notes.map((note) => note._key === key ? next : note);
+  } else {
+    draft.notes.unshift(next);
+  }
+  draft.dirty = true;
+  renderCustomerDraftNotes();
+  scheduleCustomerDraftSave();
+  closeDialog(el.customerNoteDialog);
+  showToast(key ? "แก้ไขโน้ตในแบบร่างแล้ว" : "เพิ่มโน้ตในแบบร่างแล้ว");
+}
+
+async function deleteCustomerNoteDraft(noteKey) {
+  const draft = state.customerEditDraft;
+  const note = draft?.notes.find((item) => item._key === noteKey);
+  if (!draft || !note) return;
+  const ok = await confirmAction("นำโน้ตรายการนี้ออกหรือไม่?", "ลบโน้ตลูกค้า", "ลบ");
+  if (!ok) return;
+
+  draft.notes = draft.notes.filter((item) => item._key !== noteKey);
+  if (!note._isNew && note.id) draft.deletedNoteIds.add(note.id);
+  draft.dirty = true;
+  renderCustomerDraftNotes();
+  scheduleCustomerDraftSave();
+  showToast("นำโน้ตออกจากแบบร่างแล้ว กรุณากดบันทึก");
 }
 
 function openCustomerUserForm(account = null, customerId = "") {
@@ -3542,8 +3837,10 @@ function persistCustomerDraft() {
     values: customerFormDraftValues(form),
     contacts: draft.contacts.map(({ _key, _isNew, ...contact }) => ({ ...contact, _key, _isNew })),
     accounts: draft.accounts.map(({ _key, _isNew, ...account }) => ({ ...account, _key, _isNew })),
+    notes: draft.notes.map(({ _key, _isNew, ...note }) => ({ ...note, _key, _isNew })),
     deletedContactIds: [...draft.deletedContactIds],
-    deletedAccountIds: [...draft.deletedAccountIds]
+    deletedAccountIds: [...draft.deletedAccountIds],
+    deletedNoteIds: [...draft.deletedNoteIds]
   };
   try {
     window.sessionStorage.setItem(customerDraftStorageKey(draft.customerId || "new"), JSON.stringify(payload));
@@ -3599,11 +3896,19 @@ function restoreCustomerDraft(form) {
       _key: account._key || account.id || createDraftKey(),
       _isNew: account._isNew ?? !account.id
     }));
+    draft.notes = (stored.notes || []).map((note) => ({
+      ...note,
+      _key: note._key || note.id || createDraftKey(),
+      _isNew: note._isNew ?? !note.id,
+      _dirty: note._dirty ?? Boolean(note._isNew ?? !note.id)
+    }));
     draft.deletedContactIds = new Set(stored.deletedContactIds || []);
     draft.deletedAccountIds = new Set(stored.deletedAccountIds || []);
+    draft.deletedNoteIds = new Set(stored.deletedNoteIds || []);
     draft.dirty = true;
     renderCustomerDraftContacts();
     renderCustomerDraftAccounts();
+    renderCustomerDraftNotes();
     return true;
   } catch (error) {
     console.warn("Restore customer draft failed", error);
@@ -3645,6 +3950,7 @@ async function renderCustomerEditPage(customerId) {
 
   renderCustomerDraftContacts();
   renderCustomerDraftAccounts();
+  renderCustomerDraftNotes();
   const restored = restoreCustomerDraft(document.getElementById("customer-edit-form"));
   if (restored) showToast("กู้คืนแบบร่างที่ยังไม่ได้บันทึกแล้ว", "warning");
 }
@@ -3684,6 +3990,13 @@ function collectCustomerFormState(formElement) {
     return null;
   }
 
+  const customerUserCount = Number(form.get("customer_user_count"));
+  if (!Number.isInteger(customerUserCount) || customerUserCount < 1 || customerUserCount > 999999) {
+    showToast("จำนวนผู้ใช้งานลูกค้าต้องเป็นจำนวนเต็มตั้งแต่ 1 ถึง 999999", "error");
+    formElement.elements.customer_user_count?.focus();
+    return null;
+  }
+
   const onsiteTrainingCount = Number(form.get("onsite_training_count") || 0);
   if (!Number.isInteger(onsiteTrainingCount) || onsiteTrainingCount < 0) {
     showToast("จำนวนครั้งสอนใช้งานนอกสถานที่ต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป", "error");
@@ -3696,10 +4009,12 @@ function collectCustomerFormState(formElement) {
       short_name: nullable(form.get("short_name")),
       tax_id: String(form.get("tax_id") || "").trim(),
       fleet_size: Number(form.get("fleet_size") || 0),
+      customer_user_count: customerUserCount,
       account_status: form.get("account_status"),
       onboarding_stage: nullable(form.get("onboarding_stage")),
       import_status: form.get("import_status"),
       engagement_level: nullable(form.get("engagement_level")),
+      sales_code: nullable(form.get("sales_code")),
       start_date: dateValue(formElement, "start_date"),
       billing_date: dateValue(formElement, "billing_date"),
       contract_type: form.get("contract_type"),
@@ -3725,6 +4040,10 @@ function collectCustomerFormState(formElement) {
       password_text: String(account.password_text || ""),
       pin_text: String(account.pin_text || ""),
       notes: nullable(account.notes)
+    })),
+    notes: draft.notes.map((note) => ({
+      id: note._isNew ? null : note.id,
+      note_text: String(note.note_text || "").trim()
     }))
   };
 }
@@ -3735,6 +4054,7 @@ function clearCustomerCaches() {
   state.customerModules = [];
   state.customerFeatures = [];
   state.customerAccounts = [];
+  state.customerNotes = [];
   state.currentCustomer = null;
   state.currentCustomerData = null;
   state.customerEditDraft = null;
@@ -3753,14 +4073,15 @@ async function saveCustomer(event) {
   setLoading(true, "กำลังสร้างข้อมูลลูกค้า...");
 
   try {
-    const { data, error } = await state.client.rpc("create_customer_complete_v2", {
+    const { data, error } = await state.client.rpc("create_customer_complete_v3", {
       p_customer: collected.core,
       p_owner_ids: collected.ownerIds,
       p_primary_owner_id: collected.primaryOwnerId,
       p_module_ids: collected.moduleIds,
       p_feature_ids: collected.featureIds,
       p_contacts: collected.contacts,
-      p_customer_accounts: collected.accounts
+      p_customer_accounts: collected.accounts,
+      p_customer_notes: collected.notes
     });
     if (error) throw error;
 
@@ -3929,6 +4250,50 @@ async function saveCustomerEdit(event) {
     }
     completedSteps += 1;
 
+    currentStep = "โน้ตลูกค้า";
+    for (const noteId of [...draft.deletedNoteIds]) {
+      result = await state.client
+        .from("customer_notes")
+        .delete()
+        .eq("id", noteId)
+        .eq("customer_id", customerId);
+      if (result.error) throw result.error;
+      draft.deletedNoteIds.delete(noteId);
+    }
+
+    for (const note of draft.notes) {
+      if (!note._isNew && !note._dirty) continue;
+      const payload = {
+        customer_id: customerId,
+        note_text: String(note.note_text || "").trim()
+      };
+      if (note._isNew) {
+        result = await state.client
+          .from("customer_notes")
+          .insert(payload)
+          .select("id,customer_id,note_text,created_at,created_by,updated_at,updated_by")
+          .single();
+      } else {
+        result = await state.client
+          .from("customer_notes")
+          .update(payload)
+          .eq("id", note.id)
+          .eq("customer_id", customerId)
+          .select("id,customer_id,note_text,created_at,created_by,updated_at,updated_by")
+          .single();
+      }
+      if (result.error) throw result.error;
+      if (result.data?.id) {
+        Object.assign(note, {
+          ...result.data,
+          _key: result.data.id,
+          _isNew: false,
+          _dirty: false
+        });
+      }
+    }
+    completedSteps += 1;
+
     clearCustomerDraftStorage(customerId);
     clearCustomerCaches();
     showToast("บันทึกข้อมูลลูกค้าครบแล้ว");
@@ -3937,6 +4302,7 @@ async function saveCustomerEdit(event) {
     console.error(error);
     renderCustomerDraftContacts();
     renderCustomerDraftAccounts();
+    renderCustomerDraftNotes();
     scheduleCustomerDraftSave();
     const note = completedSteps > 0 ? " ข้อมูลส่วนก่อนหน้าอาจถูกบันทึกแล้ว" : "";
     showToast(`บันทึกส่วน “${currentStep}” ไม่สำเร็จ: ${normalizeError(error)}${note}`, "error");
@@ -3945,7 +4311,6 @@ async function saveCustomerEdit(event) {
     setButtonBusy(button, false);
   }
 }
-
 async function loadCustomerDetail(customerId) {
   await Promise.all([loadCommonData(), loadCustomers()]);
   let customer = state.customers.find((item) => item.id === customerId) || null;
@@ -3961,7 +4326,14 @@ async function loadCustomerDetail(customerId) {
   }
   if (!customer) throw new Error("ไม่พบข้อมูลลูกค้า");
 
-  const [ownersResult, contactsResult, modulesResult, featuresResult, accountsResult] = await Promise.all([
+  const [
+    ownersResult,
+    contactsResult,
+    modulesResult,
+    featuresResult,
+    accountsResult,
+    notesResult
+  ] = await Promise.all([
     state.client.from("customer_owners").select("*").eq("customer_id", customerId),
     state.client.from("customer_contacts").select("*").eq("customer_id", customerId)
       .order("is_primary", { ascending: false })
@@ -3971,23 +4343,33 @@ async function loadCustomerDetail(customerId) {
     state.client.from("customer_user_accounts")
       .select("id,customer_id,email,password_text,pin_text,notes,created_at,created_by,updated_at,updated_by")
       .eq("customer_id", customerId)
-      .order("email")
+      .order("email"),
+    state.client.from("customer_notes")
+      .select("id,customer_id,note_text,created_at,created_by,updated_at,updated_by")
+      .eq("customer_id", customerId)
+      .order("updated_at", { ascending: false })
   ]);
 
-  [ownersResult, contactsResult, modulesResult, featuresResult, accountsResult].forEach((result) => {
+  [ownersResult, contactsResult, modulesResult, featuresResult, accountsResult, notesResult].forEach((result) => {
     if (result.error) throw result.error;
   });
+
+  const notes = notesResult.data || [];
+  state.customerNotes = [
+    ...state.customerNotes.filter((item) => item.customer_id !== customerId),
+    ...notes
+  ];
 
   return {
     customer,
     owners: ownersResult.data || [],
     contacts: contactsResult.data || [],
     accounts: accountsResult.data || [],
+    notes,
     moduleIds: (modulesResult.data || []).map((row) => row.module_id),
     featureIds: (featuresResult.data || []).map((row) => row.feature_id)
   };
 }
-
 async function renderCustomerDetail(customerId) {
   const data = await loadCustomerDetail(customerId);
   state.currentCustomer = data.customer;
@@ -3997,7 +4379,7 @@ async function renderCustomerDetail(customerId) {
   const ownerList = data.owners
     .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
     .map((owner) => ({
-      name: profileName(owner.profile_id),
+      profile: profileById(owner.profile_id),
       isPrimary: Boolean(owner.is_primary)
     }));
   const moduleNames = state.modules
@@ -4006,6 +4388,8 @@ async function renderCustomerDetail(customerId) {
   const featureNames = state.features
     .filter((item) => data.featureIds.includes(item.id))
     .map((item) => item.name);
+  const createdBy = profileById(c.created_by);
+  const updatedBy = profileById(c.updated_by);
 
   el.mainContent.innerHTML = `
     ${pageHeader(
@@ -4025,10 +4409,21 @@ async function renderCustomerDetail(customerId) {
             <dt>ชื่อย่อ</dt><dd>${h(c.short_name || "-")}</dd>
             <dt>เลขประจำตัวผู้เสียภาษี</dt><dd>${h(c.tax_id)}</dd>
             <dt>จำนวนรถ</dt><dd>${Number(c.fleet_size || 0).toLocaleString("th-TH")}</dd>
+            <dt>จำนวนผู้ใช้งานลูกค้า</dt><dd>${Number(c.customer_user_count || 1).toLocaleString("th-TH")} คน</dd>
+            <dt>บัญชีผู้ใช้งานที่บันทึกไว้</dt><dd>${data.accounts.length.toLocaleString("th-TH")} บัญชี</dd>
+            <dt>เซลล์</dt><dd>${h(label("sales", c.sales_code))}</dd>
             <dt>สถานะบัญชี</dt>
             <dd><span class="status-badge" data-status="${h(c.account_status)}">${h(label("account_status", c.account_status))}</span></dd>
-            <dt>สร้างโดย</dt><dd>${h(profileName(c.created_by))} · ${h(formatDateTime(c.created_at))}</dd>
-            <dt>แก้ไขล่าสุดโดย</dt><dd>${h(profileName(c.updated_by))} · ${h(formatDateTime(c.updated_at))}</dd>
+            <dt>สร้างโดย</dt>
+            <dd>${profileIdentityMarkup(createdBy, {
+              subtitle: formatDateTime(c.created_at),
+              avatarClass: "profile-avatar-small"
+            })}</dd>
+            <dt>แก้ไขล่าสุดโดย</dt>
+            <dd>${profileIdentityMarkup(updatedBy, {
+              subtitle: formatDateTime(c.updated_at),
+              avatarClass: "profile-avatar-small"
+            })}</dd>
           </dl>
         </div>
       </section>
@@ -4051,9 +4446,15 @@ async function renderCustomerDetail(customerId) {
         <div class="panel-header"><h2>3. ผู้รับผิดชอบ</h2></div>
         <div class="panel-body">
           ${ownerList.length
-            ? `<ul class="plain-list">${ownerList.map((owner) => `
-                <li>${h(owner.name)}${owner.isPrimary ? ' <span class="tag">ผู้รับผิดชอบหลัก</span>' : ""}</li>
-              `).join("")}</ul>`
+            ? `<div class="profile-identity-list">${ownerList.map((owner) => `
+                <div class="owner-detail-row">
+                  ${profileIdentityMarkup(owner.profile, {
+                    subtitle: owner.profile?.position || "ไม่ระบุตำแหน่ง",
+                    avatarClass: "profile-avatar-grid"
+                  })}
+                  ${owner.isPrimary ? '<span class="tag">ผู้รับผิดชอบหลัก</span>' : ""}
+                </div>
+              `).join("")}</div>`
             : '<p class="muted">ยังไม่มีผู้รับผิดชอบ</p>'}
         </div>
       </section>
@@ -4082,7 +4483,7 @@ async function renderCustomerDetail(customerId) {
             <div class="subsection-header">
               <div>
                 <h3>ผู้ใช้งานลูกค้า</h3>
-                <p class="muted">ข้อมูลรหัสผ่านและ PIN จัดเก็บตามข้อกำหนดปัจจุบันและไม่รวมใน Excel Export</p>
+                <p class="muted">จำนวนที่ระบุ ${Number(c.customer_user_count || 1).toLocaleString("th-TH")} คน · บันทึกบัญชีไว้ ${data.accounts.length.toLocaleString("th-TH")} บัญชี</p>
               </div>
             </div>
             <div class="detail-card-grid">
@@ -4095,7 +4496,7 @@ async function renderCustomerDetail(customerId) {
                     <dt>หมายเหตุ</dt><dd>${h(account.notes || "-")}</dd>
                   </dl>
                 </article>
-              `).join("") || '<div class="empty-state compact"><strong>ยังไม่มีผู้ใช้งานลูกค้า</strong></div>'}
+              `).join("") || '<div class="empty-state compact"><strong>ยังไม่มีบัญชีผู้ใช้งานลูกค้า</strong></div>'}
             </div>
           </div>
         </div>
@@ -4127,6 +4528,27 @@ async function renderCustomerDetail(customerId) {
             <dt>สอนใช้งานนอกสถานที่</dt>
             <dd>${Number(c.onsite_training_count || 0).toLocaleString("th-TH")} ครั้ง</dd>
           </dl>
+        </div>
+      </section>
+
+      <section class="panel edit-section customer-notes-panel">
+        <div class="panel-header"><h2>โน้ตลูกค้า</h2><span class="tag">${data.notes.length.toLocaleString("th-TH")} รายการ</span></div>
+        <div class="panel-body">
+          <div class="customer-note-list">
+            ${data.notes.length ? data.notes.map((note) => {
+              const author = noteAuthorProfile(note);
+              return `
+                <article class="customer-note-card">
+                  <div class="customer-note-header">
+                    ${profileIdentityMarkup(author, {
+                      subtitle: `แก้ไข ${formatDateTime(note.updated_at || note.created_at)}`,
+                      avatarClass: "profile-avatar-note"
+                    })}
+                  </div>
+                  <p>${h(note.note_text).replaceAll("\n", "<br>")}</p>
+                </article>`;
+            }).join("") : '<div class="empty-state compact"><strong>ยังไม่มีโน้ตลูกค้า</strong></div>'}
+          </div>
         </div>
       </section>
     </div>`;
@@ -4246,8 +4668,9 @@ async function saveContact(event) {
               </label>
               <label>
                 <span class="field-label">ตำแหน่ง</span>
-                <input name="position" maxlength="200" value="${h(profile.position || "")}"
-                       placeholder="เช่น ผู้จัดการฝ่ายขาย">
+                <input class="position-readonly" value="${h(profile.position || "ไม่ระบุตำแหน่ง")}" readonly
+                       aria-describedby="profile-position-help">
+                <small id="profile-position-help" class="field-help">แก้ไขได้โดยผู้ดูแลระบบเท่านั้น</small>
               </label>
               <label>
                 <span class="field-label">อีเมล</span>
@@ -4335,9 +4758,8 @@ async function saveContact(event) {
     setElementBusy(form, true, "กำลังบันทึกข้อมูลส่วนตัว...");
 
     try {
-      const { data: updated, error } = await state.client.rpc("update_my_profile_details", {
-        p_display_name: String(data.get("display_name") || "").trim(),
-        p_position: nullable(data.get("position"))
+      const { data: updated, error } = await state.client.rpc("update_my_profile_display_name", {
+        p_display_name: String(data.get("display_name") || "").trim()
       });
       if (error) throw error;
 
@@ -4553,6 +4975,13 @@ async function renderDailyReportPage(workDate = null) {
                 ? `<span class="status-badge" data-status="${h(report.status)}">${h(label("report_status", report.status))}</span>`
                 : `<span class="muted">ยังไม่มีรายงาน</span>`}
             </div>
+          </div>
+          <div class="toolbar-field report-author-toolbar">
+            <label>ผู้จัดทำ</label>
+            ${profileIdentityMarkup(state.profile, {
+              avatarClass: "profile-avatar-small",
+              subtitle: state.profile?.position || "ไม่ระบุตำแหน่ง"
+            })}
           </div>
           ${report ? `
             <div class="toolbar-summary toolbar-summary-end">
@@ -4867,6 +5296,7 @@ function renderManagerReportTable() {
     .map((report) => ({
       ...report,
       user_name: profileName(report.user_id),
+      user_profile: profileById(report.user_id),
       status_text: label("report_status", report.status)
     }));
 
@@ -4894,8 +5324,12 @@ function renderManagerReportTable() {
       {
         headerName: "ผู้ใช้งาน",
         field: "user_name",
-        minWidth: 180,
-        flex: 1
+        minWidth: 220,
+        flex: 1,
+        cellRenderer: (params) => profileIdentityNode(params.data.user_profile, {
+          avatarClass: "profile-avatar-grid",
+          subtitle: params.data.user_profile?.position || "ไม่ระบุตำแหน่ง"
+        })
       },
       {
         headerName: "สถานะ",
@@ -5000,11 +5434,12 @@ async function openManagerReport(reportId) {
             <h2>รายงาน ${h(formatDate(report.work_date))}</h2>
             <span class="status-badge" data-status="${h(report.status)}">${h(label("report_status", report.status))}</span>
           </div>
-          <p class="muted">
-            ผู้จัดทำ ${h(profileName(report.user_id))}
-            <span aria-hidden="true">·</span>
-            รุ่นเนื้อหา ${h(report.content_version)}
-          </p>
+          <div class="report-author-line">
+            ${profileIdentityMarkup(profileById(report.user_id), {
+              avatarClass: "report-author-avatar",
+              subtitle: `รุ่นเนื้อหา ${report.content_version}`
+            })}
+          </div>
         </div>
         <button type="button" class="icon-button" data-action="close-dialog" data-dialog="report-dialog" aria-label="ปิด">✕</button>
       </div>
@@ -5478,6 +5913,7 @@ async function deleteContact(contactKey) {
       state.customerModules = state.customerModules.filter((item) => item.customer_id !== customerId);
       state.customerFeatures = state.customerFeatures.filter((item) => item.customer_id !== customerId);
       state.customerAccounts = state.customerAccounts.filter((item) => item.customer_id !== customerId);
+      state.customerNotes = state.customerNotes.filter((item) => item.customer_id !== customerId);
       state.filteredCustomerRows = state.filteredCustomerRows.filter((item) => item.id !== customerId);
       state.currentCustomer = null;
       state.currentCustomerData = null;
@@ -5527,6 +5963,7 @@ async function deleteContact(contactKey) {
 
     el.contactForm.addEventListener("submit", saveContact);
     el.customerUserForm?.addEventListener("submit", saveCustomerUserDraft);
+    el.customerNoteForm?.addEventListener("submit", saveCustomerNoteDraft);
     el.revisionForm.addEventListener("submit", requestRevision);
     el.avatarForm.addEventListener("submit", saveAvatar);
     el.dateRangeForm?.addEventListener("submit", saveDateRange);
@@ -5670,6 +6107,7 @@ async function deleteContact(contactKey) {
           "customer-import-filter",
           "customer-engagement-filter",
           "customer-contract-filter",
+          "customer-sales-filter",
           "customer-module-filter",
           "customer-feature-filter"
         ].includes(target.id)) {
@@ -5686,7 +6124,7 @@ async function deleteContact(contactKey) {
           await validateImageFile(target.files[0], {
             maxBytes: 3 * 1024 * 1024,
             allowedTypes: ["image/png", "image/jpeg", "image/webp"],
-            requireSquare: true
+            requireSquare: false
           });
           const objectUrl = URL.createObjectURL(target.files[0]);
           el.avatarPreview.classList.add("has-image");
@@ -5779,7 +6217,7 @@ async function deleteContact(contactKey) {
           case "reset-customer-filters": {
             state.ui.customerFilters = {
               search: "", status: "", owner: "", onboarding: "", importStatus: "",
-              engagement: "", contractType: "", moduleId: "", featureId: "", fleetMin: "", fleetMax: "",
+              engagement: "", contractType: "", salesCode: "", moduleId: "", featureId: "", fleetMin: "", fleetMax: "",
               startFrom: "", startTo: "", billingFrom: "", billingTo: "", advancedOpen: false
             };
             await withGlobalLoading("กำลังล้างตัวกรอง...", () => renderCustomersPage());
@@ -5837,6 +6275,18 @@ async function deleteContact(contactKey) {
           }
           case "delete-customer-user":
             await deleteCustomerUserDraft(target.dataset.id);
+            break;
+          case "open-customer-note-create":
+            openCustomerNoteForm(null, target.dataset.customerId);
+            break;
+          case "edit-customer-note": {
+            const note = state.customerEditDraft?.notes.find((item) => item._key === target.dataset.id);
+            if (!note) throw new Error("ไม่พบโน้ตลูกค้า");
+            openCustomerNoteForm(note, target.dataset.customerId);
+            break;
+          }
+          case "delete-customer-note":
+            await deleteCustomerNoteDraft(target.dataset.id);
             break;
           case "cancel-customer-edit":
             event.preventDefault();
