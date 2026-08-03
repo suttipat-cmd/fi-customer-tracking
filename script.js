@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.0-sales-notes-profile-theme";
+  const APP_VERSION = "0.11.0-master-delete-customer-tabs-report-picker";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -61,6 +61,7 @@
     customerFeatures: [],
     customerAccounts: [],
     customerNotes: [],
+    masterUsage: new Map(),
     modules: [],
     features: [],
     masterOptions: [],
@@ -98,7 +99,7 @@
       currentRouteName: null,
       customerFilters: {
         search: "",
-        status: "",
+        accountTab: "active",
         owner: "",
         onboarding: "",
         importStatus: "",
@@ -265,6 +266,7 @@
       download: '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/>',
       save: '<path d="M5 3h12l2 2v16H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/>',
       delete: '<path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/>',
+      globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
       settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1L7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9A1.7 1.7 0 0 0 21 10h.1v4H21a1.7 1.7 0 0 0-1.6 1z"/>',
       link: '<path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2A5 5 0 0 0 12 20.1l1.1-1.1"/>',
       database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/>',
@@ -330,6 +332,10 @@
       ["Invalid sales master", "เซลล์ที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน"],
       ["Customer note text is required", "กรุณาระบุรายละเอียดโน้ตลูกค้า"],
       ["Only admin can update profile position", "ตำแหน่งแก้ไขได้เฉพาะผู้ดูแลระบบ"],
+      ["System master item cannot be deleted", "ข้อมูลส่วนกลางไม่สามารถลบได้"],
+      ["Master item is in use", "รายการนี้ถูกใช้งานแล้วและไม่สามารถลบได้"],
+      ["Master item not found", "ไม่พบข้อมูลตัวเลือกที่ต้องการ"],
+      ["Migration 009_master_delete_customer_tabs_report_picker", "ฐานข้อมูลยังไม่ได้ติดตั้ง Migration 009"],
       ["Every selected customer must be active", "ลูกค้าที่เลือกบางรายการไม่พร้อมใช้งาน กรุณาโหลดข้อมูลใหม่"],
       ["customers_tax_id", "เลขประจำตัวผู้เสียภาษีนี้มีอยู่แล้ว"],
       ["master_options_group_sort_order_uq", "ลำดับการแสดงนี้ถูกใช้งานแล้วในหมวดเดียวกัน"],
@@ -1200,27 +1206,17 @@ function exportRowsToExcel(rows, columns, fileName, sheetName) {
     }
     exportRowsToExcel(rows, [
       { header: "ชื่อนิติบุคคล", value: (row) => row.legal_name || "-", width: 36 },
-      { header: "ชื่อย่อ", value: (row) => row.short_name || "-", width: 24 },
-      { header: "เลขประจำตัวผู้เสียภาษี", value: (row) => row.tax_id || "-", width: 20 },
       { header: "จำนวนรถ", value: (row) => Number(row.fleet_size || 0), width: 12 },
-      { header: "สถานะบัญชี", value: (row) => label("account_status", row.account_status), width: 16 },
-      { header: "สถานะการนำเข้าข้อมูล", value: (row) => row.import_text || "-", width: 24 },
-      { header: "ขั้นตอนเริ่มใช้งาน", value: (row) => row.onboarding_text || "-", width: 22 },
-      { header: "ระดับความสนใจ", value: (row) => row.engagement_text || "-", width: 18 },
-      { header: "วันที่เริ่มใช้งานจริง", value: (row) => formatDate(row.start_date), width: 20 },
-      { header: "วันที่เริ่มวางบิล", value: (row) => formatDate(row.billing_date), width: 18 },
-      { header: "ผู้รับผิดชอบ", value: (row) => row.owner_text || "-", width: 28 },
-      { header: "ผู้รับผิดชอบหลัก", value: (row) => row.primary_owner_text || "-", width: 22 },
+      { header: "โมดูล", value: (row) => row.module_text || "-", width: 28 },
+      { header: "สัญญา", value: (row) => row.contract_text || "-", width: 16 },
       { header: "เซลล์", value: (row) => row.sales_text || "-", width: 20 },
       { header: "จำนวนผู้ใช้งานลูกค้า", value: (row) => Number(row.customer_user_count || 1), width: 22 },
-      { header: "จำนวนบัญชีผู้ใช้งานที่สร้าง", value: (row) => Number(row.customer_account_count || 0), width: 26 },
-      { header: "โมดูล", value: (row) => row.module_text || "-", width: 26 },
-      { header: "ฟังก์ชัน", value: (row) => row.feature_text || "-", width: 26 },
-      { header: "สัญญา", value: (row) => row.contract_text || "-", width: 16 },
-      { header: "สอนใช้งานนอกสถานที่ (ครั้ง)", value: (row) => Number(row.onsite_training_count || 0), width: 26 },
+      { header: "สอนใช้งานนอกสถานที่ (ครั้ง)", value: (row) => Number(row.onsite_training_count || 0), width: 28 },
+      { header: "สถานะการนำเข้าข้อมูล", value: (row) => row.import_text || "-", width: 24 },
+      { header: "ระดับความสนใจ", value: (row) => row.engagement_text || "-", width: 18 },
       { header: "อัปเดตล่าสุด", value: (row) => formatDateTime(row.updated_at), width: 20 },
       { header: "แก้ไขล่าสุดโดย", value: (row) => row.updated_by_name || "-", width: 22 }
-    ], `ข้อมูลลูกค้า-${bangkokDate()}.xlsx`, "ข้อมูลลูกค้า");
+    ], `ข้อมูลลูกค้า-${state.ui.customerFilters.accountTab}-${bangkokDate()}.xlsx`, "ข้อมูลลูกค้า");
   }
 
 function exportManagerReportsExcel() {
@@ -1362,7 +1358,7 @@ function profileIdentityMarkup(profile, options = {}) {
     }
   }
 
-  
+
   function mediaMimeTypeFromPath(path) {
     const cleanPath = String(path || "").split(/[?#]/, 1)[0].toLowerCase();
     if (cleanPath.endsWith(".ico")) return "image/x-icon";
@@ -1795,14 +1791,15 @@ function applySystemBranding() {
     if (config.source === "modules" || config.source === "features") {
       const result = await state.client
         .from(config.source)
-        .select("id,code,name,is_active,sort_order")
+        .select("id,code,name,is_active,sort_order,is_system")
         .order("sort_order")
         .order("name");
       if (result.error) throw result.error;
 
       const rows = (result.data || []).map((item) => ({
         ...item,
-        sort_order: Number(item.sort_order)
+        sort_order: Number(item.sort_order),
+        is_system: Boolean(item.is_system)
       }));
       if (config.source === "modules") state.modules = rows;
       else state.features = rows;
@@ -1811,7 +1808,7 @@ function applySystemBranding() {
 
     const { data, error } = await state.client
       .from("master_options")
-      .select("id,group_key,option_value,display_name,sort_order,is_active,created_at,updated_at")
+      .select("id,group_key,option_value,display_name,sort_order,is_active,is_system,created_at,updated_at")
       .eq("group_key", groupKey)
       .order("sort_order")
       .order("display_name");
@@ -1819,10 +1816,40 @@ function applySystemBranding() {
 
     state.masterOptions = [
       ...state.masterOptions.filter((item) => item.group_key !== groupKey),
-      ...(data || [])
+      ...(data || []).map((item) => ({ ...item, is_system: Boolean(item.is_system) }))
     ];
     return data || [];
   }
+
+  function masterUsageKey(groupKey, itemId) {
+    return `${groupKey}:${itemId}`;
+  }
+
+  async function loadMasterUsage(groupKey) {
+    const { data, error } = await state.client.rpc("admin_master_item_usage_v1", {
+      p_group_key: groupKey
+    });
+    if (error) throw error;
+
+    [...state.masterUsage.keys()]
+      .filter((key) => key.startsWith(`${groupKey}:`))
+      .forEach((key) => state.masterUsage.delete(key));
+
+    (data || []).forEach((item) => {
+      state.masterUsage.set(masterUsageKey(groupKey, item.id), {
+        usage_count: Number(item.usage_count || 0),
+        is_system: Boolean(item.is_system)
+      });
+    });
+  }
+
+  function masterUsageFor(groupKey, itemId) {
+    return state.masterUsage.get(masterUsageKey(groupKey, itemId)) || {
+      usage_count: 0,
+      is_system: false
+    };
+  }
+
   function masterRows(groupKey) {
     const config = MASTER_GROUPS[groupKey];
     if (!config) return [];
@@ -1833,6 +1860,7 @@ function applySystemBranding() {
         display_name: item.name,
         sort_order: Number(item.sort_order),
         is_active: item.is_active,
+        is_system: Boolean(item.is_system),
         source: "modules"
       }));
     }
@@ -1843,12 +1871,18 @@ function applySystemBranding() {
         display_name: item.name,
         sort_order: Number(item.sort_order),
         is_active: item.is_active,
+        is_system: Boolean(item.is_system),
         source: "features"
       }));
     }
     return state.masterOptions
       .filter((item) => item.group_key === groupKey)
-      .map((item) => ({ ...item, sort_order: Number(item.sort_order), source: "master_options" }));
+      .map((item) => ({
+        ...item,
+        sort_order: Number(item.sort_order),
+        is_system: Boolean(item.is_system),
+        source: "master_options"
+      }));
   }
 
   function nextMasterSortOrder(groupKey) {
@@ -1882,23 +1916,38 @@ function masterListHtml(groupKey) {
           <span role="columnheader">ลำดับ</span>
           <span role="columnheader" class="text-right">จัดการ</span>
         </div>
-        ${rows.map((item) => `
-          <div class="master-compact-row" role="row">
-            <strong class="master-compact-name" role="cell">${h(item.display_name)}</strong>
-            <code class="master-compact-code" role="cell">${h(item.option_value)}</code>
-            <span role="cell">
-              <span class="status-badge" data-status="${item.is_active ? "active" : "inactive"}">
-                ${item.is_active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+        ${rows.map((item) => {
+          const usage = masterUsageFor(groupKey, item.id);
+          const isSystem = Boolean(item.is_system || usage.is_system);
+          const usageCount = Number(usage.usage_count || 0);
+          const deleteControl = isSystem
+            ? `<span class="master-global-indicator" title="ข้อมูลส่วนกลาง ไม่สามารถลบได้"
+                     aria-label="ข้อมูลส่วนกลาง ไม่สามารถลบได้">${icon("globe")}</span>`
+            : usageCount === 0
+              ? `<button type="button" class="btn btn-danger btn-small"
+                         data-action="delete-master-option" data-id="${h(item.id)}"
+                         data-group="${h(groupKey)}">${icon("delete")} ลบ</button>`
+              : `<span class="master-usage-indicator" title="มีข้อมูลอ้างอิง ${usageCount.toLocaleString("th-TH")} รายการ">
+                   ใช้งานแล้ว ${usageCount.toLocaleString("th-TH")}
+                 </span>`;
+          return `
+            <div class="master-compact-row" role="row">
+              <strong class="master-compact-name" role="cell">${h(item.display_name)}</strong>
+              <code class="master-compact-code" role="cell">${h(item.option_value)}</code>
+              <span role="cell">
+                <span class="status-badge" data-status="${item.is_active ? "active" : "inactive"}">
+                  ${item.is_active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+                </span>
               </span>
-            </span>
-            <span role="cell"><span class="tag">ลำดับ ${Number(item.sort_order || 0)}</span></span>
-            <span role="cell" class="master-compact-action">
-              <button type="button" class="btn btn-secondary btn-small"
-                      data-action="edit-master-option" data-id="${h(item.id)}"
-                      data-group="${h(groupKey)}">${icon("edit")} แก้ไข</button>
-            </span>
-          </div>
-        `).join("")}
+              <span role="cell"><span class="tag">ลำดับ ${Number(item.sort_order || 0)}</span></span>
+              <span role="cell" class="master-compact-action">
+                <button type="button" class="btn btn-secondary btn-small"
+                        data-action="edit-master-option" data-id="${h(item.id)}"
+                        data-group="${h(groupKey)}">${icon("edit")} แก้ไข</button>
+                ${deleteControl}
+              </span>
+            </div>`;
+        }).join("")}
       </div>`;
   }
 
@@ -1911,7 +1960,10 @@ function masterListHtml(groupKey) {
   }
   async function renderMasterDataPage(groupKey = null) {
     const selectedGroup = MASTER_GROUPS[groupKey] ? groupKey : Object.keys(MASTER_GROUPS)[0];
-    await loadMasterGroupData(selectedGroup);
+    await Promise.all([
+      loadMasterGroupData(selectedGroup),
+      loadMasterUsage(selectedGroup)
+    ]);
 
     const config = MASTER_GROUPS[selectedGroup];
     const rows = masterRows(selectedGroup);
@@ -2045,6 +2097,8 @@ function masterListHtml(groupKey) {
 
       const savedRow = Array.isArray(saved) ? saved[0] : saved;
       if (!savedRow?.id) throw new Error("ฐานข้อมูลไม่ส่งข้อมูลรายการที่บันทึกกลับมา");
+      const existingRow = id ? masterRows(groupKey).find((item) => item.id === id) : null;
+      const isSystem = Boolean(existingRow?.is_system);
 
       if (config.source === "modules") {
         const row = {
@@ -2052,7 +2106,8 @@ function masterListHtml(groupKey) {
           code: savedRow.option_value,
           name: savedRow.display_name,
           sort_order: Number(savedRow.sort_order),
-          is_active: Boolean(savedRow.is_active)
+          is_active: Boolean(savedRow.is_active),
+          is_system: isSystem
         };
         state.modules = id
           ? state.modules.map((item) => item.id === id ? row : item)
@@ -2063,7 +2118,8 @@ function masterListHtml(groupKey) {
           code: savedRow.option_value,
           name: savedRow.display_name,
           sort_order: Number(savedRow.sort_order),
-          is_active: Boolean(savedRow.is_active)
+          is_active: Boolean(savedRow.is_active),
+          is_system: isSystem
         };
         state.features = id
           ? state.features.map((item) => item.id === id ? row : item)
@@ -2076,6 +2132,7 @@ function masterListHtml(groupKey) {
           display_name: savedRow.display_name,
           sort_order: Number(savedRow.sort_order),
           is_active: Boolean(savedRow.is_active),
+          is_system: isSystem,
           created_at: savedRow.created_at || null,
           updated_at: savedRow.updated_at || null
         };
@@ -2084,11 +2141,73 @@ function masterListHtml(groupKey) {
           : [...state.masterOptions, row];
       }
 
+      if (!state.masterUsage.has(masterUsageKey(groupKey, savedRow.id))) {
+        state.masterUsage.set(masterUsageKey(groupKey, savedRow.id), {
+          usage_count: 0,
+          is_system: false
+        });
+      }
       resetMasterOptionForm();
       renderMasterDataList(groupKey);
       showToast(id ? "แก้ไขรายการแล้ว" : "เพิ่มรายการแล้ว");
     } catch (error) {
       showError(error, "บันทึกข้อมูลตัวเลือกไม่สำเร็จ");
+    } finally {
+      setButtonBusy(button, false);
+    }
+  }
+
+  async function deleteMasterOption(itemId, groupKey, button) {
+    const item = masterRows(groupKey).find((row) => row.id === itemId);
+    if (!item) throw new Error("Master item not found");
+
+    const usage = masterUsageFor(groupKey, itemId);
+    if (item.is_system || usage.is_system) {
+      showToast("ข้อมูลส่วนกลางไม่สามารถลบได้", "warning");
+      return;
+    }
+    if (Number(usage.usage_count || 0) > 0) {
+      showToast("รายการนี้ถูกใช้งานแล้วและไม่สามารถลบได้", "warning");
+      return;
+    }
+
+    const confirmed = await confirmAction(
+      `ลบ “${item.display_name}” ออกจากฐานข้อมูลถาวรหรือไม่?`,
+      "ลบข้อมูลตัวเลือกกลาง",
+      "ลบถาวร"
+    );
+    if (!confirmed) return;
+
+    setButtonBusy(button, true, "กำลังลบ...");
+    try {
+      const { error } = await state.client.rpc("admin_delete_master_item_v1", {
+        p_group_key: groupKey,
+        p_item_id: itemId
+      });
+      if (error) throw error;
+
+      const source = MASTER_GROUPS[groupKey]?.source;
+      if (source === "modules") {
+        state.modules = state.modules.filter((row) => row.id !== itemId);
+      } else if (source === "features") {
+        state.features = state.features.filter((row) => row.id !== itemId);
+      } else {
+        state.masterOptions = state.masterOptions.filter((row) => row.id !== itemId);
+      }
+      state.masterUsage.delete(masterUsageKey(groupKey, itemId));
+
+      const form = document.getElementById("master-option-form");
+      if (form?.elements.item_id?.value === itemId) resetMasterOptionForm();
+      renderMasterDataList(groupKey);
+      showToast("ลบข้อมูลตัวเลือกออกจากฐานข้อมูลแล้ว");
+    } catch (error) {
+      try {
+        await loadMasterUsage(groupKey);
+        renderMasterDataList(groupKey);
+      } catch (refreshError) {
+        console.warn("รีเฟรชสถานะการใช้งาน Master ไม่สำเร็จ", refreshError);
+      }
+      showError(error, "ลบข้อมูลตัวเลือกไม่สำเร็จ");
     } finally {
       setButtonBusy(button, false);
     }
@@ -2473,7 +2592,7 @@ async function handleSession(session) {
 
     let modulesResult = await state.client
       .from("modules")
-      .select("id,code,name,is_active,sort_order")
+      .select("id,code,name,is_active,sort_order,is_system")
       .order("sort_order")
       .order("name");
     if (modulesResult.error && /sort_order|column .* does not exist/i.test(modulesResult.error.message || "")) {
@@ -2482,7 +2601,7 @@ async function handleSession(session) {
 
     let featuresResult = await state.client
       .from("features")
-      .select("id,code,name,is_active,sort_order")
+      .select("id,code,name,is_active,sort_order,is_system")
       .order("sort_order")
       .order("name");
     if (featuresResult.error && /sort_order|column .* does not exist/i.test(featuresResult.error.message || "")) {
@@ -2491,7 +2610,7 @@ async function handleSession(session) {
 
     const masterResult = await state.client
       .from("master_options")
-      .select("id,group_key,option_value,display_name,sort_order,is_active,created_at,updated_at")
+      .select("id,group_key,option_value,display_name,sort_order,is_active,is_system,created_at,updated_at")
       .order("group_key")
       .order("sort_order")
       .order("display_name");
@@ -2550,13 +2669,17 @@ async function handleSession(session) {
 
     state.modules = (modulesResult.data || []).map((item, index) => ({
       ...item,
-      sort_order: Number(item.sort_order || index + 1)
+      sort_order: Number(item.sort_order || index + 1),
+      is_system: Boolean(item.is_system)
     }));
     state.features = (featuresResult.data || []).map((item, index) => ({
       ...item,
-      sort_order: Number(item.sort_order || index + 1)
+      sort_order: Number(item.sort_order || index + 1),
+      is_system: Boolean(item.is_system)
     }));
-    state.masterOptions = masterResult.error ? fallbackRows : (masterResult.data || []);
+    state.masterOptions = masterResult.error
+      ? fallbackRows.map((item) => ({ ...item, is_system: true }))
+      : (masterResult.data || []).map((item) => ({ ...item, is_system: Boolean(item.is_system) }));
     state.configurationLoaded = true;
   }
 
@@ -2773,11 +2896,35 @@ async function renderDashboard() {
 
   window.requestAnimationFrame(() => renderDashboardCharts(state.dashboardChartData));
 }
+  function customerAccountCounts() {
+    return state.customers.reduce((counts, customer) => {
+      if (customer.account_status === "inactive") counts.inactive += 1;
+      else counts.active += 1;
+      return counts;
+    }, { active: 0, inactive: 0 });
+  }
+
+  function renderCustomerAccountTabs() {
+    const counts = customerAccountCounts();
+    const current = state.ui.customerFilters.accountTab === "inactive" ? "inactive" : "active";
+    document.querySelectorAll("[data-customer-account-tab]").forEach((button) => {
+      const status = button.dataset.customerAccountTab;
+      const active = status === current;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", String(active));
+      const count = status === "inactive" ? counts.inactive : counts.active;
+      const countNode = button.querySelector("[data-tab-count]");
+      if (countNode) countNode.textContent = count.toLocaleString("th-TH");
+    });
+  }
+
   async function renderCustomersPage() {
     try { state.grids.customers?.destroy?.(); } catch (error) { console.warn(error); }
     state.grids.customers = null;
     await Promise.all([loadCommonData(), loadCustomers(true)]);
     const filters = state.ui.customerFilters;
+    if (!["active", "inactive"].includes(filters.accountTab)) filters.accountTab = "active";
+    const counts = customerAccountCounts();
 
     el.mainContent.innerHTML = `
       ${pageHeader(
@@ -2787,21 +2934,25 @@ async function renderDashboard() {
         [{ label: "ข้อมูลลูกค้า" }]
       )}
       <section class="panel">
+        <div class="customer-account-tabs" role="tablist" aria-label="กรองตามสถานะบัญชี">
+          <button type="button" role="tab" class="customer-account-tab ${filters.accountTab === "active" ? "active" : ""}"
+                  aria-selected="${filters.accountTab === "active"}"
+                  data-action="set-customer-account-tab" data-customer-account-tab="active">
+            ใช้งาน <span class="customer-account-tab-count" data-tab-count>${counts.active.toLocaleString("th-TH")}</span>
+          </button>
+          <button type="button" role="tab" class="customer-account-tab ${filters.accountTab === "inactive" ? "active" : ""}"
+                  aria-selected="${filters.accountTab === "inactive"}"
+                  data-action="set-customer-account-tab" data-customer-account-tab="inactive">
+            ไม่ใช้งาน <span class="customer-account-tab-count" data-tab-count>${counts.inactive.toLocaleString("th-TH")}</span>
+          </button>
+        </div>
         <div class="toolbar">
           <div class="toolbar-row">
             <div class="toolbar-field toolbar-search">
               <label for="customer-search">ค้นหา</label>
               <input id="customer-search" type="search"
-                     placeholder="ชื่อบริษัท ชื่อย่อ เลขประจำตัวผู้เสียภาษี หรือผู้รับผิดชอบ"
+                     placeholder="ชื่อบริษัท ชื่อย่อ เลขประจำตัวผู้เสียภาษี ผู้รับผิดชอบ หรือเซลล์"
                      autocomplete="off" value="${h(filters.search)}">
-            </div>
-            <div class="toolbar-field">
-              <label for="customer-status-filter">สถานะบัญชี</label>
-              <select id="customer-status-filter">
-                <option value="">ทั้งหมด</option>
-                <option value="active" ${filters.status === "active" ? "selected" : ""}>ใช้งาน</option>
-                <option value="inactive" ${filters.status === "inactive" ? "selected" : ""}>ไม่ใช้งาน</option>
-              </select>
             </div>
             <div class="toolbar-field">
               <label for="customer-owner-filter">ผู้รับผิดชอบ</label>
@@ -2947,8 +3098,8 @@ function renderCustomerTable() {
   if (!container) return;
 
   const filters = state.ui.customerFilters;
+  filters.accountTab = filters.accountTab === "inactive" ? "inactive" : "active";
   filters.search = document.getElementById("customer-search")?.value.trim() || filters.search || "";
-  filters.status = document.getElementById("customer-status-filter")?.value || "";
   filters.owner = document.getElementById("customer-owner-filter")?.value || "";
   filters.onboarding = document.getElementById("customer-onboarding-filter")?.value || "";
   filters.importStatus = document.getElementById("customer-import-filter")?.value || "";
@@ -2995,8 +3146,8 @@ function renderCustomerTable() {
       const fleet = Number(customer.fleet_size || 0);
 
       return (
-        (!query || haystack.includes(query))
-        && (!filters.status || customer.account_status === filters.status)
+        customer.account_status === filters.accountTab
+        && (!query || haystack.includes(query))
         && ownerMatch
         && onboardingMatch
         && (!filters.importStatus || customer.import_status === filters.importStatus)
@@ -3014,27 +3165,16 @@ function renderCustomerTable() {
       );
     })
     .map((customer) => {
-      const owners = state.customerOwners.filter((item) => item.customer_id === customer.id);
-      const primaryOwner = owners.find((item) => item.is_primary);
       const moduleNames = state.customerModules
         .filter((item) => item.customer_id === customer.id)
         .map((item) => state.modules.find((module) => module.id === item.module_id)?.name)
         .filter(Boolean);
-      const featureNames = state.customerFeatures
-        .filter((item) => item.customer_id === customer.id)
-        .map((item) => state.features.find((feature) => feature.id === item.feature_id)?.name)
-        .filter(Boolean);
       return {
         ...customer,
         owner_text: ownerNames(customer.id).join(", ") || "-",
-        primary_owner_text: primaryOwner ? profileName(primaryOwner.profile_id) : "-",
-        primary_owner_profile: primaryOwner ? profileById(primaryOwner.profile_id) : null,
         sales_text: label("sales", customer.sales_code),
         customer_user_count: Number(customer.customer_user_count || 1),
-        customer_account_count: state.customerAccounts.filter((item) => item.customer_id === customer.id).length,
         module_text: moduleNames.join(", ") || "-",
-        feature_text: featureNames.join(", ") || "-",
-        onboarding_text: label("onboarding_stage", customer.onboarding_stage),
         import_text: label("import_status", customer.import_status),
         engagement_text: label("engagement_level", customer.engagement_level),
         contract_text: label("contract_type", customer.contract_type),
@@ -3043,8 +3183,12 @@ function renderCustomerTable() {
     });
 
   state.filteredCustomerRows = rows;
+  renderCustomerAccountTabs();
   const countNode = document.getElementById("customer-grid-count");
-  if (countNode) countNode.textContent = `${rows.length.toLocaleString("th-TH")} รายการ`;
+  if (countNode) {
+    const tabLabel = filters.accountTab === "inactive" ? "ไม่ใช้งาน" : "ใช้งาน";
+    countNode.textContent = `${rows.length.toLocaleString("th-TH")} รายการในสถานะ ${tabLabel}`;
+  }
 
   if (state.grids.customers) {
     state.grids.customers.setGridOption("rowData", rows);
@@ -3057,39 +3201,40 @@ function renderCustomerTable() {
     getRowId: (params) => params.data.id,
     columnDefs: [
       {
-        headerName: "ลูกค้า",
+        headerName: "ชื่อนิติบุคคล",
         field: "legal_name",
         pinned: mobile ? undefined : "left",
-        minWidth: 250,
-        flex: 1.5,
+        minWidth: 260,
+        flex: 1.6,
         cellRenderer: (params) => {
           const wrapper = document.createElement("div");
           wrapper.className = "grid-primary-cell";
           const title = document.createElement("strong");
-          title.textContent = params.data.legal_name || "-";
-          const secondary = document.createElement("span");
-          secondary.className = "grid-secondary";
-          secondary.textContent = params.data.short_name || params.data.tax_id || "ไม่มีชื่อย่อ";
-          wrapper.append(title, secondary);
+          title.textContent = params.value || "-";
+          wrapper.append(title);
+          if (params.data.short_name) {
+            const secondary = document.createElement("span");
+            secondary.className = "grid-secondary";
+            secondary.textContent = params.data.short_name;
+            wrapper.append(secondary);
+          }
           return wrapper;
         }
       },
       {
-        headerName: "สถานะบัญชี",
-        field: "account_status",
-        minWidth: 130,
-        cellRenderer: (params) => statusBadgeNode(label("account_status", params.value), params.value)
+        headerName: "จำนวนรถ",
+        field: "fleet_size",
+        minWidth: 110,
+        maxWidth: 125,
+        type: "numericColumn",
+        filter: "agNumberColumnFilter",
+        valueFormatter: (params) => Number(params.value || 0).toLocaleString("th-TH")
       },
       {
-        headerName: "ขั้นตอนเริ่มใช้งาน",
-        field: "onboarding_text",
-        minWidth: 170
-      },
-      {
-        headerName: "การนำเข้าข้อมูล",
-        field: "import_text",
-        minWidth: 155,
-        cellRenderer: (params) => statusBadgeNode(params.value, params.data.import_status)
+        headerName: "โมดูล",
+        field: "module_text",
+        minWidth: 190,
+        flex: 1
       },
       {
         headerName: "สัญญา",
@@ -3097,73 +3242,53 @@ function renderCustomerTable() {
         minWidth: 125
       },
       {
-        headerName: "จำนวนรถ",
-        field: "fleet_size",
-        minWidth: 105,
-        maxWidth: 120,
-        type: "numericColumn",
-        filter: "agNumberColumnFilter",
-        valueFormatter: (params) => Number(params.value || 0).toLocaleString("th-TH")
-      },
-      {
-        headerName: "ผู้รับผิดชอบหลัก",
-        field: "primary_owner_text",
-        minWidth: 210,
-        cellRenderer: (params) => params.data.primary_owner_profile
-          ? profileIdentityNode(params.data.primary_owner_profile, {
-              avatarClass: "profile-avatar-grid",
-              showPosition: false
-            })
-          : "-"
-      },
-      {
         headerName: "เซลล์",
         field: "sales_text",
         minWidth: 150
       },
       {
-        headerName: "จำนวนผู้ใช้งาน",
+        headerName: "จำนวนผู้ใช้งานลูกค้า",
         field: "customer_user_count",
-        minWidth: 140,
-        maxWidth: 155,
+        minWidth: 175,
+        maxWidth: 195,
         type: "numericColumn",
         filter: "agNumberColumnFilter",
         valueFormatter: (params) => `${Number(params.value || 1).toLocaleString("th-TH")} คน`
       },
       {
-        headerName: "บัญชีที่สร้าง",
-        field: "customer_account_count",
-        minWidth: 130,
-        maxWidth: 145,
+        headerName: "สอนใช้งานนอกสถานที่ (ครั้ง)",
+        field: "onsite_training_count",
+        minWidth: 205,
+        maxWidth: 225,
         type: "numericColumn",
         filter: "agNumberColumnFilter",
-        valueFormatter: (params) => `${Number(params.value || 0).toLocaleString("th-TH")} บัญชี`
+        valueFormatter: (params) => Number(params.value || 0).toLocaleString("th-TH")
       },
       {
-        headerName: "เริ่มใช้งานจริง",
-        field: "start_date",
-        minWidth: 145,
-        valueFormatter: (params) => formatDate(params.value)
+        headerName: "สถานะการนำเข้าข้อมูล",
+        field: "import_text",
+        minWidth: 180,
+        cellRenderer: (params) => statusBadgeNode(params.value, params.data.import_status)
+      },
+      {
+        headerName: "ระดับความสนใจ",
+        field: "engagement_text",
+        minWidth: 150
       },
       {
         headerName: "อัปเดตล่าสุด",
         field: "updated_at",
-        minWidth: 185,
+        minWidth: 175,
         sort: "desc",
-        cellRenderer: (params) => {
-          const wrapper = document.createElement("div");
-          wrapper.className = "grid-primary-cell";
-          const date = document.createElement("span");
-          date.textContent = formatDateTime(params.value);
-          const by = document.createElement("span");
-          by.className = "grid-secondary";
-          by.textContent = params.data.updated_by_name;
-          wrapper.append(date, by);
-          return wrapper;
-        }
+        valueFormatter: (params) => formatDateTime(params.value)
       },
       {
-        headerName: "",
+        headerName: "แก้ไขล่าสุดโดย",
+        field: "updated_by_name",
+        minWidth: 180
+      },
+      {
+        headerName: "การกระทำ",
         colId: "actions",
         pinned: "right",
         width: 142,
@@ -4854,20 +4979,97 @@ function reportItemCustomerIds(itemId, itemCustomerRows = state.currentDailyItem
     .map((row) => row.customer_id);
 }
 
-function reportCustomerCheckboxes(name, selectedIds = [], disabled = false, prefix = "report-customer") {
+function reportCustomerMultiSelect(name, selectedIds = [], disabled = false, prefix = "report-customer") {
   const selected = new Set(selectedIds);
-  return state.customers
+  const customers = state.customers
     .filter((customer) => !customer.is_archived)
-    .sort((a, b) => a.legal_name.localeCompare(b.legal_name, "th"))
-    .map((customer) => {
-      const id = `${prefix}-${customer.id}`;
-      return `
-        <label class="choice-card report-customer-choice" for="${h(id)}">
-          <input id="${h(id)}" type="checkbox" name="${h(name)}" value="${h(customer.id)}"
-                 ${selected.has(customer.id) ? "checked" : ""} ${disabled ? "disabled" : ""}>
-          <span>${h(customer.short_name || customer.legal_name)}</span>
-        </label>`;
-    }).join("") || '<p class="muted">ยังไม่มีข้อมูลลูกค้า</p>';
+    .sort((a, b) => a.legal_name.localeCompare(b.legal_name, "th"));
+  const selectedNames = customers
+    .filter((customer) => selected.has(customer.id))
+    .map((customer) => customer.short_name || customer.legal_name);
+  const summary = selectedNames.length === 0
+    ? "ยังไม่ได้เลือกลูกค้า"
+    : selectedNames.length === 1
+      ? selectedNames[0]
+      : `เลือก ${selectedNames.length.toLocaleString("th-TH")} ราย · ${selectedNames.slice(0, 2).join(", ")}${selectedNames.length > 2 ? ` +${selectedNames.length - 2}` : ""}`;
+
+  return `
+    <details class="customer-multiselect ${disabled ? "is-disabled" : ""}" data-customer-multiselect
+             ${disabled ? 'data-disabled="true"' : ""}>
+      <summary aria-disabled="${disabled ? "true" : "false"}">
+        <span class="customer-multiselect-summary" data-multiselect-summary>${h(summary)}</span>
+        <span class="customer-multiselect-count" data-multiselect-count>${selectedNames.length.toLocaleString("th-TH")}</span>
+      </summary>
+      <div class="customer-multiselect-dropdown">
+        <div class="customer-multiselect-toolbar">
+          <input type="search" data-multiselect-search placeholder="ค้นหาลูกค้า..." autocomplete="off"
+                 aria-label="ค้นหาลูกค้าในรายการ">
+          <div class="customer-multiselect-actions">
+            <button type="button" class="btn btn-tertiary btn-small"
+                    data-action="select-all-report-customers" ${disabled ? "disabled" : ""}>เลือกทั้งหมด</button>
+            <button type="button" class="btn btn-tertiary btn-small"
+                    data-action="clear-report-customers" ${disabled ? "disabled" : ""}>ล้าง</button>
+          </div>
+        </div>
+        <div class="customer-multiselect-options" role="group" aria-label="รายชื่อลูกค้า">
+          ${customers.map((customer) => {
+            const id = `${prefix}-${customer.id}`;
+            const displayName = customer.short_name || customer.legal_name;
+            const searchText = `${customer.legal_name} ${customer.short_name || ""}`.toLowerCase();
+            return `
+              <label class="customer-multiselect-option" for="${h(id)}" data-search-text="${h(searchText)}">
+                <input id="${h(id)}" type="checkbox" name="${h(name)}" value="${h(customer.id)}"
+                       data-customer-multiselect-option
+                       ${selected.has(customer.id) ? "checked" : ""} ${disabled ? "disabled" : ""}>
+                <span>
+                  <strong>${h(displayName)}</strong>
+                  ${customer.short_name ? `<small>${h(customer.legal_name)}</small>` : ""}
+                </span>
+              </label>`;
+          }).join("") || '<p class="muted customer-multiselect-empty">ยังไม่มีข้อมูลลูกค้า</p>'}
+        </div>
+      </div>
+    </details>`;
+}
+
+function updateCustomerMultiSelectSummary(scope) {
+  const picker = scope?.matches?.("[data-customer-multiselect]")
+    ? scope
+    : scope?.closest?.("[data-customer-multiselect]");
+  if (!picker) return;
+  const selectedIds = [...picker.querySelectorAll("input[data-customer-multiselect-option]:checked")]
+    .map((input) => input.value);
+  const names = reportCustomerNames(selectedIds);
+  const text = names.length === 0
+    ? "ยังไม่ได้เลือกลูกค้า"
+    : names.length === 1
+      ? names[0]
+      : `เลือก ${names.length.toLocaleString("th-TH")} ราย · ${names.slice(0, 2).join(", ")}${names.length > 2 ? ` +${names.length - 2}` : ""}`;
+  const summary = picker.querySelector("[data-multiselect-summary]");
+  const count = picker.querySelector("[data-multiselect-count]");
+  if (summary) summary.textContent = text;
+  if (count) count.textContent = names.length.toLocaleString("th-TH");
+}
+
+function refreshAllCustomerMultiSelectSummaries() {
+  document.querySelectorAll("[data-customer-multiselect]").forEach(updateCustomerMultiSelectSummary);
+}
+
+function filterCustomerMultiSelect(searchInput) {
+  const picker = searchInput.closest("[data-customer-multiselect]");
+  if (!picker) return;
+  const query = searchInput.value.trim().toLowerCase();
+  picker.querySelectorAll("[data-search-text]").forEach((option) => {
+    option.classList.toggle("hidden", Boolean(query) && !option.dataset.searchText.includes(query));
+  });
+}
+
+function setVisibleCustomerMultiSelectOptions(button, checked) {
+  const picker = button.closest("[data-customer-multiselect]");
+  if (!picker) return;
+  picker.querySelectorAll(".customer-multiselect-option:not(.hidden) input[data-customer-multiselect-option]:not(:disabled)")
+    .forEach((input) => { input.checked = checked; });
+  updateCustomerMultiSelectSummary(picker);
 }
 
 function checkedValues(scope, name) {
@@ -4892,9 +5094,16 @@ function syncReportCustomerPicker(toggle) {
   const summary = editor.querySelector("[data-report-group-summary]");
   picker.classList.toggle("hidden", useGroup);
   summary?.classList.toggle("hidden", !useGroup);
+  const details = picker.matches("[data-customer-multiselect]")
+    ? picker
+    : picker.querySelector("[data-customer-multiselect]");
+  if (useGroup && details) details.open = false;
   picker.querySelectorAll('input[type="checkbox"]').forEach((input) => {
     input.disabled = useGroup || toggle.disabled;
   });
+  picker.querySelectorAll("[data-action='select-all-report-customers'], [data-action='clear-report-customers']")
+    .forEach((button) => { button.disabled = useGroup || toggle.disabled; });
+  updateCustomerMultiSelectSummary(details || picker);
 }
 
 async function renderDailyReportPage(workDate = null) {
@@ -4956,7 +5165,7 @@ async function renderDailyReportPage(workDate = null) {
       pageActions,
       [{ label: "รายงานประจำวัน" }]
     )}
-    <section class="panel">
+    <section class="panel daily-report-panel">
       <div class="toolbar">
         <div class="toolbar-row">
           <div class="toolbar-field">
@@ -5011,9 +5220,7 @@ async function renderDailyReportPage(workDate = null) {
               </div>
               <span id="report-group-customer-count" class="muted">${groupCustomerIds.length.toLocaleString("th-TH")} ราย</span>
             </div>
-            <div class="choice-grid report-customer-grid">
-              ${reportCustomerCheckboxes("report_group_customer_id", groupCustomerIds, locked, `report-group-${report.id}`)}
-            </div>
+            ${reportCustomerMultiSelect("report_group_customer_id", groupCustomerIds, locked, `report-group-${report.id}`)}
             ${!locked ? `
               <div class="report-group-actions">
                 <button type="button" class="btn btn-secondary btn-small"
@@ -5035,6 +5242,7 @@ async function renderDailyReportPage(workDate = null) {
 
   document.querySelectorAll('[data-field="use_report_customer_group"], input[name="use_report_customer_group"]').forEach(syncReportCustomerPicker);
   updateReportGroupUsageLabels();
+  refreshAllCustomerMultiSelectSummaries();
 }
 
 function renderDailySection(section, title, items, locked) {
@@ -5056,8 +5264,8 @@ function renderDailySection(section, title, items, locked) {
                 <span>ใช้กลุ่มลูกค้าของรายงาน</span>
               </label>
               <small class="field-help" data-report-group-summary></small>
-              <div class="choice-grid report-customer-grid ${useGroup ? "hidden" : ""}" data-explicit-customer-picker>
-                ${reportCustomerCheckboxes("item_customer_id", selectedIds, locked || useGroup, `item-${item.id}`)}
+              <div class="report-customer-picker ${useGroup ? "hidden" : ""}" data-explicit-customer-picker>
+                ${reportCustomerMultiSelect("item_customer_id", selectedIds, locked || useGroup, `item-${item.id}`)}
               </div>
               ${!locked ? `
                 <div class="report-item-actions">
@@ -5076,8 +5284,8 @@ function renderDailySection(section, title, items, locked) {
               <span>ใช้กลุ่มลูกค้าของรายงาน</span>
             </label>
             <small class="field-help" data-report-group-summary></small>
-            <div class="choice-grid report-customer-grid ${hasGroup ? "hidden" : ""}" data-explicit-customer-picker>
-              ${reportCustomerCheckboxes("item_customer_id", [], hasGroup, `new-${section}`)}
+            <div class="report-customer-picker ${hasGroup ? "hidden" : ""}" data-explicit-customer-picker>
+              ${reportCustomerMultiSelect("item_customer_id", [], hasGroup, `new-${section}`)}
             </div>
             <div class="report-item-actions">
               <button class="btn btn-primary btn-small" type="submit">+ เพิ่มข้อ</button>
@@ -6033,6 +6241,11 @@ async function deleteContact(contactKey) {
         return;
       }
 
+      if (target.matches("[data-multiselect-search]")) {
+        filterCustomerMultiSelect(target);
+        return;
+      }
+
       if (target.id === "customer-search") {
         state.ui.customerFilters.search = target.value;
         renderCustomerTable();
@@ -6094,14 +6307,15 @@ async function deleteContact(contactKey) {
     document.addEventListener("change", async (event) => {
       const target = event.target;
       try {
-        if (target.matches("[data-date-native]")) {
+        if (target.matches("input[data-customer-multiselect-option]")) {
+          updateCustomerMultiSelectSummary(target);
+        } else if (target.matches("[data-date-native]")) {
           syncDateControlFromNative(target, true);
           if (target.closest("#customer-edit-form, #customer-core-form")) {
             markCustomerEditDirty();
             scheduleCustomerDraftSave();
           }
         } else if ([
-          "customer-status-filter",
           "customer-owner-filter",
           "customer-onboarding-filter",
           "customer-import-filter",
@@ -6162,6 +6376,16 @@ async function deleteContact(contactKey) {
     }, true);
 
     document.addEventListener("click", async (event) => {
+      const clickedPicker = event.target.closest("[data-customer-multiselect]");
+      document.querySelectorAll("details[data-customer-multiselect][open]").forEach((picker) => {
+        if (picker !== clickedPicker) picker.open = false;
+      });
+
+      if (event.target.closest("details[data-customer-multiselect][data-disabled='true'] > summary")) {
+        event.preventDefault();
+        return;
+      }
+
       const target = event.target.closest("[data-action]");
       if (!target) return;
       const action = target.dataset.action;
@@ -6214,9 +6438,15 @@ async function deleteContact(contactKey) {
           case "clear-date-range":
             clearDateRangeDraft();
             break;
+          case "set-customer-account-tab": {
+            const accountTab = target.dataset.customerAccountTab === "inactive" ? "inactive" : "active";
+            state.ui.customerFilters.accountTab = accountTab;
+            renderCustomerTable();
+            break;
+          }
           case "reset-customer-filters": {
             state.ui.customerFilters = {
-              search: "", status: "", owner: "", onboarding: "", importStatus: "",
+              search: "", accountTab: "active", owner: "", onboarding: "", importStatus: "",
               engagement: "", contractType: "", salesCode: "", moduleId: "", featureId: "", fleetMin: "", fleetMax: "",
               startFrom: "", startTo: "", billingFrom: "", billingTo: "", advancedOpen: false
             };
@@ -6297,6 +6527,12 @@ async function deleteContact(contactKey) {
           case "create-daily-report":
             await createDailyReport(target.dataset.date);
             break;
+          case "select-all-report-customers":
+            setVisibleCustomerMultiSelectOptions(target, true);
+            break;
+          case "clear-report-customers":
+            setVisibleCustomerMultiSelectOptions(target, false);
+            break;
           case "save-report-customer-group":
             await saveDailyReportCustomerGroup(target.dataset.id, target);
             break;
@@ -6357,6 +6593,9 @@ async function deleteContact(contactKey) {
             break;
           case "edit-master-option":
             editMasterOption(target.dataset.id, target.dataset.group);
+            break;
+          case "delete-master-option":
+            await deleteMasterOption(target.dataset.id, target.dataset.group, target);
             break;
           default:
             break;

@@ -1,21 +1,40 @@
 # FI Customer Tracking Web App
 
-> **Current version:** `0.10.0-sales-notes-profile-theme`  
-> **Base version:** `0.9.0-customer-accounts-report-groups`  
-> **Runtime:** GitHub Pages + Plain HTML/CSS/JavaScript + Supabase Auth/PostgreSQL/Storage  
+> **Current version:** `0.11.0-master-delete-customer-tabs-report-picker`
+> **Base version:** `0.10.0-sales-notes-profile-theme`
+> **Runtime:** GitHub Pages + Plain HTML/CSS/JavaScript + Supabase Auth/PostgreSQL/Storage
 > **Repository runtime files:** `README.md`, `index.html`, `script.js`, `style.css`
 
 ## Release status
 
-เวอร์ชันนี้เพิ่ม Master Data `เซลล์`, จำนวนผู้ใช้งานลูกค้าแบบกรอกเอง, โน้ตลูกค้าหลายรายการ, ขยายการแสดงรูปโปรไฟล์และผลของสี Accent, จำกัดการแก้ตำแหน่งให้เฉพาะ Admin และปรับหน้า Master Data เป็น Compact List
+เวอร์ชันนี้เพิ่มการลบ Master Data ที่ยังไม่ถูกใช้งานแบบ Hard Delete ผ่าน RPC ที่ตรวจสิทธิ์และการอ้างอิง, แสดงไอคอนลูกโลกสำหรับ Global/Default Master ที่ห้ามลบ, ปรับ Customer List เป็น Tab ตามสถานะบัญชีพร้อมคอลัมน์ชุดใหม่ และเปลี่ยนการเลือกลูกค้าใน Daily Report เป็น Dropdown Multi-select ทั้งระดับรายงานและระดับรายการ
 
-ต้องรัน Migration `008_sales_notes_profile_theme` และ Verify ให้ผ่านก่อน Deploy Frontend ชุดนี้
+ต้องรัน Migration `009_master_delete_customer_tabs_report_picker` และ Verify ให้ผ่านก่อน Deploy Frontend ชุดนี้
 
-Migration จะกำหนด `customer_user_count = 1` ให้ลูกค้าเดิมทั้งหมดที่ยังไม่มีค่า ส่วน `sales_code` จะเริ่มเป็นค่าว่างจนกว่าจะสร้าง Master เซลล์และเลือกให้ลูกค้า
+Migration เพิ่ม `is_system` ให้ `modules`, `features` และ `master_options`, ยกเลิก Direct DELETE ของ Master จาก Browser และบังคับให้ลบผ่าน `admin_delete_master_item_v1` เท่านั้น โดยข้อมูลลูกค้าและรายงานเดิมไม่ถูกแก้ไข
 
 > **คำเตือนด้านข้อมูลลับ:** `customer_user_accounts.password_text` และ `pin_text` ยังคงเก็บเป็นข้อความปกติตาม Business Requirement เดิม ห้ามนำสองคอลัมน์นี้ไปใส่ใน Excel, Log, Toast, Screenshot หรือระบบวิเคราะห์ภายนอก และต้องจำกัดสิทธิ์ฐานข้อมูลกับ Backup อย่างเข้มงวด
 
 ## Changelog
+
+### 0.11.0-master-delete-customer-tabs-report-picker
+
+- เพิ่ม `is_system` ใน `modules`, `features` และ `master_options`
+- ตรวจว่า Master ตั้งต้น/Global ที่ระบบต้องใช้มีอยู่ครบ จากนั้น Mark และแสดงไอคอนลูกโลกแทนปุ่มลบ
+- Master ที่ไม่ใช่ Global และไม่มีข้อมูลอ้างอิงแสดงปุ่ม `ลบ`
+- ลบ Master แบบ Hard Delete ผ่าน `admin_delete_master_item_v1`
+- Backend ตรวจ Admin, Global flag และ Usage ซ้ำภายใน Transaction ก่อนลบ
+- Master Option แบบ Text Reference ล็อกตาราง `customers` ระหว่างตรวจและลบเพื่อกัน Race Condition
+- ยกเลิก Direct DELETE ของ `modules`, `features` และ `master_options` จาก Browser
+- เพิ่ม `admin_master_item_usage_v1` สำหรับโหลดจำนวนข้อมูลอ้างอิงโดยไม่ทำ N+1 Query
+- Customer List แยก Tab `ใช้งาน` และ `ไม่ใช้งาน` พร้อมจำนวน โดยเปิด Tab `ใช้งาน` เป็นค่าเริ่มต้น
+- ปรับ Customer List เป็น 12 คอลัมน์ตาม Current Requirement
+- Excel Export ใช้ข้อมูลจาก Tab และตัวกรองปัจจุบัน พร้อมคอลัมน์เดียวกับ List ที่เกี่ยวข้อง
+- เปลี่ยน Customer Picker ใน Daily Report เป็น Dropdown Multi-select
+- ใช้ Dropdown Multi-select ชุดเดียวกันทั้งกลุ่มลูกค้าระดับรายงานและลูกค้าเฉพาะรายการ
+- Multi-select รองรับค้นหา เลือกทั้งหมด ล้างค่า จำนวนที่เลือก และ Scroll ภายใน
+- เพิ่ม Migration, Verify, Rollback และ Operational Reset `v0.11.0`
+- Cache Busting และ Internal Version Stamp เป็น `0.11.0-master-delete-customer-tabs-report-picker`
 
 ### 0.10.0-sales-notes-profile-theme
 
@@ -55,21 +74,23 @@ Migration จะกำหนด `customer_user_count = 1` ให้ลูกค�
 2. Role `admin`, `manager`, `user`
 3. Customer CRUD แบบ Soft Delete
 4. Customer Create/Detail/Edit ตามโครงสร้าง 6 ส่วน
-5. เซลล์หนึ่งรายการต่อลูกค้า
-6. จำนวนผู้ใช้งานลูกค้าแบบกรอกเอง ตั้งแต่ 1 ขึ้นไป
-7. ผู้รับผิดชอบหลายคนและผู้รับผิดชอบหลักหนึ่งคน
-8. ผู้ติดต่อหลายคนและผู้ติดต่อหลักหนึ่งคน
-9. บัญชีผู้ใช้งานลูกค้าหลายรายการ
-10. โน้ตลูกค้าหลายรายการ
-11. Module และ Feature หลายรายการต่อลูกค้า
-12. Daily Report หนึ่งฉบับต่อผู้ใช้ต่อวัน
-13. หลายลูกค้าต่อ Daily Report Item
-14. กลุ่มลูกค้าระดับรายงานสำหรับใช้ซ้ำหลายข้อ
-15. Manager Acknowledge / Request Revision
-16. Profile avatar, display name, admin-managed position และ Theme
-17. Admin Branding และ Master Data
-18. Excel Export เฉพาะข้อมูลที่ผ่านตัวกรอง โดยไม่รวม Credential
-19. Customer Audit จาก Database Trigger โดยไม่ทำสำเนา Credential
+5. Customer List แยก Tab ตามสถานะบัญชี
+6. เซลล์หนึ่งรายการต่อลูกค้า
+7. จำนวนผู้ใช้งานลูกค้าแบบกรอกเอง ตั้งแต่ 1 ขึ้นไป
+8. ผู้รับผิดชอบหลายคนและผู้รับผิดชอบหลักหนึ่งคน
+9. ผู้ติดต่อหลายคนและผู้ติดต่อหลักหนึ่งคน
+10. บัญชีผู้ใช้งานลูกค้าหลายรายการ
+11. โน้ตลูกค้าหลายรายการ
+12. Module และ Feature หลายรายการต่อลูกค้า
+13. Daily Report หนึ่งฉบับต่อผู้ใช้ต่อวัน
+14. Dropdown Multi-select สำหรับกลุ่มลูกค้าระดับรายงานและลูกค้าเฉพาะรายการ
+15. หลายลูกค้าต่อ Daily Report Item
+16. Manager Acknowledge / Request Revision
+17. Profile avatar, display name, admin-managed position และ Theme
+18. Admin Branding และ Master Data
+19. Hard Delete Master ที่ไม่ใช่ Global และยังไม่ถูกใช้งาน
+20. Excel Export เฉพาะข้อมูลที่ผ่าน Tab/ตัวกรอง โดยไม่รวม Credential
+21. Customer Audit จาก Database Trigger โดยไม่ทำสำเนา Credential
 
 ทรัพยากรที่ยกเลิกและไม่มีในระบบ:
 
@@ -113,7 +134,10 @@ style.css
 008_sales_notes_profile_theme.sql
 008_sales_notes_profile_theme_verify.sql
 008_sales_notes_profile_theme_rollback.sql
-reset_usage_data_scope_a_v0.10.0.sql
+009_master_delete_customer_tabs_report_picker.sql
+009_master_delete_customer_tabs_report_picker_verify.sql
+009_master_delete_customer_tabs_report_picker_rollback.sql
+reset_usage_data_scope_a_v0.11.0.sql
 ```
 
 ## 3. Roles and permissions
@@ -133,7 +157,8 @@ reset_usage_data_scope_a_v0.10.0.sql
 | แก้ตำแหน่งของตนเอง | Yes | No | No |
 | แก้ชื่อ/ตำแหน่ง/Role/Active ของผู้อื่น | Yes | No | No |
 | จัดการ Branding | Yes | No | No |
-| จัดการ Master Data | Yes | No | No |
+| เพิ่ม/แก้/ปิด Master Data | Yes | No | No |
+| ลบ Master ที่ไม่ใช่ Global และไม่มีการใช้งาน | Yes | No | No |
 
 กฎสำคัญ:
 
@@ -143,6 +168,7 @@ reset_usage_data_scope_a_v0.10.0.sql
 - Admin เปลี่ยน Role หรือปิดบัญชีตัวเองผ่าน Admin RPC ไม่ได้
 - ทุก Active Role เห็นลูกค้าทั้งหมดและแก้ลูกค้าที่ยังไม่ถูกลบได้
 - Browser ใช้ Publishable/Anon Key เท่านั้น ไม่มี `service_role` ใน Frontend
+- Browser ไม่มีสิทธิ์ Direct DELETE ตาราง Master; ต้องผ่าน Guarded RPC เท่านั้น
 
 ## 4. Customer model
 
@@ -204,25 +230,31 @@ reset_usage_data_scope_a_v0.10.0.sql
 
 ## 5. Customer List, filters and Excel
 
-คอลัมน์เริ่มต้น:
+Customer List แยกตาม `customers.account_status`:
 
-1. ลูกค้า / ชื่อย่อ
-2. สถานะบัญชี
-3. ขั้นตอนเริ่มใช้งาน
-4. สถานะการนำเข้าข้อมูล
-5. ประเภทสัญญา
-6. จำนวนรถ
-7. ผู้รับผิดชอบหลักพร้อม Avatar
-8. เซลล์
-9. จำนวนผู้ใช้งานลูกค้าที่กรอก
-10. จำนวนบัญชีผู้ใช้งานที่บันทึกไว้
-11. วันที่เริ่มใช้งานจริง
-12. อัปเดตล่าสุด
-13. การกระทำ
+- `ใช้งาน (จำนวน)` — Tab เริ่มต้น
+- `ไม่ใช้งาน (จำนวน)`
 
-ตัวกรองรองรับ Search, Account Status, Owner, Onboarding, Import, Engagement, Contract, Sales, Module, Feature, Fleet Range และ Date Range
+จำนวนบน Tab นับจากลูกค้าที่ยังไม่ถูก Soft Delete ทั้งหมดและไม่เปลี่ยนตาม Search/Filter ส่วนข้อมูลในตารางและ Excel ใช้ Tab กับตัวกรองปัจจุบัน
 
-Excel รวม Sales, จำนวนผู้ใช้งานที่กรอก และจำนวนบัญชีที่สร้าง แต่ไม่รวม `password_text` หรือ `pin_text`
+คอลัมน์ตามลำดับ:
+
+1. ชื่อนิติบุคคล
+2. จำนวนรถ
+3. โมดูล
+4. สัญญา
+5. เซลล์
+6. จำนวนผู้ใช้งานลูกค้า
+7. สอนใช้งานนอกสถานที่ (ครั้ง)
+8. สถานะการนำเข้าข้อมูล
+9. ระดับความสนใจ
+10. อัปเดตล่าสุด
+11. แก้ไขล่าสุดโดย
+12. การกระทำ
+
+ตัวกรองรองรับ Search, Owner, Onboarding, Import, Engagement, Contract, Sales, Module, Feature, Fleet Range และ Date Range ส่วนสถานะบัญชีควบคุมผ่าน Tab
+
+Excel ใช้แถวที่ผ่าน Tab, Search, Filter และ Sort ปัจจุบัน ไม่รวมคอลัมน์การกระทำ และไม่รวม `password_text` หรือ `pin_text`
 
 ## 6. Daily Report model
 
@@ -231,6 +263,9 @@ Excel รวม Sales, จำนวนผู้ใช้งานที่กร
 - Item หนึ่งข้อเชื่อมลูกค้าได้ 0 คนขึ้นไป
 - Report หนึ่งฉบับมีกลุ่มลูกค้าระดับรายงานได้หนึ่งชุด
 - Item เลือกใช้กลุ่มรายงานหรือเลือกลูกค้าเฉพาะ Item ได้
+- Customer Picker ทั้งสองตำแหน่งเป็น Dropdown Multi-select ชุดเดียวกัน
+- Multi-select แสดงจำนวนที่เลือก รองรับค้นหา เลือกทั้งหมด ล้างค่า และ Scroll ภายใน
+- รายการ Checkbox ไม่กินพื้นที่หน้าจอขณะ Dropdown ปิด
 - การเปลี่ยนกลุ่มหรือ Item เพิ่ม `daily_reports.content_version`
 - Manager ต้องส่ง `expected_content_version` เมื่อ Acknowledge หรือ Request Revision
 - Report ที่ `acknowledged` ถูกล็อก
@@ -240,26 +275,45 @@ Excel รวม Sales, จำนวนผู้ใช้งานที่กร
 
 | Group | Storage | Used by |
 |---|---|---|
-| `modules` | `modules` | Customer modules |
-| `features` | `features` | Customer features |
-| `onboarding_stage` | `master_options` | Customer onboarding |
-| `import_status` | `master_options` | Customer import status |
-| `engagement_level` | `master_options` | Customer engagement |
-| `contract_type` | `master_options` | Customer contract |
-| `sales` | `master_options` | Customer sales assignment |
+| `modules` | `modules` | `customer_modules.module_id` |
+| `features` | `features` | `customer_features.feature_id` |
+| `onboarding_stage` | `master_options` | `customers.onboarding_stage` |
+| `import_status` | `master_options` | `customers.import_status` |
+| `engagement_level` | `master_options` | `customers.engagement_level` |
+| `contract_type` | `master_options` | `customers.contract_type` |
+| `sales` | `master_options` | `customers.sales_code` |
 
-กฎ:
+กฎทั่วไป:
 
 - Module/Feature Code ใช้ `a-z`, `0-9`, `_`
 - Master Value ห้ามว่างและยาวไม่เกิน 100 ตัวอักษร
-- `sort_order` เป็นจำนวนเต็ม `1–9999`
-- `sort_order` ห้ามซ้ำภายในกลุ่ม
+- `sort_order` เป็นจำนวนเต็ม `1–9999` และห้ามซ้ำภายในกลุ่ม
 - Code/Value ห้ามซ้ำภายในกลุ่ม
-- รายการที่ถูกใช้งานแล้วให้ปิด `is_active` แทนการลบ
-- Frontend เขียนผ่าน `admin_save_master_item_v3`
+- Frontend เพิ่ม/แก้ผ่าน `admin_save_master_item_v3`
 - หน้า Master Data เป็น Compact List และไม่ Render ทั้ง Route หลังบันทึก
 
-Migration 008 ไม่สร้าง Sales Seed เนื่องจากรายชื่อเซลล์เป็นข้อมูลเฉพาะองค์กร Admin ต้องเพิ่มรายการก่อนนำไปเลือกให้ลูกค้า
+กฎการลบ:
+
+- `is_system = true` คือ Global/Default Master แสดงไอคอนลูกโลกและห้ามลบ
+- รายการที่มี Usage มากกว่า `0` ไม่แสดงปุ่มลบ
+- รายการที่ `is_system = false` และ Usage เท่ากับ `0` แสดงปุ่ม `ลบ`
+- การลบเป็น Hard Delete และหายจากฐานข้อมูลจริง
+- Frontend โหลด Usage ผ่าน `admin_master_item_usage_v1`
+- การลบต้องผ่าน `admin_delete_master_item_v1`; RPC ตรวจ Admin, Global flag และ Usage ซ้ำ
+- Usage นับรวมลูกค้าที่ Soft Delete แล้ว เพราะข้อมูลอ้างอิงยังอยู่
+- `modules`/`features` มี FK `ON DELETE RESTRICT`
+- `master_options` เป็น Text Reference จึง Lock ตาราง `customers` ระหว่างตรวจและลบ
+- Direct DELETE ของ Master จาก Browser ถูก Revoke
+
+Global/Default ที่ Migration 009 ต้องพบและ Mark:
+
+- Modules: `erp`, `maintenance`, `ai`
+- Features: `project`, `live_entry`
+- Onboarding: `to_do`, `pending_data`, `onboarding`, `training_completed`, `go_live`
+- Import: `waiting`, `in_process`, `done`
+- Engagement: `interest`, `neutral`
+- Contract: `monthly`, `annual`
+- Sales ไม่มี Global Seed
 
 ## 8. Current database schema
 
@@ -352,11 +406,37 @@ RLS:
 - `daily_report_item_customers`: explicit customers per item
 - `daily_report_events`: immutable workflow events
 
-### 8.7 Other tables
+### 8.7 Master and other tables
 
-- `modules`
-- `features`
-- `master_options`
+`modules`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` | PK |
+| `code` | `text` | Unique |
+| `name` | `text` | |
+| `sort_order` | `integer` | Unique, `1–9999` |
+| `is_active` | `boolean` | |
+| `is_system` | `boolean` | default false; Global rows cannot be deleted |
+| timestamps | `timestamptz` | |
+
+`features` มีโครงสร้าง Master เดียวกับ `modules` โดยใช้ `customer_features` เป็นตารางอ้างอิง
+
+`master_options`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` | PK |
+| `group_key` | `text` | Controlled group |
+| `option_value` | `text` | Unique ภายในกลุ่ม |
+| `display_name` | `text` | |
+| `sort_order` | `integer` | Unique ภายในกลุ่ม |
+| `is_active` | `boolean` | |
+| `is_system` | `boolean` | default false; Global rows cannot be deleted |
+| actor/timestamps | | |
+
+ตารางอื่น:
+
 - `app_settings`
 - `customer_audit_logs`
 
@@ -380,11 +460,16 @@ Current RPCs used by this release:
 - `admin_update_profile_full`
 - `admin_update_profile_avatar`
 - `admin_save_master_item_v3`
+- `admin_master_item_usage_v1`
+- `admin_delete_master_item_v1`
 
 Security rules:
 
 - RLS เปิดทุกตารางที่ Frontend เข้าถึง
 - Security-definer RPC ตรวจ Active User/Role ภายในและกำหนด `search_path`
+- `admin_master_item_usage_v1` และ `admin_delete_master_item_v1` ตรวจ `app_private.is_admin()`
+- Browser ไม่มี Direct DELETE Grant/Policy สำหรับ Master Data
+- Anon ไม่มีสิทธิ์ Execute Master Delete RPC
 - Browser ใช้ Publishable/Anon Key เท่านั้น
 - Position เปลี่ยนผ่าน Admin RPC เท่านั้น
 - Credential ไม่แสดงใน List, Excel, Toast หรือ Console โดยตั้งใจ
@@ -422,11 +507,11 @@ const SUPABASE_PUBLISHABLE_KEY = "<publishable-or-anon-key>";
 ### Required order
 
 1. สำรองฐานข้อมูล
-2. รัน `008_sales_notes_profile_theme.sql`
-3. รัน `008_sales_notes_profile_theme_verify.sql`
-4. Deploy Runtime Files ทั้ง 4 ไฟล์พร้อมกัน
-5. Hard Refresh Browser
-6. เพิ่ม Sales Master อย่างน้อยหนึ่งรายการตามข้อมูลจริงขององค์กร
+2. ยืนยันว่า Migration `008_sales_notes_profile_theme` ติดตั้งแล้ว
+3. รัน `009_master_delete_customer_tabs_report_picker.sql`
+4. รัน `009_master_delete_customer_tabs_report_picker_verify.sql`
+5. Deploy Runtime Files ทั้ง 4 ไฟล์พร้อมกัน
+6. Hard Refresh Browser
 7. Smoke Test ด้วย Admin, Manager และ User
 
 ### Local static run
@@ -445,56 +530,57 @@ git pull --rebase origin main
 git diff --check
 
 git add README.md index.html script.js style.css
-git commit -m "release: v0.10.0 sales notes profile theme"
+git commit -m "release: v0.11.0 master delete customer tabs report picker"
 git push origin main
 
-git tag -a v0.10.0-sales-notes-profile-theme \
-  -m "FI Customer Tracking v0.10.0 sales notes profile theme"
-git push origin v0.10.0-sales-notes-profile-theme
+git tag -a v0.11.0-master-delete-customer-tabs-report-picker   -m "FI Customer Tracking v0.11.0 master delete customer tabs report picker"
+git push origin v0.11.0-master-delete-customer-tabs-report-picker
 ```
 
 ### Post-deploy smoke test
 
 Admin:
 
-- สร้าง/แก้ Master เซลล์และตรวจว่าไม่ Refresh ทั้งหน้า
-- แก้ตำแหน่งผู้ใช้
-- เปลี่ยน Accent และตรวจ Navigation, Card, Grid, Pagination และ Chart
-- เปลี่ยน Avatar รูปแนวนอน/แนวตั้ง
+- เปิด Master ทุกกลุ่มและตรวจไอคอนลูกโลกของ Global/Default
+- สร้าง Master ใหม่ที่ยังไม่ใช้ แล้วลบและยืนยันว่าหายจากฐานข้อมูล
+- นำ Master ใหม่ไปผูกกับลูกค้า แล้วตรวจว่าไม่แสดงปุ่มลบ
+- ทดสอบ Race/Permission โดยยืนยันว่า RPC ปฏิเสธรายการที่ถูกใช้งานและบัญชีที่ไม่ใช่ Admin
 
 ทุก Role:
 
-- สร้างลูกค้าด้วยจำนวนผู้ใช้งานอย่างน้อย 1
-- เลือกเซลล์
-- เพิ่ม แก้ และลบโน้ต
-- ตรวจ Draft หลังสลับ Browser Tab
-- ตรวจ Customer List, Detail และ Excel
-- ตรวจ Avatar ใน Owner และ Daily Report
+- เปิด Customer List แล้วตรวจ Tab `ใช้งาน` เป็นค่าเริ่มต้น
+- สลับ Tab และตรวจจำนวนกับข้อมูลใน Grid
+- ตรวจ 12 คอลัมน์ Search Filter Sort และ Excel
+- เปิด Daily Report แล้วทดสอบ Dropdown Multi-select ทั้งระดับรายงานและระดับรายการ
+- ทดสอบ Search, เลือกทั้งหมด, ล้างค่า, Save, Submit, Print และ Manager Review
 
 ## 13. Rollback
 
-1. Deploy Frontend `v0.9.0-customer-accounts-report-groups`
-2. รัน `008_sales_notes_profile_theme_rollback.sql`
+1. Deploy Frontend `v0.10.0-sales-notes-profile-theme`
+2. รัน `009_master_delete_customer_tabs_report_picker_rollback.sql`
 3. Hard Refresh
 
-Rollback ลบถาวร:
+Rollback จะ:
 
-- Customer Notes ทั้งหมด
-- Sales Master และการเลือกเซลล์ของลูกค้า
-- ค่า `customer_user_count`
+- ลบ RPC Usage/Delete ของ Migration 009
+- ลบคอลัมน์ `is_system`
+- คืน RLS Policy ของ `modules` และ `features` ตาม `v0.10.0` โดยยังคงไม่มี Direct DELETE Grant สำหรับ Browser
+- เก็บ Master Data ทุกแถวไว้
 
-Rollback คืนการแก้ตำแหน่งของตนเองตามพฤติกรรม v0.9.0 เพื่อให้ตรงกับ Frontend รุ่นเดิม ข้อมูลที่ถูกลบต้องกู้จาก Backup เท่านั้น
+Master ที่ถูก Hard Delete ไปแล้วก่อน Rollback จะไม่ถูกสร้างกลับ ต้องกู้จาก Backup หรือสร้างใหม่ด้วย Admin
 
 ## 14. Operational reset
 
-`reset_usage_data_scope_a_v0.10.0.sql` ล้าง Customer, Notes, Accounts, Audit และ Daily Reports แต่เก็บ:
+`reset_usage_data_scope_a_v0.11.0.sql` ล้าง Customer, Notes, Accounts, Audit และ Daily Reports แต่เก็บ:
 
 - `auth.users`
 - `profiles`
-- Modules, Features และ Master Data รวม Sales
+- Modules, Features และ Master Data รวม Sales กับ `is_system`
 - Branding, `app_settings`
 - Storage files
 - Migration history
+
+Reset ไม่ใช้ `CASCADE` และตรวจ Migration 009 ก่อนทำงาน
 
 ## 15. Known limitations
 
@@ -503,4 +589,7 @@ Rollback คืนการแก้ตำแหน่งของตนเอ�
 - จำนวนผู้ใช้งานลูกค้าที่กรอกอาจต่างจากจำนวนบัญชีที่สร้างไว้โดยตั้งใจ
 - Password/PIN ของบัญชีผู้ใช้งานลูกค้าเป็น Plaintext ตาม Requirement
 - Signed Avatar URL มีอายุจำกัดและต้องสร้างใหม่เมื่อโหลดข้อมูล
-- SQL/RLS ต้องทดสอบกับ Supabase Project จริงหลัง Deploy
+- จำนวนบน Customer Status Tab เป็นจำนวนรวมก่อนใช้ Search/Advanced Filter
+- Master ที่ถูก Hard Delete ไม่สามารถ Undo ได้โดยไม่มี Backup
+- Migration 009 ไม่สร้าง Global/Default ที่หายไป และจะหยุดพร้อม Rollback หากรายการตั้งต้นที่จำเป็นไม่ครบ
+- SQL/RLS และ Concurrency ต้องทดสอบกับ Supabase Project จริงหลัง Deploy
