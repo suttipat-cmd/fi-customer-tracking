@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.11.0-master-delete-customer-tabs-report-picker";
+  const APP_VERSION = "0.12.0-customer-excel-report-security-fee";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -82,6 +82,7 @@
     customerEditDraft: null,
     filteredCustomerRows: [],
     filteredManagerRows: [],
+    excelImportPreview: null,
     routeRenderToken: 0,
     authHandling: false,
     loadingCount: 0,
@@ -180,6 +181,10 @@
     confirmTitle: document.getElementById("confirm-title"),
     confirmMessage: document.getElementById("confirm-message"),
     confirmOkButton: document.getElementById("confirm-ok-button"),
+    customerExcelImportFile: document.getElementById("customer-excel-import-file"),
+    excelImportDialog: document.getElementById("excel-import-dialog"),
+    excelImportDialogContent: document.getElementById("excel-import-dialog-content"),
+    excelImportConfirmButton: document.getElementById("excel-import-confirm-button"),
     toastRegion: document.getElementById("toast-region"),
     printRoot: document.getElementById("print-root")
   };
@@ -329,6 +334,11 @@
       ["Customer account emails are required and must be unique", "อีเมลผู้ใช้งานลูกค้าต้องไม่ว่างและห้ามซ้ำ"],
       ["Customer account email is invalid", "รูปแบบอีเมลผู้ใช้งานลูกค้าไม่ถูกต้อง"],
       ["Customer user count must be between 1 and 999999", "จำนวนผู้ใช้งานลูกค้าต้องเป็นจำนวนเต็มตั้งแต่ 1 ถึง 999999"],
+      ["Monthly service fee must be nonnegative", "ค่าบริการต้องเป็นจำนวนเงินไม่ติดลบและมีทศนิยมไม่เกิน 2 ตำแหน่ง"],
+      ["Excel import payload", "รูปแบบข้อมูลนำเข้าจาก Excel ไม่ถูกต้อง"],
+      ["Excel import stale", "ข้อมูลในระบบถูกแก้หลังส่งออก กรุณาส่งออก Excel ใหม่"],
+      ["Selected report customers must be active", "รายงานมีลูกค้าที่ไม่อยู่ในสถานะใช้งาน กรุณานำออกก่อนส่ง"],
+      ["Migration 010_customer_excel_report_security_fee", "ฐานข้อมูลยังไม่ได้ติดตั้ง Migration 010"],
       ["Invalid sales master", "เซลล์ที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน"],
       ["Customer note text is required", "กรุณาระบุรายละเอียดโน้ตลูกค้า"],
       ["Only admin can update profile position", "ตำแหน่งแก้ไขได้เฉพาะผู้ดูแลระบบ"],
@@ -551,6 +561,13 @@
 
   function getCssVar(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  }
+
+  function formatMoney(value) {
+    if (value === null || value === undefined || value === "") return "-";
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "-";
+    return `${number.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
   }
 
   function formatDate(value) {
@@ -1178,17 +1195,870 @@ function renderDashboardCharts(data = state.dashboardChartData) {
   }
 
 
+
+  const CUSTOMER_EXCEL_TEMPLATE_VERSION = "fi-customer-update-v1";
+  const CUSTOMER_EXCEL_EDITABLE_SHEETS = ["Customers", "Contacts", "Customer Accounts", "Notes"];
+
+  function excelSafeValue(value) {
+    if (value === null || value === undefined) return "";
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === "object") return excelSafeValue(JSON.stringify(value));
+    if (typeof value !== "string") return value;
+    const text = value.replace(/\u0000/g, "");
+    return /^[=+\-@]/.test(text) ? `'${text}` : text;
+  }
+
+  function excelImportText(value) {
+    const text = String(value ?? "").trim();
+    return /^'[=+\-@]/.test(text) ? text.slice(1) : text;
+  }
+
+  function normalizeIsoTimestamp(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
+  }
+
+  function validUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+  }
+
+  function sameImportValue(a, b) {
+    if ((a === null || a === undefined || a === "") && (b === null || b === undefined || b === "")) return true;
+    if (typeof a === "number" || typeof b === "number") return Number(a) === Number(b);
+    if (typeof a === "boolean" || typeof b === "boolean") return Boolean(a) === Boolean(b);
+    return String(a) === String(b);
+  }
+
+  function workbookSheetFromRows(rows, columns) {
+    const output = rows.map((row) => Object.fromEntries(
+      columns.map((column) => [column.header, excelSafeValue(column.value(row))])
+    ));
+    const worksheet = window.XLSX.utils.json_to_sheet(output, {
+      header: columns.map((column) => column.header),
+      skipHeader: false
+    });
+    worksheet["!cols"] = columns.map((column) => ({ wch: column.width || 18 }));
+    worksheet["!autofilter"] = rows.length
+      ? { ref: `A1:${window.XLSX.utils.encode_col(columns.length - 1)}${rows.length + 1}` }
+      : undefined;
+    return worksheet;
+  }
+
+  function appendWorkbookSheet(workbook, name, rows, columns) {
+    window.XLSX.utils.book_append_sheet(workbook, workbookSheetFromRows(rows, columns), name);
+  }
+
+  function jsonCell(value) {
+    if (value === null || value === undefined) return "";
+    try {
+      return JSON.stringify(value);
+    } catch (_error) {
+      return String(value);
+    }
+  }
+
+
+  async function fetchAllPaged(queryFactory, pageSize = 500) {
+    const rows = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const result = await queryFactory().range(offset, offset + pageSize - 1);
+      if (result.error) throw result.error;
+      const page = result.data || [];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+      if (rows.length > 100000) throw new Error("ข้อมูลส่งออกเกินขีดจำกัด 100,000 แถว");
+    }
+    return rows;
+  }
+
+  function chunkValues(values, size = 100) {
+    const chunks = [];
+    for (let index = 0; index < values.length; index += size) {
+      chunks.push(values.slice(index, index + size));
+    }
+    return chunks;
+  }
+
+  async function fetchCustomerRelationRows(table, columns, customerIds, orders = []) {
+    const rows = [];
+    for (const customerIdChunk of chunkValues(customerIds)) {
+      const chunkRows = await fetchAllPaged(() => {
+        let query = state.client
+          .from(table)
+          .select(columns)
+          .in("customer_id", customerIdChunk);
+        orders.forEach((column) => {
+          query = query.order(column, { ascending: true });
+        });
+        return query;
+      });
+      rows.push(...chunkRows);
+    }
+    return rows;
+  }
+
+  async function fetchCustomerWorkbookData() {
+    await loadCommonData();
+    const customers = await fetchAllPaged(() =>
+      state.client
+        .from("customers")
+        .select("*")
+        .eq("is_archived", false)
+        .order("id", { ascending: true })
+    );
+    const customerIds = customers.map((customer) => customer.id);
+    if (!customerIds.length) {
+      return {
+        customers: [], owners: [], contacts: [], accounts: [], notes: [],
+        customerModules: [], customerFeatures: [], auditLogs: []
+      };
+    }
+
+    const [
+      owners,
+      contacts,
+      notes,
+      customerModules,
+      customerFeatures,
+      auditLogs
+    ] = await Promise.all([
+      fetchCustomerRelationRows("customer_owners", "*", customerIds, ["customer_id", "profile_id"]),
+      fetchCustomerRelationRows("customer_contacts", "*", customerIds, ["customer_id", "id"]),
+      fetchCustomerRelationRows(
+        "customer_notes",
+        "id,customer_id,note_text,created_at,created_by,updated_at,updated_by",
+        customerIds,
+        ["customer_id", "id"]
+      ),
+      fetchCustomerRelationRows("customer_modules", "*", customerIds, ["customer_id", "module_id"]),
+      fetchCustomerRelationRows("customer_features", "*", customerIds, ["customer_id", "feature_id"]),
+      fetchCustomerRelationRows("customer_audit_logs", "*", customerIds, ["customer_id", "created_at", "id"])
+    ]);
+
+    const accounts = [];
+    for (const customerIdChunk of chunkValues(customerIds)) {
+      const chunkAccounts = await fetchAllPaged(() =>
+        state.client.rpc("customer_accounts_export_safe_v1", {
+          p_customer_ids: customerIdChunk
+        })
+      );
+      accounts.push(...chunkAccounts);
+    }
+
+    return {
+      customers,
+      owners,
+      contacts,
+      accounts,
+      notes,
+      customerModules,
+      customerFeatures,
+      auditLogs
+    };
+  }
+
+  function customerLegalNameFromData(customerId, data) {
+    return data.customers.find((customer) => customer.id === customerId)?.legal_name || customerId || "-";
+  }
+
+  function profileEmail(profileId) {
+    return state.profiles.find((profile) => profile.id === profileId)?.email || "";
+  }
+
+  function profileDisplayName(profileId) {
+    return state.profiles.find((profile) => profile.id === profileId)?.display_name || "";
+  }
+
+  async function exportCustomersExcel() {
+    if (!window.XLSX?.utils) throw new Error("โหลดเครื่องมือสร้างไฟล์ Excel ไม่สำเร็จ");
+    const data = await fetchCustomerWorkbookData();
+    if (!data.customers.length) {
+      showToast("ไม่มีข้อมูลลูกค้าสำหรับส่งออก", "warning");
+      return;
+    }
+
+    const workbook = window.XLSX.utils.book_new();
+    workbook.Props = {
+      Title: "FI Customer Tracking - Customer Data",
+      Subject: "Customer export and admin update template",
+      Author: "FI Customer Tracking",
+      CreatedDate: new Date()
+    };
+
+    const instructions = [
+      { key: "template_version", value: CUSTOMER_EXCEL_TEMPLATE_VERSION },
+      { key: "application_version", value: APP_VERSION },
+      { key: "exported_at", value: new Date().toISOString() },
+      { key: "scope", value: "ลูกค้าที่ยังไม่ถูก Soft Delete ทั้งสถานะใช้งานและไม่ใช้งาน" },
+      { key: "editable_sheets", value: CUSTOMER_EXCEL_EDITABLE_SHEETS.join(", ") },
+      { key: "update_rule", value: "Admin อัปเดตข้อมูลเดิมเท่านั้น ห้ามเพิ่มแถวใหม่ ห้ามลบ และต้องเก็บ id/customer_id/updated_at เดิม" },
+      { key: "stale_protection", value: "หากข้อมูลในระบบถูกแก้หลังส่งออก ระบบจะปฏิเสธแถวนั้นทั้งหมดและไม่บันทึกบางส่วน" },
+      { key: "read_only_sheets", value: "Owners, Modules, Features, Audit Logs, Master Reference" },
+      { key: "credentials", value: "ไม่ส่งออก Password/PIN และไม่รองรับการแก้ Password/PIN ผ่าน Excel" },
+      { key: "formula_policy", value: "ห้ามใส่สูตรใน Sheet ที่แก้ไขได้ เพื่อป้องกัน Formula Injection" },
+      { key: "date_format", value: "วันที่ใช้ YYYY-MM-DD และเวลารุ่นข้อมูลใช้ ISO-8601 ห้ามแก้ updated_at" },
+      { key: "blank_rule", value: "ช่อง Optional ใช้ค่าว่างได้; monthly_service_fee ว่างหรือ 0 ได้ และห้ามติดลบ" }
+    ];
+    appendWorkbookSheet(workbook, "Instructions", instructions, [
+      { header: "key", value: (row) => row.key, width: 24 },
+      { header: "value", value: (row) => row.value, width: 100 }
+    ]);
+
+    appendWorkbookSheet(workbook, "Customers", data.customers, [
+      { header: "__template_version", value: () => CUSTOMER_EXCEL_TEMPLATE_VERSION, width: 25 },
+      { header: "id", value: (row) => row.id, width: 38 },
+      { header: "legal_name", value: (row) => row.legal_name, width: 45 },
+      { header: "short_name", value: (row) => row.short_name || "", width: 24 },
+      { header: "tax_id", value: (row) => row.tax_id, width: 16 },
+      { header: "fleet_size", value: (row) => Number(row.fleet_size || 0), width: 12 },
+      { header: "customer_user_count", value: (row) => Number(row.customer_user_count || 1), width: 22 },
+      { header: "account_status", value: (row) => row.account_status, width: 16 },
+      { header: "sales_code", value: (row) => row.sales_code || "", width: 18 },
+      { header: "onboarding_stage", value: (row) => row.onboarding_stage || "", width: 22 },
+      { header: "import_status", value: (row) => row.import_status, width: 18 },
+      { header: "engagement_level", value: (row) => row.engagement_level || "", width: 20 },
+      { header: "start_date", value: (row) => row.start_date || "", width: 14 },
+      { header: "billing_date", value: (row) => row.billing_date || "", width: 14 },
+      { header: "contract_type", value: (row) => row.contract_type, width: 18 },
+      { header: "onsite_training_count", value: (row) => Number(row.onsite_training_count || 0), width: 23 },
+      { header: "monthly_service_fee", value: (row) => row.monthly_service_fee ?? "", width: 22 },
+      { header: "created_at", value: (row) => row.created_at, width: 27 },
+      { header: "created_by", value: (row) => row.created_by, width: 38 },
+      { header: "created_by_name", value: (row) => profileDisplayName(row.created_by), width: 24 },
+      { header: "updated_at", value: (row) => row.updated_at, width: 27 },
+      { header: "updated_by", value: (row) => row.updated_by, width: 38 },
+      { header: "updated_by_name", value: (row) => profileDisplayName(row.updated_by), width: 24 }
+    ]);
+
+    appendWorkbookSheet(workbook, "Owners", data.owners, [
+      { header: "customer_id", value: (row) => row.customer_id, width: 38 },
+      { header: "customer_legal_name", value: (row) => customerLegalNameFromData(row.customer_id, data), width: 45 },
+      { header: "profile_id", value: (row) => row.profile_id, width: 38 },
+      { header: "profile_name", value: (row) => profileDisplayName(row.profile_id), width: 24 },
+      { header: "profile_email", value: (row) => profileEmail(row.profile_id), width: 32 },
+      { header: "is_primary", value: (row) => Boolean(row.is_primary), width: 14 },
+      { header: "created_at", value: (row) => row.created_at || "", width: 27 },
+      { header: "updated_at", value: (row) => row.updated_at || "", width: 27 }
+    ]);
+
+    appendWorkbookSheet(workbook, "Contacts", data.contacts, [
+      { header: "__template_version", value: () => CUSTOMER_EXCEL_TEMPLATE_VERSION, width: 25 },
+      { header: "id", value: (row) => row.id, width: 38 },
+      { header: "customer_id", value: (row) => row.customer_id, width: 38 },
+      { header: "customer_legal_name", value: (row) => customerLegalNameFromData(row.customer_id, data), width: 45 },
+      { header: "contact_name", value: (row) => row.contact_name, width: 28 },
+      { header: "position", value: (row) => row.position || "", width: 24 },
+      { header: "phone", value: (row) => row.phone || "", width: 20 },
+      { header: "email", value: (row) => row.email || "", width: 32 },
+      { header: "line_id", value: (row) => row.line_id || "", width: 22 },
+      { header: "is_primary", value: (row) => Boolean(row.is_primary), width: 14 },
+      { header: "is_active", value: (row) => Boolean(row.is_active), width: 14 },
+      { header: "created_at", value: (row) => row.created_at, width: 27 },
+      { header: "created_by", value: (row) => row.created_by, width: 38 },
+      { header: "updated_at", value: (row) => row.updated_at, width: 27 },
+      { header: "updated_by", value: (row) => row.updated_by, width: 38 }
+    ]);
+
+    appendWorkbookSheet(workbook, "Customer Accounts", data.accounts, [
+      { header: "__template_version", value: () => CUSTOMER_EXCEL_TEMPLATE_VERSION, width: 25 },
+      { header: "id", value: (row) => row.id, width: 38 },
+      { header: "customer_id", value: (row) => row.customer_id, width: 38 },
+      { header: "customer_legal_name", value: (row) => customerLegalNameFromData(row.customer_id, data), width: 45 },
+      { header: "email", value: (row) => row.email, width: 34 },
+      { header: "notes", value: (row) => row.notes || "", width: 45 },
+      { header: "has_password", value: (row) => Boolean(row.has_password), width: 16 },
+      { header: "has_pin", value: (row) => Boolean(row.has_pin), width: 12 },
+      { header: "created_at", value: (row) => row.created_at, width: 27 },
+      { header: "created_by", value: (row) => row.created_by, width: 38 },
+      { header: "updated_at", value: (row) => row.updated_at, width: 27 },
+      { header: "updated_by", value: (row) => row.updated_by, width: 38 }
+    ]);
+
+    appendWorkbookSheet(workbook, "Modules", data.customerModules, [
+      { header: "customer_id", value: (row) => row.customer_id, width: 38 },
+      { header: "customer_legal_name", value: (row) => customerLegalNameFromData(row.customer_id, data), width: 45 },
+      { header: "module_id", value: (row) => row.module_id, width: 38 },
+      { header: "module_code", value: (row) => state.modules.find((item) => item.id === row.module_id)?.code || "", width: 20 },
+      { header: "module_name", value: (row) => state.modules.find((item) => item.id === row.module_id)?.name || "", width: 30 },
+      { header: "created_at", value: (row) => row.created_at || "", width: 27 }
+    ]);
+
+    appendWorkbookSheet(workbook, "Features", data.customerFeatures, [
+      { header: "customer_id", value: (row) => row.customer_id, width: 38 },
+      { header: "customer_legal_name", value: (row) => customerLegalNameFromData(row.customer_id, data), width: 45 },
+      { header: "feature_id", value: (row) => row.feature_id, width: 38 },
+      { header: "feature_code", value: (row) => state.features.find((item) => item.id === row.feature_id)?.code || "", width: 20 },
+      { header: "feature_name", value: (row) => state.features.find((item) => item.id === row.feature_id)?.name || "", width: 30 },
+      { header: "created_at", value: (row) => row.created_at || "", width: 27 }
+    ]);
+
+    appendWorkbookSheet(workbook, "Notes", data.notes, [
+      { header: "__template_version", value: () => CUSTOMER_EXCEL_TEMPLATE_VERSION, width: 25 },
+      { header: "id", value: (row) => row.id, width: 38 },
+      { header: "customer_id", value: (row) => row.customer_id, width: 38 },
+      { header: "customer_legal_name", value: (row) => customerLegalNameFromData(row.customer_id, data), width: 45 },
+      { header: "note_text", value: (row) => row.note_text, width: 70 },
+      { header: "created_at", value: (row) => row.created_at, width: 27 },
+      { header: "created_by", value: (row) => row.created_by, width: 38 },
+      { header: "created_by_name", value: (row) => profileDisplayName(row.created_by), width: 24 },
+      { header: "updated_at", value: (row) => row.updated_at, width: 27 },
+      { header: "updated_by", value: (row) => row.updated_by, width: 38 },
+      { header: "updated_by_name", value: (row) => profileDisplayName(row.updated_by), width: 24 }
+    ]);
+
+    appendWorkbookSheet(workbook, "Audit Logs", data.auditLogs, [
+      { header: "id", value: (row) => row.id, width: 38 },
+      { header: "customer_id", value: (row) => row.customer_id, width: 38 },
+      { header: "customer_legal_name", value: (row) => customerLegalNameFromData(row.customer_id, data), width: 45 },
+      { header: "action", value: (row) => row.action || row.operation || "", width: 16 },
+      { header: "changed_by", value: (row) => row.changed_by || row.actor_id || row.created_by || "", width: 38 },
+      { header: "changed_by_name", value: (row) => profileDisplayName(row.changed_by || row.actor_id || row.created_by), width: 24 },
+      { header: "old_data", value: (row) => jsonCell(row.old_data || row.old_values), width: 80 },
+      { header: "new_data", value: (row) => jsonCell(row.new_data || row.new_values), width: 80 },
+      { header: "created_at", value: (row) => row.created_at, width: 27 }
+    ]);
+
+    const masterRows = [
+      ...state.modules.map((item) => ({
+        group_key: "modules", id: item.id, option_value: item.code,
+        display_name: item.name, is_active: item.is_active, is_system: item.is_system
+      })),
+      ...state.features.map((item) => ({
+        group_key: "features", id: item.id, option_value: item.code,
+        display_name: item.name, is_active: item.is_active, is_system: item.is_system
+      })),
+      ...state.masterOptions.map((item) => ({
+        group_key: item.group_key, id: item.id, option_value: item.option_value,
+        display_name: item.display_name, is_active: item.is_active, is_system: item.is_system
+      }))
+    ];
+    appendWorkbookSheet(workbook, "Master Reference", masterRows, [
+      { header: "group_key", value: (row) => row.group_key, width: 24 },
+      { header: "id", value: (row) => row.id, width: 38 },
+      { header: "option_value", value: (row) => row.option_value, width: 24 },
+      { header: "display_name", value: (row) => row.display_name, width: 34 },
+      { header: "is_active", value: (row) => Boolean(row.is_active), width: 14 },
+      { header: "is_system", value: (row) => Boolean(row.is_system), width: 14 }
+    ]);
+
+    window.XLSX.writeFile(
+      workbook,
+      `ข้อมูลลูกค้าครบชุด-${bangkokDate()}.xlsx`,
+      { compression: true, bookType: "xlsx" }
+    );
+  }
+
+  function sheetRows(workbook, sheetName, requiredHeaders) {
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) throw new Error(`ไม่พบ Sheet “${sheetName}”`);
+    for (const [address, cell] of Object.entries(sheet)) {
+      if (!address.startsWith("!") && cell?.f) {
+        throw new Error(`Sheet “${sheetName}” มีสูตรที่เซลล์ ${address} ซึ่งไม่อนุญาต`);
+      }
+    }
+    const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+    const headers = window.XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, blankrows: false })[0] || [];
+    const missing = requiredHeaders.filter((header) => !headers.includes(header));
+    if (missing.length) {
+      throw new Error(`Sheet “${sheetName}” ขาดคอลัมน์: ${missing.join(", ")}`);
+    }
+    return rows;
+  }
+
+  function excelBoolean(value, fieldName) {
+    if (typeof value === "boolean") return value;
+    const text = String(value ?? "").trim().toLowerCase();
+    if (["true", "1", "yes", "y", "ใช่"].includes(text)) return true;
+    if (["false", "0", "no", "n", "ไม่"].includes(text)) return false;
+    throw new Error(`${fieldName} ต้องเป็น TRUE หรือ FALSE`);
+  }
+
+  function excelOptionalText(value, maxLength, fieldName) {
+    const text = excelImportText(value);
+    if (!text) return null;
+    if (text.length > maxLength) throw new Error(`${fieldName} ยาวเกิน ${maxLength} ตัวอักษร`);
+    return text;
+  }
+
+  function excelRequiredText(value, maxLength, fieldName) {
+    const text = excelImportText(value);
+    if (!text) throw new Error(`${fieldName} ห้ามว่าง`);
+    if (text.length > maxLength) throw new Error(`${fieldName} ยาวเกิน ${maxLength} ตัวอักษร`);
+    return text;
+  }
+
+  function excelInteger(value, min, max, fieldName) {
+    const number = Number(String(value ?? "").replaceAll(",", "").trim());
+    if (!Number.isInteger(number) || number < min || number > max) {
+      throw new Error(`${fieldName} ต้องเป็นจำนวนเต็ม ${min}–${max}`);
+    }
+    return number;
+  }
+
+  function excelOptionalMoney(value, fieldName) {
+    const text = String(value ?? "").replaceAll(",", "").trim();
+    if (!text) return null;
+    if (!/^\d+(?:\.\d{1,2})?$/.test(text)) {
+      throw new Error(`${fieldName} ต้องเป็นตัวเลขไม่ติดลบและมีทศนิยมไม่เกิน 2 ตำแหน่ง`);
+    }
+    const number = Number(text);
+    if (!Number.isFinite(number) || number < 0 || number > 999999999999.99) {
+      throw new Error(`${fieldName} อยู่นอกช่วงที่รองรับ`);
+    }
+    return Math.round(number * 100) / 100;
+  }
+
+  function excelOptionalDate(value, fieldName) {
+    const text = String(value ?? "").trim();
+    if (!text) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error(`${fieldName} ต้องใช้รูปแบบ YYYY-MM-DD`);
+    const date = new Date(`${text}T00:00:00Z`);
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text) {
+      throw new Error(`${fieldName} ไม่ใช่วันที่ที่ถูกต้อง`);
+    }
+    return text;
+  }
+
+  function excelRowVersion(value, fieldName) {
+    const text = String(value ?? "").trim();
+    if (!text || Number.isNaN(new Date(text).getTime())) {
+      throw new Error(`${fieldName} ไม่ใช่ ISO timestamp ที่ถูกต้อง`);
+    }
+    return normalizeIsoTimestamp(text);
+  }
+
+  function pushFieldChanges(changes, resource, id, customerName, current, next, fields) {
+    const changedFields = {};
+    fields.forEach((field) => {
+      if (!sameImportValue(current[field], next[field])) {
+        changedFields[field] = next[field];
+        changes.push({
+          resource,
+          id,
+          customerName,
+          field,
+          oldValue: current[field],
+          newValue: next[field]
+        });
+      }
+    });
+    return changedFields;
+  }
+
+  async function prepareCustomerExcelImport(file) {
+    if (state.profile?.role !== "admin") throw new Error("เฉพาะผู้ดูแลระบบเท่านั้นที่นำเข้า Excel ได้");
+    if (!file || !/\.xlsx$/i.test(file.name)) throw new Error("รองรับเฉพาะไฟล์ .xlsx");
+    if (file.size > 15 * 1024 * 1024) throw new Error("ไฟล์ต้องมีขนาดไม่เกิน 15 MB");
+    if (!window.XLSX?.read) throw new Error("โหลดเครื่องมืออ่าน Excel ไม่สำเร็จ");
+
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = window.XLSX.read(arrayBuffer, { type: "array", cellDates: false });
+    const instructionRows = sheetRows(workbook, "Instructions", ["key", "value"]);
+    const metadata = Object.fromEntries(instructionRows.map((row) => [String(row.key), String(row.value)]));
+    if (metadata.template_version !== CUSTOMER_EXCEL_TEMPLATE_VERSION) {
+      throw new Error(`Template Version ไม่ตรง ระบบต้องการ ${CUSTOMER_EXCEL_TEMPLATE_VERSION}`);
+    }
+
+    const customerRows = sheetRows(workbook, "Customers", [
+      "__template_version", "id", "legal_name", "short_name", "tax_id", "fleet_size",
+      "customer_user_count", "account_status", "sales_code", "onboarding_stage",
+      "import_status", "engagement_level", "start_date", "billing_date",
+      "contract_type", "onsite_training_count", "monthly_service_fee", "updated_at"
+    ]);
+    const contactRows = sheetRows(workbook, "Contacts", [
+      "__template_version", "id", "customer_id", "contact_name", "position", "phone",
+      "email", "line_id", "is_primary", "is_active", "updated_at"
+    ]);
+    const accountRows = sheetRows(workbook, "Customer Accounts", [
+      "__template_version", "id", "customer_id", "email", "notes",
+      "has_password", "has_pin", "updated_at"
+    ]);
+    const noteRows = sheetRows(workbook, "Notes", [
+      "__template_version", "id", "customer_id", "note_text", "updated_at"
+    ]);
+
+    const data = await fetchCustomerWorkbookData();
+    const customerMap = new Map(data.customers.map((row) => [row.id, row]));
+    const contactMap = new Map(data.contacts.map((row) => [row.id, row]));
+    const accountMap = new Map(data.accounts.map((row) => [row.id, row]));
+    const noteMap = new Map(data.notes.map((row) => [row.id, row]));
+    const errors = [];
+    const changes = [];
+    const payload = { template_version: CUSTOMER_EXCEL_TEMPLATE_VERSION, customers: [], contacts: [], accounts: [], notes: [] };
+
+    const ensureTemplate = (row, sheetName, rowNumber) => {
+      if (String(row.__template_version || "") !== CUSTOMER_EXCEL_TEMPLATE_VERSION) {
+        throw new Error(`${sheetName} แถว ${rowNumber}: Template Version ไม่ตรง`);
+      }
+    };
+
+    const customerSeen = new Set();
+    customerRows.forEach((row, index) => {
+      const rowNumber = index + 2;
+      try {
+        ensureTemplate(row, "Customers", rowNumber);
+        const id = String(row.id || "").trim();
+        if (!validUuid(id)) throw new Error(`Customers แถว ${rowNumber}: id ไม่ถูกต้อง`);
+        if (customerSeen.has(id)) throw new Error(`Customers แถว ${rowNumber}: id ซ้ำ`);
+        customerSeen.add(id);
+        const current = customerMap.get(id);
+        if (!current) throw new Error(`Customers แถว ${rowNumber}: ไม่พบลูกค้าเดิม ห้ามเพิ่มลูกค้าใหม่`);
+
+        const next = {
+          legal_name: excelRequiredText(row.legal_name, 500, `Customers แถว ${rowNumber} legal_name`),
+          short_name: excelOptionalText(row.short_name, 300, `Customers แถว ${rowNumber} short_name`),
+          tax_id: String(row.tax_id || "").trim(),
+          fleet_size: excelInteger(row.fleet_size, 0, 999999999, `Customers แถว ${rowNumber} fleet_size`),
+          customer_user_count: excelInteger(row.customer_user_count, 1, 999999, `Customers แถว ${rowNumber} customer_user_count`),
+          account_status: String(row.account_status || "").trim(),
+          sales_code: excelOptionalText(row.sales_code, 100, `Customers แถว ${rowNumber} sales_code`),
+          onboarding_stage: excelOptionalText(row.onboarding_stage, 100, `Customers แถว ${rowNumber} onboarding_stage`),
+          import_status: excelRequiredText(row.import_status, 100, `Customers แถว ${rowNumber} import_status`),
+          engagement_level: excelOptionalText(row.engagement_level, 100, `Customers แถว ${rowNumber} engagement_level`),
+          start_date: excelOptionalDate(row.start_date, `Customers แถว ${rowNumber} start_date`),
+          billing_date: excelOptionalDate(row.billing_date, `Customers แถว ${rowNumber} billing_date`),
+          contract_type: excelRequiredText(row.contract_type, 100, `Customers แถว ${rowNumber} contract_type`),
+          onsite_training_count: excelInteger(row.onsite_training_count, 0, 999999, `Customers แถว ${rowNumber} onsite_training_count`),
+          monthly_service_fee: excelOptionalMoney(row.monthly_service_fee, `Customers แถว ${rowNumber} monthly_service_fee`)
+        };
+        if (!/^\d{13}$/.test(next.tax_id)) throw new Error(`Customers แถว ${rowNumber}: tax_id ต้องเป็นตัวเลข 13 หลัก`);
+        if (!["active", "inactive"].includes(next.account_status)) throw new Error(`Customers แถว ${rowNumber}: account_status ไม่ถูกต้อง`);
+
+        const masterValues = {
+          sales: next.sales_code,
+          onboarding_stage: next.onboarding_stage,
+          import_status: next.import_status,
+          engagement_level: next.engagement_level,
+          contract_type: next.contract_type
+        };
+        Object.entries(masterValues).forEach(([groupKey, value]) => {
+          if (!value) return;
+          const option = state.masterOptions.find((item) => item.group_key === groupKey && item.option_value === value);
+          if (!option) throw new Error(`Customers แถว ${rowNumber}: ไม่พบ Master ${groupKey}=${value}`);
+          if (!option.is_active && current[{
+            sales: "sales_code", onboarding_stage: "onboarding_stage",
+            import_status: "import_status", engagement_level: "engagement_level",
+            contract_type: "contract_type"
+          }[groupKey]] !== value) {
+            throw new Error(`Customers แถว ${rowNumber}: Master ${groupKey}=${value} ถูกปิดใช้งาน`);
+          }
+        });
+
+        const changedFields = pushFieldChanges(
+          changes, "Customers", id, current.legal_name, current, next,
+          ["legal_name", "short_name", "tax_id", "fleet_size", "customer_user_count",
+            "account_status", "sales_code", "onboarding_stage", "import_status",
+            "engagement_level", "start_date", "billing_date", "contract_type",
+            "onsite_training_count", "monthly_service_fee"]
+        );
+        if (Object.keys(changedFields).length) {
+          const expectedUpdatedAt = excelRowVersion(row.updated_at, `Customers แถว ${rowNumber} updated_at`);
+          if (expectedUpdatedAt !== normalizeIsoTimestamp(current.updated_at)) {
+            throw new Error(`Customers แถว ${rowNumber}: ข้อมูลถูกแก้หลังส่งออก กรุณาส่งออกไฟล์ใหม่`);
+          }
+          payload.customers.push({ id, expected_updated_at: expectedUpdatedAt, ...next });
+        }
+      } catch (error) {
+        errors.push(error.message);
+      }
+    });
+
+    const contactSeen = new Set();
+    const prospectiveContacts = data.contacts.map((row) => ({ ...row }));
+    contactRows.forEach((row, index) => {
+      const rowNumber = index + 2;
+      try {
+        ensureTemplate(row, "Contacts", rowNumber);
+        const id = String(row.id || "").trim();
+        const customerId = String(row.customer_id || "").trim();
+        if (!validUuid(id) || !validUuid(customerId)) throw new Error(`Contacts แถว ${rowNumber}: id/customer_id ไม่ถูกต้อง`);
+        if (contactSeen.has(id)) throw new Error(`Contacts แถว ${rowNumber}: id ซ้ำ`);
+        contactSeen.add(id);
+        const current = contactMap.get(id);
+        if (!current) throw new Error(`Contacts แถว ${rowNumber}: ไม่พบผู้ติดต่อเดิม ห้ามเพิ่มแถวใหม่`);
+        if (current.customer_id !== customerId) throw new Error(`Contacts แถว ${rowNumber}: ห้ามเปลี่ยน customer_id`);
+
+        const next = {
+          contact_name: excelRequiredText(row.contact_name, 300, `Contacts แถว ${rowNumber} contact_name`),
+          position: excelOptionalText(row.position, 300, `Contacts แถว ${rowNumber} position`),
+          phone: excelOptionalText(row.phone, 100, `Contacts แถว ${rowNumber} phone`),
+          email: excelOptionalText(row.email, 320, `Contacts แถว ${rowNumber} email`),
+          line_id: excelOptionalText(row.line_id, 200, `Contacts แถว ${rowNumber} line_id`),
+          is_primary: excelBoolean(row.is_primary, `Contacts แถว ${rowNumber} is_primary`),
+          is_active: excelBoolean(row.is_active, `Contacts แถว ${rowNumber} is_active`)
+        };
+        if (next.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next.email)) {
+          throw new Error(`Contacts แถว ${rowNumber}: email ไม่ถูกต้อง`);
+        }
+
+        const changedFields = pushFieldChanges(
+          changes, "Contacts", id, customerLegalNameFromData(customerId, data), current, next,
+          ["contact_name", "position", "phone", "email", "line_id", "is_primary", "is_active"]
+        );
+        const prospective = prospectiveContacts.find((item) => item.id === id);
+        Object.assign(prospective, next);
+        if (Object.keys(changedFields).length) {
+          const expectedUpdatedAt = excelRowVersion(row.updated_at, `Contacts แถว ${rowNumber} updated_at`);
+          if (expectedUpdatedAt !== normalizeIsoTimestamp(current.updated_at)) {
+            throw new Error(`Contacts แถว ${rowNumber}: ข้อมูลถูกแก้หลังส่งออก กรุณาส่งออกไฟล์ใหม่`);
+          }
+          payload.contacts.push({ id, customer_id: customerId, expected_updated_at: expectedUpdatedAt, ...next });
+        }
+      } catch (error) {
+        errors.push(error.message);
+      }
+    });
+
+    const primaryByCustomer = new Map();
+    prospectiveContacts.filter((row) => row.is_active && row.is_primary).forEach((row) => {
+      primaryByCustomer.set(row.customer_id, (primaryByCustomer.get(row.customer_id) || 0) + 1);
+    });
+    [...primaryByCustomer.entries()].filter(([, count]) => count > 1).forEach(([customerId]) => {
+      errors.push(`Contacts: ลูกค้า ${customerLegalNameFromData(customerId, data)} มีผู้ติดต่อหลักที่เปิดใช้งานมากกว่า 1 ราย`);
+    });
+
+    const accountSeen = new Set();
+    const prospectiveAccounts = data.accounts.map((row) => ({ ...row }));
+    accountRows.forEach((row, index) => {
+      const rowNumber = index + 2;
+      try {
+        ensureTemplate(row, "Customer Accounts", rowNumber);
+        const id = String(row.id || "").trim();
+        const customerId = String(row.customer_id || "").trim();
+        if (!validUuid(id) || !validUuid(customerId)) throw new Error(`Customer Accounts แถว ${rowNumber}: id/customer_id ไม่ถูกต้อง`);
+        if (accountSeen.has(id)) throw new Error(`Customer Accounts แถว ${rowNumber}: id ซ้ำ`);
+        accountSeen.add(id);
+        const current = accountMap.get(id);
+        if (!current) throw new Error(`Customer Accounts แถว ${rowNumber}: ไม่พบบัญชีเดิม ห้ามเพิ่มแถวใหม่`);
+        if (current.customer_id !== customerId) throw new Error(`Customer Accounts แถว ${rowNumber}: ห้ามเปลี่ยน customer_id`);
+
+        const hasPassword = excelBoolean(row.has_password, `Customer Accounts แถว ${rowNumber} has_password`);
+        const hasPin = excelBoolean(row.has_pin, `Customer Accounts แถว ${rowNumber} has_pin`);
+        if (hasPassword !== Boolean(current.has_password) || hasPin !== Boolean(current.has_pin)) {
+          throw new Error(`Customer Accounts แถว ${rowNumber}: has_password/has_pin เป็นข้อมูลอ่านอย่างเดียว`);
+        }
+        const next = {
+          email: excelRequiredText(row.email, 320, `Customer Accounts แถว ${rowNumber} email`).toLowerCase(),
+          notes: excelOptionalText(row.notes, 2000, `Customer Accounts แถว ${rowNumber} notes`)
+        };
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next.email)) {
+          throw new Error(`Customer Accounts แถว ${rowNumber}: email ไม่ถูกต้อง`);
+        }
+        const changedFields = pushFieldChanges(
+          changes, "Customer Accounts", id, customerLegalNameFromData(customerId, data), current, next,
+          ["email", "notes"]
+        );
+        Object.assign(prospectiveAccounts.find((item) => item.id === id), next);
+        if (Object.keys(changedFields).length) {
+          const expectedUpdatedAt = excelRowVersion(row.updated_at, `Customer Accounts แถว ${rowNumber} updated_at`);
+          if (expectedUpdatedAt !== normalizeIsoTimestamp(current.updated_at)) {
+            throw new Error(`Customer Accounts แถว ${rowNumber}: ข้อมูลถูกแก้หลังส่งออก กรุณาส่งออกไฟล์ใหม่`);
+          }
+          payload.accounts.push({ id, customer_id: customerId, expected_updated_at: expectedUpdatedAt, ...next });
+        }
+      } catch (error) {
+        errors.push(error.message);
+      }
+    });
+
+    const emailKeys = new Set();
+    prospectiveAccounts.forEach((row) => {
+      const key = `${row.customer_id}:${String(row.email || "").trim().toLowerCase()}`;
+      if (emailKeys.has(key)) {
+        errors.push(`Customer Accounts: อีเมล ${row.email} ซ้ำภายในลูกค้ารายเดียวกัน`);
+      }
+      emailKeys.add(key);
+    });
+
+    const noteSeen = new Set();
+    noteRows.forEach((row, index) => {
+      const rowNumber = index + 2;
+      try {
+        ensureTemplate(row, "Notes", rowNumber);
+        const id = String(row.id || "").trim();
+        const customerId = String(row.customer_id || "").trim();
+        if (!validUuid(id) || !validUuid(customerId)) throw new Error(`Notes แถว ${rowNumber}: id/customer_id ไม่ถูกต้อง`);
+        if (noteSeen.has(id)) throw new Error(`Notes แถว ${rowNumber}: id ซ้ำ`);
+        noteSeen.add(id);
+        const current = noteMap.get(id);
+        if (!current) throw new Error(`Notes แถว ${rowNumber}: ไม่พบโน้ตเดิม ห้ามเพิ่มแถวใหม่`);
+        if (current.customer_id !== customerId) throw new Error(`Notes แถว ${rowNumber}: ห้ามเปลี่ยน customer_id`);
+        const next = {
+          note_text: excelRequiredText(row.note_text, 5000, `Notes แถว ${rowNumber} note_text`)
+        };
+        const changedFields = pushFieldChanges(
+          changes, "Notes", id, customerLegalNameFromData(customerId, data), current, next, ["note_text"]
+        );
+        if (Object.keys(changedFields).length) {
+          const expectedUpdatedAt = excelRowVersion(row.updated_at, `Notes แถว ${rowNumber} updated_at`);
+          if (expectedUpdatedAt !== normalizeIsoTimestamp(current.updated_at)) {
+            throw new Error(`Notes แถว ${rowNumber}: ข้อมูลถูกแก้หลังส่งออก กรุณาส่งออกไฟล์ใหม่`);
+          }
+          payload.notes.push({ id, customer_id: customerId, expected_updated_at: expectedUpdatedAt, ...next });
+        }
+      } catch (error) {
+        errors.push(error.message);
+      }
+    });
+
+    const prospectiveTaxIds = new Map();
+    data.customers.forEach((row) => {
+      const patch = payload.customers.find((item) => item.id === row.id);
+      const taxId = patch?.tax_id || row.tax_id;
+      if (prospectiveTaxIds.has(taxId) && prospectiveTaxIds.get(taxId) !== row.id) {
+        errors.push(`Customers: เลขประจำตัวผู้เสียภาษี ${taxId} ซ้ำ`);
+      }
+      prospectiveTaxIds.set(taxId, row.id);
+    });
+
+    if (changes.length > 5000) errors.push("ไฟล์มีการเปลี่ยนแปลงเกิน 5,000 ช่อง กรุณาแบ่งอัปเดตเป็นหลายครั้ง");
+    return {
+      fileName: file.name,
+      payload,
+      changes,
+      errors: [...new Set(errors)],
+      counts: {
+        customers: payload.customers.length,
+        contacts: payload.contacts.length,
+        accounts: payload.accounts.length,
+        notes: payload.notes.length
+      }
+    };
+  }
+
+  function displayImportValue(value) {
+    if (value === null || value === undefined || value === "") return "ว่าง";
+    if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+    if (typeof value === "object") return jsonCell(value);
+    return String(value);
+  }
+
+  function renderCustomerExcelImportPreview(preview) {
+    state.excelImportPreview = preview;
+    if (!el.excelImportDialogContent || !el.excelImportConfirmButton) return;
+    const hasErrors = preview.errors.length > 0;
+    const hasChanges = preview.changes.length > 0;
+    el.excelImportConfirmButton.disabled = hasErrors || !hasChanges;
+    el.excelImportDialogContent.innerHTML = `
+      <div class="excel-import-summary">
+        <div class="card"><strong>${preview.changes.length.toLocaleString("th-TH")}</strong><span>ช่องที่เปลี่ยน</span></div>
+        <div class="card"><strong>${preview.counts.customers.toLocaleString("th-TH")}</strong><span>ลูกค้า</span></div>
+        <div class="card"><strong>${preview.counts.contacts.toLocaleString("th-TH")}</strong><span>ผู้ติดต่อ</span></div>
+        <div class="card"><strong>${preview.counts.accounts.toLocaleString("th-TH")}</strong><span>บัญชีลูกค้า</span></div>
+        <div class="card"><strong>${preview.counts.notes.toLocaleString("th-TH")}</strong><span>โน้ต</span></div>
+      </div>
+      <p class="muted">ไฟล์: ${h(preview.fileName)}</p>
+      ${hasErrors ? `
+        <div class="alert alert-danger">
+          <strong>ไม่สามารถนำเข้าได้ (${preview.errors.length.toLocaleString("th-TH")} ข้อ)</strong>
+          <ul class="excel-import-errors">
+            ${preview.errors.slice(0, 100).map((message) => `<li>${h(message)}</li>`).join("")}
+          </ul>
+          ${preview.errors.length > 100 ? `<p>แสดง 100 ข้อแรกจาก ${preview.errors.length.toLocaleString("th-TH")} ข้อ</p>` : ""}
+        </div>` : ""}
+      ${!hasErrors && !hasChanges ? `
+        <div class="alert alert-info">ไม่พบข้อมูลที่เปลี่ยนจากฐานข้อมูลปัจจุบัน</div>` : ""}
+      ${preview.changes.length ? `
+        <div class="table-wrap excel-import-preview-table">
+          <table>
+            <thead><tr><th>ประเภท</th><th>ลูกค้า</th><th>ฟิลด์</th><th>ค่าเดิม</th><th>ค่าใหม่</th></tr></thead>
+            <tbody>
+              ${preview.changes.slice(0, 300).map((change) => `
+                <tr>
+                  <td>${h(change.resource)}</td>
+                  <td>${h(change.customerName)}</td>
+                  <td><code>${h(change.field)}</code></td>
+                  <td>${h(displayImportValue(change.oldValue))}</td>
+                  <td>${h(displayImportValue(change.newValue))}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+        ${preview.changes.length > 300 ? `<p class="muted">แสดง 300 รายการแรกจาก ${preview.changes.length.toLocaleString("th-TH")} รายการ</p>` : ""}
+      ` : ""}
+    `;
+    openDialog(el.excelImportDialog);
+  }
+
+  async function openCustomerExcelImport() {
+    if (state.profile?.role !== "admin") {
+      showToast("เฉพาะผู้ดูแลระบบเท่านั้นที่นำเข้า Excel ได้", "error");
+      return;
+    }
+    state.excelImportPreview = null;
+    if (el.customerExcelImportFile) {
+      el.customerExcelImportFile.value = "";
+      el.customerExcelImportFile.click();
+    }
+  }
+
+  async function handleCustomerExcelImportFile(file) {
+    setLoading(true, "กำลังตรวจสอบไฟล์ Excel...");
+    try {
+      const preview = await prepareCustomerExcelImport(file);
+      renderCustomerExcelImportPreview(preview);
+    } catch (error) {
+      state.excelImportPreview = null;
+      if (el.excelImportConfirmButton) el.excelImportConfirmButton.disabled = true;
+      if (el.excelImportDialogContent) {
+        el.excelImportDialogContent.innerHTML = `
+          <div class="alert alert-danger"><strong>ตรวจสอบไฟล์ไม่ผ่าน</strong><span>${h(normalizeError(error))}</span></div>`;
+      }
+      openDialog(el.excelImportDialog);
+      showError(error, "ตรวจสอบไฟล์ Excel ไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function closeCustomerExcelImport() {
+    state.excelImportPreview = null;
+    if (el.customerExcelImportFile) el.customerExcelImportFile.value = "";
+    if (el.excelImportConfirmButton) el.excelImportConfirmButton.disabled = true;
+    closeDialog(el.excelImportDialog);
+  }
+
+  async function confirmCustomerExcelImport(button) {
+    const preview = state.excelImportPreview;
+    if (!preview || preview.errors.length || !preview.changes.length) return;
+    const ok = await confirmAction(
+      `ยืนยันอัปเดต ${preview.changes.length.toLocaleString("th-TH")} ช่องหรือไม่? ระบบจะบันทึกทั้งหมดใน Transaction เดียว`,
+      "ยืนยันอัปเดตจาก Excel",
+      "อัปเดตข้อมูล"
+    );
+    if (!ok) return;
+
+    setButtonBusy(button, true, "กำลังอัปเดต...");
+    setLoading(true, "กำลังอัปเดตข้อมูลจาก Excel...");
+    try {
+      const { data, error } = await state.client.rpc("admin_update_customers_from_excel_v1", {
+        p_payload: preview.payload
+      });
+      if (error) throw error;
+      closeCustomerExcelImport();
+      clearCustomerCaches();
+      await loadCustomers(true);
+      showToast(`อัปเดตข้อมูลจาก Excel สำเร็จ ${Number(data?.updated_rows || preview.changes.length).toLocaleString("th-TH")} แถว`);
+      if (parseRoute().name === "customers") await renderCustomersPage();
+    } catch (error) {
+      showError(error, "อัปเดตข้อมูลจาก Excel ไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+      setButtonBusy(button, false);
+    }
+  }
+
 function exportRowsToExcel(rows, columns, fileName, sheetName) {
   if (!rows.length) {
     showToast("ไม่มีข้อมูลสำหรับส่งออก", "warning");
     return;
   }
   if (!window.XLSX?.utils) {
-    showToast("โหลดเครื่องมือสร้างไฟล์ Excel ไม่สำเร็จ", "error");
-    return;
+    throw new Error("โหลดเครื่องมือสร้างไฟล์ Excel ไม่สำเร็จ");
   }
   const output = rows.map((row) => Object.fromEntries(
-    columns.map((column) => [column.header, column.value(row)])
+    columns.map((column) => [column.header, excelSafeValue(column.value(row))])
   ));
   const worksheet = window.XLSX.utils.json_to_sheet(output);
   worksheet["!cols"] = columns.map((column) => ({ wch: column.width || 18 }));
@@ -1196,28 +2066,7 @@ function exportRowsToExcel(rows, columns, fileName, sheetName) {
   window.XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
   window.XLSX.writeFile(workbook, fileName, { compression: true });
 }
-  function exportCustomersExcel() {
-    const rows = [];
-    state.grids.customers?.forEachNodeAfterFilterAndSort?.((node) => {
-      if (node.data) rows.push(node.data);
-    });
-    if (!state.grids.customers && state.filteredCustomerRows?.length) {
-      rows.push(...state.filteredCustomerRows);
-    }
-    exportRowsToExcel(rows, [
-      { header: "ชื่อนิติบุคคล", value: (row) => row.legal_name || "-", width: 36 },
-      { header: "จำนวนรถ", value: (row) => Number(row.fleet_size || 0), width: 12 },
-      { header: "โมดูล", value: (row) => row.module_text || "-", width: 28 },
-      { header: "สัญญา", value: (row) => row.contract_text || "-", width: 16 },
-      { header: "เซลล์", value: (row) => row.sales_text || "-", width: 20 },
-      { header: "จำนวนผู้ใช้งานลูกค้า", value: (row) => Number(row.customer_user_count || 1), width: 22 },
-      { header: "สอนใช้งานนอกสถานที่ (ครั้ง)", value: (row) => Number(row.onsite_training_count || 0), width: 28 },
-      { header: "สถานะการนำเข้าข้อมูล", value: (row) => row.import_text || "-", width: 24 },
-      { header: "ระดับความสนใจ", value: (row) => row.engagement_text || "-", width: 18 },
-      { header: "อัปเดตล่าสุด", value: (row) => formatDateTime(row.updated_at), width: 20 },
-      { header: "แก้ไขล่าสุดโดย", value: (row) => row.updated_by_name || "-", width: 22 }
-    ], `ข้อมูลลูกค้า-${state.ui.customerFilters.accountTab}-${bangkokDate()}.xlsx`, "ข้อมูลลูกค้า");
-  }
+  
 
 function exportManagerReportsExcel() {
   const rows = [];
@@ -1241,7 +2090,9 @@ async function runExcelExport(button, exporter) {
   setButtonBusy(button, true, "กำลังสร้างไฟล์...");
   try {
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
-    exporter();
+    await exporter();
+  } catch (error) {
+    showError(error, "สร้างไฟล์ Excel ไม่สำเร็จ");
   } finally {
     setButtonBusy(button, false);
   }
@@ -2377,57 +3228,57 @@ async function handleSession(session) {
     el.appView.classList.toggle("sidebar-collapsed", collapsed && window.innerWidth > 820);
     renderNavigation();
   }
-  function renderNavigation() {
-    const role = state.profile?.role;
-    const groups = [
-      {
-        label: "พื้นที่ทำงาน",
-        items: [
-          { route: "dashboard", icon: "dashboard", label: "ภาพรวม", roles: ["admin", "manager", "user"] },
-          { route: "customers", icon: "customers", label: "ข้อมูลลูกค้า", roles: ["admin", "manager", "user"] }
-        ]
-      },
-      {
-        label: "รายงาน",
-        items: [
-          { route: "daily-report", icon: "report", label: "รายงานประจำวัน", roles: ["user"] },
-          { route: "manager-reports", icon: "team", label: "รายงานของทีม", roles: ["admin", "manager"] }
-        ]
-      },
-      {
-        label: "การดูแลระบบ",
-        items: [
-          { route: "admin-users", icon: "users", label: "จัดการผู้ใช้", roles: ["admin"] },
-          { route: "system-settings", icon: "image", label: "ตั้งค่าภาพระบบ", roles: ["admin"] },
-          { route: "master-data", icon: "database", label: "ข้อมูลตัวเลือกกลาง", roles: ["admin"] }
-        ]
-      },
-      {
-        label: "บัญชีผู้ใช้งาน",
-        items: [
-          { route: "profile", icon: "profile", label: "ข้อมูลส่วนตัวและรูปแบบสี", roles: ["admin", "manager", "user"] }
-        ]
-      }
-    ];
+function renderNavigation() {
+  const role = state.profile?.role;
+  const groups = [
+    {
+      label: "พื้นที่ทำงาน",
+      items: [
+        { route: "dashboard", icon: "dashboard", label: "ภาพรวม", roles: ["admin", "manager", "user"] },
+        { route: "customers", icon: "customers", label: "ข้อมูลลูกค้า", roles: ["admin", "manager", "user"] }
+      ]
+    },
+    {
+      label: "รายงาน",
+      items: [
+        { route: "daily-report", icon: "report", label: "รายงานประจำวันของฉัน", roles: ["admin", "manager", "user"] },
+        { route: "manager-reports", icon: "team", label: "รายงานของทีม", roles: ["admin", "manager"] }
+      ]
+    },
+    {
+      label: "การดูแลระบบ",
+      items: [
+        { route: "admin-users", icon: "users", label: "จัดการผู้ใช้", roles: ["admin"] },
+        { route: "system-settings", icon: "image", label: "ตั้งค่าภาพระบบ", roles: ["admin"] },
+        { route: "master-data", icon: "database", label: "ข้อมูลตัวเลือกกลาง", roles: ["admin"] }
+      ]
+    },
+    {
+      label: "บัญชีผู้ใช้งาน",
+      items: [
+        { route: "profile", icon: "profile", label: "ข้อมูลส่วนตัวและรูปแบบสี", roles: ["admin", "manager", "user"] }
+      ]
+    }
+  ];
 
-    const active = parseRoute().name;
-    el.mainNav.innerHTML = groups.map((group) => {
-      const visible = group.items.filter((item) => item.roles.includes(role));
-      if (!visible.length) return "";
-      return `
-        <div class="nav-group">
-          <span class="nav-group-label">${h(group.label)}</span>
-          ${visible.map((item) => `
-            <a class="nav-link ${active === item.route ? "active" : ""}" href="#/${item.route}"
-               ${active === item.route ? 'aria-current="page"' : ""}
-               title="${h(item.label)}">
-              <span class="nav-icon">${icon(item.icon)}</span>
-              <span>${h(item.label)}</span>
-            </a>
-          `).join("")}
-        </div>`;
-    }).join("");
-  }
+  const active = parseRoute().name;
+  el.mainNav.innerHTML = groups.map((group) => {
+    const visible = group.items.filter((item) => item.roles.includes(role));
+    if (!visible.length) return "";
+    return `
+      <div class="nav-group">
+        <span class="nav-group-label">${h(group.label)}</span>
+        ${visible.map((item) => `
+          <a class="nav-link ${active === item.route ? "active" : ""}" href="#/${item.route}"
+             ${active === item.route ? 'aria-current="page"' : ""}
+             title="${h(item.label)}">
+            <span class="nav-icon">${icon(item.icon)}</span>
+            <span>${h(item.label)}</span>
+          </a>
+        `).join("")}
+      </div>`;
+  }).join("");
+}
 
   function parseRoute() {
     const raw = location.hash.replace(/^#\/?/, "");
@@ -2439,22 +3290,21 @@ async function handleSession(session) {
       parts
     };
   }
-
-  function routeAllowed(routeName) {
-    const role = state.profile?.role;
-    const rules = {
-      dashboard: ["admin", "manager", "user"],
-      customers: ["admin", "manager", "user"],
-      customer: ["admin", "manager", "user"],
-      profile: ["admin", "manager", "user"],
-      "daily-report": ["user"],
-      "manager-reports": ["admin", "manager"],
-      "admin-users": ["admin"],
-      "system-settings": ["admin"],
-      "master-data": ["admin"]
-    };
-    return rules[routeName]?.includes(role) ?? false;
-  }
+function routeAllowed(routeName) {
+  const role = state.profile?.role;
+  const rules = {
+    dashboard: ["admin", "manager", "user"],
+    customers: ["admin", "manager", "user"],
+    customer: ["admin", "manager", "user"],
+    profile: ["admin", "manager", "user"],
+    "daily-report": ["admin", "manager", "user"],
+    "manager-reports": ["admin", "manager"],
+    "admin-users": ["admin"],
+    "system-settings": ["admin"],
+    "master-data": ["admin"]
+  };
+  return rules[routeName]?.includes(role) ?? false;
+}
 
   async function renderRoute() {
     if (!state.profile) return;
@@ -2685,40 +3535,39 @@ async function handleSession(session) {
 
 async function loadCustomers(force = false) {
   if (!force && state.customers.length) return;
-  const [customersResult, ownersResult, modulesResult, featuresResult, accountsResult] = await Promise.all([
+
+  const customers = await fetchAllPaged(() =>
     state.client
       .from("customers")
-      .select("id,legacy_customer_id,legal_name,short_name,tax_id,fleet_size,customer_user_count,account_status,onboarding_stage,import_status,engagement_level,sales_code,start_date,billing_date,contract_type,onsite_training_count,is_archived,archived_at,archived_by,created_at,created_by,updated_at,updated_by")
+      .select("id,legacy_customer_id,legal_name,short_name,tax_id,fleet_size,customer_user_count,monthly_service_fee,account_status,onboarding_stage,import_status,engagement_level,sales_code,start_date,billing_date,contract_type,onsite_training_count,is_archived,archived_at,archived_by,created_at,created_by,updated_at,updated_by")
       .eq("is_archived", false)
       .order("updated_at", { ascending: false })
-      .limit(1000),
-    state.client
-      .from("customer_owners")
-      .select("customer_id,profile_id,is_primary")
-      .limit(5000),
-    state.client
-      .from("customer_modules")
-      .select("customer_id,module_id")
-      .limit(5000),
-    state.client
-      .from("customer_features")
-      .select("customer_id,feature_id")
-      .limit(5000),
-    state.client
-      .from("customer_user_accounts")
-      .select("id,customer_id")
-      .limit(5000)
+      .order("id", { ascending: true })
+  );
+
+  state.customers = customers;
+  const customerIds = customers.map((customer) => customer.id);
+  if (!customerIds.length) {
+    state.customerOwners = [];
+    state.customerModules = [];
+    state.customerFeatures = [];
+    state.customerAccounts = [];
+    return;
+  }
+
+  const [owners, modules, features, accounts] = await Promise.all([
+    fetchCustomerRelationRows("customer_owners", "customer_id,profile_id,is_primary", customerIds, ["customer_id", "profile_id"]),
+    fetchCustomerRelationRows("customer_modules", "customer_id,module_id", customerIds, ["customer_id", "module_id"]),
+    fetchCustomerRelationRows("customer_features", "customer_id,feature_id", customerIds, ["customer_id", "feature_id"]),
+    fetchCustomerRelationRows("customer_user_accounts", "id,customer_id", customerIds, ["customer_id", "id"])
   ]);
-  [customersResult, ownersResult, modulesResult, featuresResult, accountsResult].forEach((result) => {
-    if (result.error) throw result.error;
-  });
-  state.customers = customersResult.data || [];
-  const activeIds = new Set(state.customers.map((customer) => customer.id));
-  state.customerOwners = (ownersResult.data || []).filter((row) => activeIds.has(row.customer_id));
-  state.customerModules = (modulesResult.data || []).filter((row) => activeIds.has(row.customer_id));
-  state.customerFeatures = (featuresResult.data || []).filter((row) => activeIds.has(row.customer_id));
-  state.customerAccounts = (accountsResult.data || []).filter((row) => activeIds.has(row.customer_id));
+
+  state.customerOwners = owners;
+  state.customerModules = modules;
+  state.customerFeatures = features;
+  state.customerAccounts = accounts;
 }
+
 
   function profileName(id) {
     return profileById(id)?.display_name || "-";
@@ -2733,25 +3582,36 @@ async function loadCustomers(force = false) {
 
 async function renderDashboard() {
   await Promise.all([loadCommonData(), loadCustomers(true)]);
-  const customers = state.customers;
+  const customers = state.customers.filter((customer) =>
+    !customer.is_archived && customer.account_status === "active"
+  );
   const goLive = customers.filter((customer) => customer.onboarding_stage === "go_live").length;
   const importPending = customers.filter((customer) => customer.import_status !== "done").length;
   const updatedAt = formatDateTime(new Date().toISOString());
+  const today = bangkokDate();
 
-  let reportQuery = state.client.from("daily_reports").select("id,status,work_date,user_id,updated_at,last_revision_reason");
-  if (state.profile.role === "user") {
-    reportQuery = reportQuery
-      .eq("user_id", state.profile.id)
-      .eq("work_date", bangkokDate())
-      .order("updated_at", { ascending: false });
-  } else {
-    reportQuery = reportQuery
-      .eq("work_date", bangkokDate())
-      .order("updated_at", { ascending: false });
+  const ownResult = await state.client
+    .from("daily_reports")
+    .select("id,status,work_date,user_id,updated_at,last_revision_reason")
+    .eq("user_id", state.profile.id)
+    .eq("work_date", today)
+    .order("updated_at", { ascending: false })
+    .maybeSingle();
+  if (ownResult.error) throw ownResult.error;
+  const ownReport = ownResult.data || null;
+
+  let teamReports = [];
+  if (["admin", "manager"].includes(state.profile.role)) {
+    const teamResult = await state.client
+      .from("daily_reports")
+      .select("id,status,work_date,user_id,updated_at,last_revision_reason")
+      .eq("work_date", today)
+      .in("status", ["submitted", "acknowledged", "revision_required"])
+      .order("updated_at", { ascending: false })
+      .limit(1000);
+    if (teamResult.error) throw teamResult.error;
+    teamReports = teamResult.data || [];
   }
-  const { data: reports, error: reportsError } = await reportQuery;
-  if (reportsError) throw reportsError;
-  const reportRows = reports || [];
 
   const onboardingOrder = masterOptions("onboarding_stage", { includeInactive: true }).map((item) => item.option_value);
   const onboarding = onboardingOrder.map((key) => ({
@@ -2770,46 +3630,44 @@ async function renderDashboard() {
 
   state.dashboardChartData = { onboarding, importStatus };
 
-  let rolePanel = "";
-  if (state.profile.role === "user") {
-    const todayReport = reportRows[0] || null;
-    rolePanel = `
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <h2>รายงานประจำวันนี้</h2>
-            <p class="muted">บันทึกงานวันนี้และแผนงานวันพรุ่งนี้</p>
+  const ownReportPanel = `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>รายงานประจำวันของฉัน</h2>
+          <p class="muted">บันทึกงานวันนี้และแผนงานวันพรุ่งนี้</p>
+        </div>
+        ${ownReport ? `<span class="status-badge" data-status="${h(ownReport.status)}">${h(label("report_status", ownReport.status))}</span>` : ""}
+      </div>
+      <div class="panel-body">
+        ${ownReport ? `
+          ${ownReport.last_revision_reason && ownReport.status === "revision_required"
+            ? `<div class="alert alert-danger"><strong>รายงานถูกส่งกลับ:</strong>&nbsp;${h(ownReport.last_revision_reason)}</div>`
+            : ""}
+          <div class="toolbar-summary">
+            <span>อัปเดตล่าสุด ${h(formatDateTime(ownReport.updated_at))}</span>
+            <a class="btn btn-primary" href="#/daily-report">เปิดรายงาน</a>
           </div>
-          ${todayReport ? `<span class="status-badge" data-status="${h(todayReport.status)}">${h(label("report_status", todayReport.status))}</span>` : ""}
-        </div>
-        <div class="panel-body">
-          ${todayReport ? `
-            ${todayReport.last_revision_reason && todayReport.status === "revision_required"
-              ? `<div class="alert alert-danger"><strong>ผู้จัดการส่งกลับ:</strong>&nbsp;${h(todayReport.last_revision_reason)}</div>`
-              : ""}
-            <div class="toolbar-summary">
-              <span>อัปเดตล่าสุด ${h(formatDateTime(todayReport.updated_at))}</span>
-              <a class="btn btn-primary" href="#/daily-report">เปิดรายงาน</a>
-            </div>
-          ` : `
-            <div class="empty-state">
-              <strong>ยังไม่มีรายงานสำหรับวันนี้</strong>
-              <span>เริ่มบันทึกงานและแก้ไขได้ก่อนผู้จัดการรับทราบ</span>
-              <a class="btn btn-primary" href="#/daily-report">${icon("plus")} เริ่มเขียนรายงาน</a>
-            </div>
-          `}
-        </div>
-      </section>`;
-  } else {
-    const pending = reportRows.filter((report) => report.status === "submitted").length;
-    const acknowledged = reportRows.filter((report) => report.status === "acknowledged").length;
-    const revision = reportRows.filter((report) => report.status === "revision_required").length;
-    rolePanel = `
+        ` : `
+          <div class="empty-state">
+            <strong>ยังไม่มีรายงานสำหรับวันนี้</strong>
+            <span>เริ่มเขียนรายงานได้ทุก Role และ Draft จะเห็นเฉพาะเจ้าของ</span>
+            <a class="btn btn-primary" href="#/daily-report">${icon("plus")} เริ่มเขียนรายงาน</a>
+          </div>
+        `}
+      </div>
+    </section>`;
+
+  const teamPanel = ["admin", "manager"].includes(state.profile.role) ? (() => {
+    const pending = teamReports.filter((report) => report.status === "submitted").length;
+    const acknowledged = teamReports.filter((report) => report.status === "acknowledged").length;
+    const revision = teamReports.filter((report) => report.status === "revision_required").length;
+    return `
       <section class="panel">
         <div class="panel-header">
           <div>
             <h2>รายงานของทีมวันนี้</h2>
-            <p class="muted">ติดตามรายงานที่รอรับทราบและรายการที่ส่งกลับ</p>
+            <p class="muted">แสดงเฉพาะรายงานที่ถูกส่งแล้ว Draft ของผู้อื่นจะไม่ถูกโหลด</p>
           </div>
           <a class="btn btn-secondary btn-small" href="#/manager-reports">ดูทั้งหมด</a>
         </div>
@@ -2821,7 +3679,7 @@ async function renderDashboard() {
                 <span class="stat-icon">${icon("clock")}</span>
               </div>
               <span class="stat-value">${pending}</span>
-              <span class="stat-meta">รายงานที่ผู้ใช้งานส่งแล้ว</span>
+              <span class="stat-meta">รายงานที่ส่งแล้ว</span>
             </div>
             <div class="card stat-card">
               <div class="stat-card-header">
@@ -2837,23 +3695,23 @@ async function renderDashboard() {
                 <span class="stat-icon">${icon("refresh")}</span>
               </div>
               <span class="stat-value">${revision}</span>
-              <span class="stat-meta">รายงานที่รอแก้ไข</span>
+              <span class="stat-meta">รอเจ้าของแก้ไขและส่งใหม่</span>
             </div>
           </div>
         </div>
       </section>`;
-  }
+  })() : "";
 
   el.mainContent.innerHTML = `
     ${pageHeader("ภาพรวม", `ข้อมูลล่าสุด ณ ${updatedAt}`)}
     <section class="cards-grid cards-grid-3" style="margin-bottom:20px">
       <div class="card stat-card">
         <div class="stat-card-header">
-          <span class="stat-label">ลูกค้าทั้งหมด</span>
+          <span class="stat-label">ลูกค้าที่ใช้งาน</span>
           <span class="stat-icon">${icon("building")}</span>
         </div>
         <span class="stat-value">${customers.length}</span>
-        <span class="stat-meta">เฉพาะรายการที่ใช้งานอยู่</span>
+        <span class="stat-meta">ไม่รวมลูกค้าสถานะไม่ใช้งานและ Soft Delete</span>
       </div>
       <div class="card stat-card">
         <div class="stat-card-header">
@@ -2861,7 +3719,7 @@ async function renderDashboard() {
           <span class="stat-icon">${icon("rocket")}</span>
         </div>
         <span class="stat-value">${goLive}</span>
-        <span class="stat-meta">ผ่านขั้นตอนเริ่มใช้งาน</span>
+        <span class="stat-meta">ลูกค้าที่ใช้งานและอยู่ขั้น Go Live</span>
       </div>
       <div class="card stat-card">
         <div class="stat-card-header">
@@ -2869,14 +3727,14 @@ async function renderDashboard() {
           <span class="stat-icon">${icon("import")}</span>
         </div>
         <span class="stat-value">${importPending}</span>
-        <span class="stat-meta">รอดำเนินการหรือกำลังดำเนินการ</span>
+        <span class="stat-meta">เฉพาะลูกค้าที่ใช้งาน</span>
       </div>
     </section>
 
     <section class="chart-grid chart-grid-2" aria-label="กราฟสรุป">
       <article class="panel chart-panel">
         <div class="panel-header">
-          <div><h2>สถานะการเริ่มใช้งาน</h2><p class="muted">จำนวนลูกค้าตามขั้นตอน</p></div>
+          <div><h2>สถานะการเริ่มใช้งาน</h2><p class="muted">เฉพาะลูกค้าที่ใช้งาน</p></div>
         </div>
         <div id="onboarding-chart" class="chart-container">
           <div class="chart-loading"><span class="spinner"></span><span>กำลังสร้างกราฟ...</span></div>
@@ -2884,7 +3742,7 @@ async function renderDashboard() {
       </article>
       <article class="panel chart-panel">
         <div class="panel-header">
-          <div><h2>สถานะการนำเข้าข้อมูล</h2><p class="muted">สัดส่วนความคืบหน้าการนำเข้าข้อมูล</p></div>
+          <div><h2>สถานะการนำเข้าข้อมูล</h2><p class="muted">เฉพาะลูกค้าที่ใช้งาน</p></div>
         </div>
         <div id="import-chart" class="chart-container">
           <div class="chart-loading"><span class="spinner"></span><span>กำลังสร้างกราฟ...</span></div>
@@ -2892,7 +3750,10 @@ async function renderDashboard() {
       </article>
     </section>
 
-    ${rolePanel}`;
+    <div class="dashboard-report-panels">
+      ${ownReportPanel}
+      ${teamPanel}
+    </div>`;
 
   window.requestAnimationFrame(() => renderDashboardCharts(state.dashboardChartData));
 }
@@ -2971,8 +3832,12 @@ async function renderDashboard() {
                 ${icon("refresh")} ล้างตัวกรอง
               </button>
               <button class="btn btn-secondary" data-action="export-customers-excel">
-                ${icon("download")} Excel
+                ${icon("download")} Excel ครบชุด
               </button>
+              ${state.profile?.role === "admin" ? `
+                <button class="btn btn-secondary" data-action="import-customers-excel">
+                  ${icon("import")} อัปเดตจาก Excel
+                </button>` : ""}
             </div>
           </div>
 
@@ -3174,6 +4039,9 @@ function renderCustomerTable() {
         owner_text: ownerNames(customer.id).join(", ") || "-",
         sales_text: label("sales", customer.sales_code),
         customer_user_count: Number(customer.customer_user_count || 1),
+        monthly_service_fee: customer.monthly_service_fee === null || customer.monthly_service_fee === undefined
+          ? null
+          : Number(customer.monthly_service_fee),
         module_text: moduleNames.join(", ") || "-",
         import_text: label("import_status", customer.import_status),
         engagement_text: label("engagement_level", customer.engagement_level),
@@ -3245,6 +4113,14 @@ function renderCustomerTable() {
         headerName: "เซลล์",
         field: "sales_text",
         minWidth: 150
+      },
+      {
+        headerName: "ค่าบริการต่อเดือน",
+        field: "monthly_service_fee",
+        minWidth: 165,
+        type: "numericColumn",
+        filter: "agNumberColumnFilter",
+        valueFormatter: (params) => formatMoney(params.value)
       },
       {
         headerName: "จำนวนผู้ใช้งานลูกค้า",
@@ -3359,6 +4235,12 @@ function renderCustomerTable() {
               <input name="customer_user_count" type="number" min="1" max="999999" step="1"
                      value="${h(c.customer_user_count ?? 1)}" required>
               <small class="field-help">จำนวนผู้ใช้งานจริงที่ลูกค้าแจ้ง ต้องตั้งแต่ 1 ขึ้นไป และไม่ผูกกับจำนวนบัญชีที่สร้าง</small>
+            </label>
+            <label>
+              <span class="field-label">ค่าบริการต่อเดือน (บาท)</span>
+              <input name="monthly_service_fee" type="number" min="0" max="999999999999.99" step="0.01"
+                     value="${h(c.monthly_service_fee ?? "")}" placeholder="เว้นว่างได้ หรือกรอก 0">
+              <small class="field-help">จำนวนเงินต่อเดือน หน่วยบาท รองรับทศนิยมไม่เกิน 2 ตำแหน่ง</small>
             </label>
             <label>
               <span class="field-label">สถานะบัญชี <span class="required">*</span></span>
@@ -4123,8 +5005,22 @@ function collectCustomerFormState(formElement) {
   }
 
   const onsiteTrainingCount = Number(form.get("onsite_training_count") || 0);
-  if (!Number.isInteger(onsiteTrainingCount) || onsiteTrainingCount < 0) {
-    showToast("จำนวนครั้งสอนใช้งานนอกสถานที่ต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป", "error");
+  if (!Number.isInteger(onsiteTrainingCount) || onsiteTrainingCount < 0 || onsiteTrainingCount > 999999) {
+    showToast("จำนวนครั้งสอนใช้งานนอกสถานที่ต้องเป็นจำนวนเต็มตั้งแต่ 0 ถึง 999999", "error");
+    return null;
+  }
+
+  const feeRaw = String(form.get("monthly_service_fee") ?? "").trim();
+  const monthlyServiceFee = feeRaw === "" ? null : Number(feeRaw);
+  if (
+    monthlyServiceFee !== null
+    && (!/^\d+(?:\.\d{1,2})?$/.test(feeRaw)
+      || !Number.isFinite(monthlyServiceFee)
+      || monthlyServiceFee < 0
+      || monthlyServiceFee > 999999999999.99)
+  ) {
+    showToast("ค่าบริการต้องเป็นจำนวนเงินไม่ติดลบและมีทศนิยมไม่เกิน 2 ตำแหน่ง", "error");
+    formElement.elements.monthly_service_fee?.focus();
     return null;
   }
 
@@ -4135,6 +5031,7 @@ function collectCustomerFormState(formElement) {
       tax_id: String(form.get("tax_id") || "").trim(),
       fleet_size: Number(form.get("fleet_size") || 0),
       customer_user_count: customerUserCount,
+      monthly_service_fee: monthlyServiceFee,
       account_status: form.get("account_status"),
       onboarding_stage: nullable(form.get("onboarding_stage")),
       import_status: form.get("import_status"),
@@ -4198,7 +5095,7 @@ async function saveCustomer(event) {
   setLoading(true, "กำลังสร้างข้อมูลลูกค้า...");
 
   try {
-    const { data, error } = await state.client.rpc("create_customer_complete_v3", {
+    const { data, error } = await state.client.rpc("create_customer_complete_v4", {
       p_customer: collected.core,
       p_owner_ids: collected.ownerIds,
       p_primary_owner_id: collected.primaryOwnerId,
@@ -4535,6 +5432,7 @@ async function renderCustomerDetail(customerId) {
             <dt>เลขประจำตัวผู้เสียภาษี</dt><dd>${h(c.tax_id)}</dd>
             <dt>จำนวนรถ</dt><dd>${Number(c.fleet_size || 0).toLocaleString("th-TH")}</dd>
             <dt>จำนวนผู้ใช้งานลูกค้า</dt><dd>${Number(c.customer_user_count || 1).toLocaleString("th-TH")} คน</dd>
+            <dt>ค่าบริการต่อเดือน</dt><dd>${formatMoney(c.monthly_service_fee)}</dd>
             <dt>บัญชีผู้ใช้งานที่บันทึกไว้</dt><dd>${data.accounts.length.toLocaleString("th-TH")} บัญชี</dd>
             <dt>เซลล์</dt><dd>${h(label("sales", c.sales_code))}</dd>
             <dt>สถานะบัญชี</dt>
@@ -4964,9 +5862,57 @@ async function saveContact(event) {
     }
   }
 
+
+async function loadReportCustomersByIds(customerIds = []) {
+  const uniqueIds = [...new Set(customerIds.filter(validUuid))];
+  const known = new Set(state.customers.map((customer) => customer.id));
+  const missing = uniqueIds.filter((id) => !known.has(id));
+  if (!missing.length) return;
+  const { data, error } = await state.client
+    .from("customers")
+    .select("id,legal_name,short_name,account_status,is_archived,updated_at")
+    .in("id", missing)
+    .limit(1000);
+  if (error) throw error;
+  state.customers = [...state.customers, ...(data || []).filter((row) => !known.has(row.id))];
+}
+
+function validateSelectedReportCustomers(customerIds = []) {
+  const invalid = customerIds.filter((customerId) => {
+    const customer = state.customers.find((item) => item.id === customerId);
+    return !customer || customer.is_archived || customer.account_status !== "active";
+  });
+  if (!invalid.length) return true;
+  showToast(
+    `ลูกค้าที่เลือก ${invalid.map(customerDisplayName).join(", ")} ไม่อยู่ในสถานะใช้งาน กรุณานำออกก่อนบันทึก`,
+    "error"
+  );
+  return false;
+}
+
+function currentReportCustomerIds() {
+  const ids = new Set(state.currentDailyGroupCustomerIds || []);
+  (state.currentDailyItemCustomers || []).forEach((row) => ids.add(row.customer_id));
+  return [...ids];
+}
+
+function invalidCurrentReportCustomerIds() {
+  return currentReportCustomerIds().filter((customerId) => {
+    const customer = state.customers.find((item) => item.id === customerId);
+    return !customer || customer.is_archived || customer.account_status !== "active";
+  });
+}
+
+function reportCustomerStateLabel(customer) {
+  if (!customer) return "ไม่พบข้อมูล";
+  if (customer.is_archived) return "ถูกลบ";
+  if (customer.account_status !== "active") return "ไม่ใช้งาน";
+  return "";
+}
+
 function customerDisplayName(customerId) {
   const customer = state.customers.find((item) => item.id === customerId);
-  return customer ? (customer.short_name || customer.legal_name) : "ลูกค้าที่ไม่แสดงในรายการ";
+  return customer?.legal_name || "ลูกค้าที่ไม่พบในระบบ";
 }
 
 function reportCustomerNames(customerIds = []) {
@@ -4982,11 +5928,16 @@ function reportItemCustomerIds(itemId, itemCustomerRows = state.currentDailyItem
 function reportCustomerMultiSelect(name, selectedIds = [], disabled = false, prefix = "report-customer") {
   const selected = new Set(selectedIds);
   const customers = state.customers
-    .filter((customer) => !customer.is_archived)
+    .filter((customer) =>
+      (!customer.is_archived && customer.account_status === "active")
+      || selected.has(customer.id)
+    )
     .sort((a, b) => a.legal_name.localeCompare(b.legal_name, "th"));
-  const selectedNames = customers
-    .filter((customer) => selected.has(customer.id))
-    .map((customer) => customer.short_name || customer.legal_name);
+  const selectedCustomers = customers.filter((customer) => selected.has(customer.id));
+  const selectedNames = selectedCustomers.map((customer) => customer.legal_name);
+  const invalidSelectedCount = selectedCustomers.filter((customer) =>
+    customer.is_archived || customer.account_status !== "active"
+  ).length;
   const summary = selectedNames.length === 0
     ? "ยังไม่ได้เลือกลูกค้า"
     : selectedNames.length === 1
@@ -4998,11 +5949,13 @@ function reportCustomerMultiSelect(name, selectedIds = [], disabled = false, pre
              ${disabled ? 'data-disabled="true"' : ""}>
       <summary aria-disabled="${disabled ? "true" : "false"}">
         <span class="customer-multiselect-summary" data-multiselect-summary>${h(summary)}</span>
-        <span class="customer-multiselect-count" data-multiselect-count>${selectedNames.length.toLocaleString("th-TH")}</span>
+        <span class="customer-multiselect-count ${invalidSelectedCount ? "has-warning" : ""}" data-multiselect-count>
+          ${selectedNames.length.toLocaleString("th-TH")}
+        </span>
       </summary>
       <div class="customer-multiselect-dropdown">
         <div class="customer-multiselect-toolbar">
-          <input type="search" data-multiselect-search placeholder="ค้นหาลูกค้า..." autocomplete="off"
+          <input type="search" data-multiselect-search placeholder="ค้นหาชื่อนิติบุคคล..." autocomplete="off"
                  aria-label="ค้นหาลูกค้าในรายการ">
           <div class="customer-multiselect-actions">
             <button type="button" class="btn btn-tertiary btn-small"
@@ -5011,22 +5964,26 @@ function reportCustomerMultiSelect(name, selectedIds = [], disabled = false, pre
                     data-action="clear-report-customers" ${disabled ? "disabled" : ""}>ล้าง</button>
           </div>
         </div>
-        <div class="customer-multiselect-options" role="group" aria-label="รายชื่อลูกค้า">
+        <div class="customer-multiselect-options" role="group" aria-label="รายชื่อลูกค้าที่ใช้งาน">
           ${customers.map((customer) => {
             const id = `${prefix}-${customer.id}`;
-            const displayName = customer.short_name || customer.legal_name;
+            const statusText = reportCustomerStateLabel(customer);
+            const invalid = Boolean(statusText);
             const searchText = `${customer.legal_name} ${customer.short_name || ""}`.toLowerCase();
             return `
-              <label class="customer-multiselect-option" for="${h(id)}" data-search-text="${h(searchText)}">
+              <label class="customer-multiselect-option ${invalid ? "is-invalid-customer" : ""}"
+                     for="${h(id)}" data-search-text="${h(searchText)}">
                 <input id="${h(id)}" type="checkbox" name="${h(name)}" value="${h(customer.id)}"
                        data-customer-multiselect-option
                        ${selected.has(customer.id) ? "checked" : ""} ${disabled ? "disabled" : ""}>
                 <span>
-                  <strong>${h(displayName)}</strong>
-                  ${customer.short_name ? `<small>${h(customer.legal_name)}</small>` : ""}
+                  <strong>${h(customer.legal_name)}</strong>
+                  ${statusText
+                    ? `<small><span class="text-danger">${h(statusText)} — ต้องนำออกก่อนส่ง</span></small>`
+                    : ""}
                 </span>
               </label>`;
-          }).join("") || '<p class="muted customer-multiselect-empty">ยังไม่มีข้อมูลลูกค้า</p>'}
+          }).join("") || '<p class="muted customer-multiselect-empty">ยังไม่มีลูกค้าที่ใช้งาน</p>'}
         </div>
       </div>
     </details>`;
@@ -5040,6 +5997,10 @@ function updateCustomerMultiSelectSummary(scope) {
   const selectedIds = [...picker.querySelectorAll("input[data-customer-multiselect-option]:checked")]
     .map((input) => input.value);
   const names = reportCustomerNames(selectedIds);
+  const invalidCount = selectedIds.filter((customerId) => {
+    const customer = state.customers.find((item) => item.id === customerId);
+    return !customer || customer.is_archived || customer.account_status !== "active";
+  }).length;
   const text = names.length === 0
     ? "ยังไม่ได้เลือกลูกค้า"
     : names.length === 1
@@ -5048,7 +6009,11 @@ function updateCustomerMultiSelectSummary(scope) {
   const summary = picker.querySelector("[data-multiselect-summary]");
   const count = picker.querySelector("[data-multiselect-count]");
   if (summary) summary.textContent = text;
-  if (count) count.textContent = names.length.toLocaleString("th-TH");
+  if (count) {
+    count.textContent = names.length.toLocaleString("th-TH");
+    count.classList.toggle("has-warning", invalidCount > 0);
+    count.title = invalidCount ? `มีลูกค้าที่ไม่พร้อมใช้งาน ${invalidCount} ราย` : "";
+  }
 }
 
 function refreshAllCustomerMultiSelectSummaries() {
@@ -5068,7 +6033,10 @@ function setVisibleCustomerMultiSelectOptions(button, checked) {
   const picker = button.closest("[data-customer-multiselect]");
   if (!picker) return;
   picker.querySelectorAll(".customer-multiselect-option:not(.hidden) input[data-customer-multiselect-option]:not(:disabled)")
-    .forEach((input) => { input.checked = checked; });
+    .forEach((input) => {
+      if (checked && input.closest(".is-invalid-customer")) return;
+      input.checked = checked;
+    });
   updateCustomerMultiSelectSummary(picker);
 }
 
@@ -5148,11 +6116,17 @@ async function renderDailyReportPage(workDate = null) {
     }
   }
 
+  await loadReportCustomersByIds([
+    ...groupCustomerIds,
+    ...itemCustomers.map((row) => row.customer_id)
+  ]);
+
   state.currentDailyReport = report;
   state.currentDailyItems = items;
   state.currentDailyItemCustomers = itemCustomers;
   state.currentDailyGroupCustomerIds = groupCustomerIds;
   const locked = report?.status === "acknowledged";
+  const invalidCustomerIds = invalidCurrentReportCustomerIds();
 
   const pageActions = report
     ? `<button class="btn btn-secondary" data-action="print-own-report">พิมพ์ / บันทึกเป็นไฟล์</button>`
@@ -5203,6 +6177,11 @@ async function renderDailyReportPage(workDate = null) {
         ${report?.status === "revision_required" ? `
           <div class="alert alert-danger"><strong>เหตุผลที่ผู้จัดการส่งกลับ:</strong>&nbsp;${h(report.last_revision_reason || "-")}</div>
         ` : ""}
+        ${report && invalidCustomerIds.length ? `
+          <div class="alert alert-danger">
+            <strong>พบลูกค้าที่ไม่พร้อมใช้งาน ${invalidCustomerIds.length.toLocaleString("th-TH")} ราย</strong>
+            <span>กรุณานำออกจากกลุ่มหรือรายการก่อนส่งรายงานให้ผู้จัดการ</span>
+          </div>` : ""}
 
         ${!report ? `
           <div class="empty-state">
@@ -5298,6 +6277,7 @@ function renderDailySection(section, title, items, locked) {
 async function saveDailyReportCustomerGroup(reportId, button) {
   const section = button.closest(".report-customer-group");
   const customerIds = checkedValues(section, "report_group_customer_id");
+  if (!validateSelectedReportCustomers(customerIds)) return;
   setButtonBusy(button, true, "กำลังบันทึก...");
   try {
     const { error } = await state.client.rpc("save_daily_report_customer_group", {
@@ -5344,7 +6324,9 @@ async function addDailyReportItem(event) {
     const sortOrder = currentSection.reduce((max, item) => Math.max(max, Number(item.sort_order || 0)), -1) + 1;
     const useGroup = form.querySelector('input[name="use_report_customer_group"]')?.checked || false;
     const customerIds = useGroup ? [] : checkedValues(form, "item_customer_id");
-    const { error } = await state.client.rpc("save_daily_report_item_v2", {
+    if (!useGroup && !validateSelectedReportCustomers(customerIds)) return;
+    if (useGroup && !validateSelectedReportCustomers(state.currentDailyGroupCustomerIds)) return;
+    const { error } = await state.client.rpc("save_daily_report_item_v3", {
       p_item_id: null,
       p_report_id: state.currentDailyReport.id,
       p_section: section,
@@ -5368,6 +6350,8 @@ async function saveDailyReportItem(itemId, button) {
   const detail = editor.querySelector('[data-field="detail"]').value.trim();
   const useGroup = editor.querySelector('[data-field="use_report_customer_group"]')?.checked || false;
   const customerIds = useGroup ? [] : checkedValues(editor, "item_customer_id");
+  if (!useGroup && !validateSelectedReportCustomers(customerIds)) return;
+  if (useGroup && !validateSelectedReportCustomers(state.currentDailyGroupCustomerIds)) return;
   if (!detail) {
     showToast("กรุณากรอกรายละเอียด", "error");
     return;
@@ -5379,7 +6363,7 @@ async function saveDailyReportItem(itemId, button) {
   }
   setButtonBusy(button, true);
   try {
-    const { error } = await state.client.rpc("save_daily_report_item_v2", {
+    const { error } = await state.client.rpc("save_daily_report_item_v3", {
       p_item_id: itemId,
       p_report_id: state.currentDailyReport.id,
       p_section: item.section,
@@ -5397,22 +6381,29 @@ async function saveDailyReportItem(itemId, button) {
     setButtonBusy(button, false);
   }
 }
-
-  async function submitDailyReport(reportId, button) {
-    const ok = await confirmAction("ยืนยันการส่งรายงานให้ผู้จัดการหรือไม่?", "ส่งรายงาน", "ส่งรายงาน");
-    if (!ok) return;
-    setButtonBusy(button, true, "กำลังส่ง...");
-    try {
-      const { error } = await state.client.rpc("submit_daily_report", { p_report_id: reportId });
-      if (error) throw error;
-      showToast("ส่งรายงานแล้ว");
-      await renderDailyReportPage(state.currentDailyReport.work_date);
-    } catch (error) {
-      showError(error, "ส่งรายงานไม่สำเร็จ");
-    } finally {
-      setButtonBusy(button, false);
-    }
+async function submitDailyReport(reportId, button) {
+  const invalidIds = invalidCurrentReportCustomerIds();
+  if (invalidIds.length) {
+    showToast(
+      `ยังส่งรายงานไม่ได้ กรุณานำลูกค้าที่ไม่พร้อมใช้งานออก: ${invalidIds.map(customerDisplayName).join(", ")}`,
+      "error"
+    );
+    return;
   }
+  const ok = await confirmAction("ยืนยันการส่งรายงานให้ผู้จัดการหรือไม่?", "ส่งรายงาน", "ส่งรายงาน");
+  if (!ok) return;
+  setButtonBusy(button, true, "กำลังส่ง...");
+  try {
+    const { error } = await state.client.rpc("submit_daily_report", { p_report_id: reportId });
+    if (error) throw error;
+    showToast("ส่งรายงานแล้ว");
+    await renderDailyReportPage(state.currentDailyReport.work_date);
+  } catch (error) {
+    showError(error, "ส่งรายงานไม่สำเร็จ");
+  } finally {
+    setButtonBusy(button, false);
+  }
+}
 
 async function renderManagerReportsPage() {
   try { state.grids.managerReports?.destroy?.(); } catch (error) { console.warn(error); }
@@ -5423,6 +6414,7 @@ async function renderManagerReportsPage() {
     .from("daily_reports")
     .select("*")
     .gte("work_date", fromDate)
+    .in("status", ["submitted", "acknowledged", "revision_required"])
     .order("work_date", { ascending: false })
     .order("updated_at", { ascending: false })
     .limit(1000);
@@ -5430,6 +6422,7 @@ async function renderManagerReportsPage() {
   state.managerReports = data || [];
 
   if (!state.ui.managerFilters.date) state.ui.managerFilters.date = bangkokDate();
+  if (state.ui.managerFilters.status === "draft") state.ui.managerFilters.status = "";
   const filters = state.ui.managerFilters;
 
   el.mainContent.innerHTML = `
@@ -5455,7 +6448,7 @@ async function renderManagerReportsPage() {
             <label for="manager-report-user"><span class="field-label">ผู้ใช้งาน</span></label>
             <select id="manager-report-user">
               <option value="">ทั้งหมด</option>
-              ${state.profiles.filter((profile) => profile.role === "user").map((profile) => `
+              ${state.profiles.filter((profile) => profile.is_active).map((profile) => `
                 <option value="${h(profile.id)}" ${filters.userId === profile.id ? "selected" : ""}>${h(profile.display_name)}</option>
               `).join("")}
             </select>
@@ -5464,7 +6457,6 @@ async function renderManagerReportsPage() {
             <label for="manager-report-status"><span class="field-label">สถานะ</span></label>
             <select id="manager-report-status">
               <option value="">ทั้งหมด</option>
-              <option value="draft" ${filters.status === "draft" ? "selected" : ""}>ฉบับร่าง</option>
               <option value="submitted" ${filters.status === "submitted" ? "selected" : ""}>ส่งแล้ว</option>
               <option value="acknowledged" ${filters.status === "acknowledged" ? "selected" : ""}>รับทราบแล้ว</option>
               <option value="revision_required" ${filters.status === "revision_required" ? "selected" : ""}>ส่งกลับให้แก้ไข</option>
@@ -5596,6 +6588,9 @@ async function openManagerReport(reportId) {
   const report = state.managerReports.find((item) => item.id === reportId)
     || (await state.client.from("daily_reports").select("*").eq("id", reportId).single()).data;
   if (!report) throw new Error("ไม่พบรายงาน");
+  if (report.status === "draft") {
+    throw new Error("รายงานฉบับร่างเห็นได้เฉพาะเจ้าของและยังไม่พร้อมตรวจ");
+  }
 
   const [itemsResult, eventsResult, groupResult] = await Promise.all([
     state.client
@@ -5622,11 +6617,17 @@ async function openManagerReport(reportId) {
     itemCustomers = relationResult.data || [];
   }
 
+  const groupCustomerIds = (groupResult.data || []).map((row) => row.customer_id);
+  await loadReportCustomersByIds([
+    ...groupCustomerIds,
+    ...itemCustomers.map((row) => row.customer_id)
+  ]);
+
   state.reviewReport = {
     report,
     items,
     itemCustomers,
-    groupCustomerIds: (groupResult.data || []).map((row) => row.customer_id),
+    groupCustomerIds,
     events: eventsResult.data || []
   };
 
@@ -6175,6 +7176,10 @@ async function deleteContact(contactKey) {
     el.revisionForm.addEventListener("submit", requestRevision);
     el.avatarForm.addEventListener("submit", saveAvatar);
     el.dateRangeForm?.addEventListener("submit", saveDateRange);
+    el.customerExcelImportFile?.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (file) await handleCustomerExcelImportFile(file);
+    });
 
     window.addEventListener("hashchange", renderRoute);
     window.addEventListener("resize", () => {
@@ -6455,6 +7460,15 @@ async function deleteContact(contactKey) {
           }
           case "export-customers-excel":
             await runExcelExport(target, exportCustomersExcel);
+            break;
+          case "import-customers-excel":
+            await openCustomerExcelImport();
+            break;
+          case "close-excel-import":
+            closeCustomerExcelImport();
+            break;
+          case "confirm-customer-excel-import":
+            await confirmCustomerExcelImport(target);
             break;
           case "reset-manager-filters": {
             state.ui.managerFilters = { date: bangkokDate(), userId: "", status: "" };
