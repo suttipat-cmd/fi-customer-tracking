@@ -41,7 +41,7 @@
     { key: "import_text", label: "สถานะการนำเข้าข้อมูล", description: "สถานะ Import" },
     { key: "engagement_text", label: "ระดับความสนใจ", description: "ระดับ Engagement" },
     { key: "start_date", label: "วันที่เริ่มใช้งานจริง", description: "วันที่ Go Live" },
-    { key: "billing_date", label: "วันที่เริ่มวางบิล", description: "วันที่เริ่ม Billing" },
+    { key: "billing_date", label: "วันที่เริ่มติดต่อ", description: "วันที่เริ่ม Billing" },
     { key: "updated_at", label: "อัปเดตล่าสุด", description: "วันและเวลาที่แก้ไขล่าสุด" },
     { key: "updated_by_name", label: "แก้ไขล่าสุดโดย", description: "ชื่อผู้แก้ไขล่าสุด" }
   ];
@@ -802,7 +802,7 @@ function dateControlHtml({
         toKey: "startTo"
       },
       billing: {
-        title: "ช่วงวันที่เริ่มวางบิล",
+        title: "ช่วงวันที่เริ่มติดต่อ",
         fromKey: "billingFrom",
         toKey: "billingTo"
       }
@@ -1496,7 +1496,7 @@ function renderDashboardCharts(data = state.dashboardChartData) {
       import_text: { header: "สถานะการนำเข้าข้อมูล", width: 24, value: (row) => row.import_text === "-" ? "" : row.import_text },
       engagement_text: { header: "ระดับความสนใจ", width: 20, value: (row) => row.engagement_text === "-" ? "" : row.engagement_text },
       start_date: { header: "วันที่เริ่มใช้งานจริง", width: 20, value: (row) => row.start_date ? formatDate(row.start_date) : "" },
-      billing_date: { header: "วันที่เริ่มวางบิล", width: 20, value: (row) => row.billing_date ? formatDate(row.billing_date) : "" },
+      billing_date: { header: "วันที่เริ่มติดต่อ", width: 20, value: (row) => row.billing_date ? formatDate(row.billing_date) : "" },
       updated_at: { header: "อัปเดตล่าสุด", width: 22, value: (row) => formatDateTime(row.updated_at) },
       updated_by_name: { header: "แก้ไขล่าสุดโดย", width: 24, value: (row) => row.updated_by_name === "-" ? "" : row.updated_by_name }
     };
@@ -1551,7 +1551,7 @@ function renderDashboardCharts(data = state.dashboardChartData) {
       ["เซลล์", filters.salesCode ? (filters.salesCode === "none" ? "ไม่ระบุ" : label("sales", filters.salesCode)) : "ทั้งหมด"],
       ["จำนวนรถ", filters.fleetMin || filters.fleetMax ? `${filters.fleetMin || "0"} – ${filters.fleetMax || "ไม่จำกัด"}` : "ทั้งหมด"],
       ["วันที่เริ่มใช้งานจริง", filters.startFrom || filters.startTo ? `${filters.startFrom ? formatDate(filters.startFrom) : "ไม่จำกัด"} – ${filters.startTo ? formatDate(filters.startTo) : "ไม่จำกัด"}` : "ทั้งหมด"],
-      ["วันที่เริ่มวางบิล", filters.billingFrom || filters.billingTo ? `${filters.billingFrom ? formatDate(filters.billingFrom) : "ไม่จำกัด"} – ${filters.billingTo ? formatDate(filters.billingTo) : "ไม่จำกัด"}` : "ทั้งหมด"]
+      ["วันที่เริ่มติดต่อ", filters.billingFrom || filters.billingTo ? `${filters.billingFrom ? formatDate(filters.billingFrom) : "ไม่จำกัด"} – ${filters.billingTo ? formatDate(filters.billingTo) : "ไม่จำกัด"}` : "ทั้งหมด"]
     ];
     return values;
   }
@@ -4388,7 +4388,7 @@ async function renderDashboard() {
                 </button>
               </div>
               <div class="date-range-filter-field">
-                <span class="field-label">วันที่เริ่มวางบิล</span>
+                <span class="field-label">วันที่เริ่มติดต่อ</span>
                 <button type="button" class="date-range-trigger" data-action="open-date-range-filter" data-kind="billing">
                   ${icon("calendar")}
                   <span data-date-range-label="billing">${h(dateRangeButtonText("billing"))}</span>
@@ -4564,7 +4564,7 @@ function customerListColumnDefinitions(mobile) {
     },
     billing_date: {
       colId: "billing_date",
-      headerName: "วันที่เริ่มวางบิล",
+      headerName: "วันที่เริ่มติดต่อ",
       field: "billing_date",
       minWidth: 165,
       valueFormatter: (params) => formatDate(params.value)
@@ -4845,7 +4845,7 @@ function renderCustomerTable() {
             ${dateControlHtml({
               id: "customer-billing-date",
               name: "billing_date",
-              label: "วันที่เริ่มวางบิล",
+              label: "วันที่เริ่มติดต่อ",
               value: c.billing_date || ""
             })}
           </div>
@@ -6015,7 +6015,7 @@ async function renderCustomerDetail(customerId) {
             <dt>ขั้นตอนเริ่มใช้งาน</dt><dd>${h(label("onboarding_stage", c.onboarding_stage))}</dd>
             <dt>ระดับความสนใจ</dt><dd>${h(label("engagement_level", c.engagement_level))}</dd>
             <dt>วันที่เริ่มใช้งานจริง</dt><dd>${h(formatDate(c.start_date))}</dd>
-            <dt>วันที่เริ่มวางบิล</dt><dd>${h(formatDate(c.billing_date))}</dd>
+            <dt>วันที่เริ่มติดต่อ</dt><dd>${h(formatDate(c.billing_date))}</dd>
           </dl>
         </div>
       </section>
