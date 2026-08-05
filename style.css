@@ -1,4 +1,4 @@
-/* FI Customer Tracking v0.12.0-customer-excel-report-security-fee */
+/* FI Customer Tracking v0.13.0-list-settings-excel-split-manager-review */
 :root {
   --brand-blue: #3573ef;
   --brand-blue-strong: #245cd8;
@@ -4923,3 +4923,189 @@ input[type="radio"] {
     max-height: 72vh;
   }
 }
+
+/* Customer list administration and Excel action separation */
+.customer-toolbar-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.toolbar-action-separator {
+  width: 1px;
+  height: 30px;
+  margin: 5px 2px;
+  background: var(--border);
+}
+
+.customer-list-settings-body {
+  padding-top: 18px;
+}
+
+.customer-list-settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.55fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.customer-list-settings-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.customer-list-settings-section-header h3,
+.customer-list-settings-sort-card h3 {
+  margin-bottom: 4px;
+}
+
+.customer-list-settings-section-header p,
+.customer-list-settings-sort-card p {
+  margin: 0;
+}
+
+.customer-list-settings-columns {
+  max-height: min(55vh, 560px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  padding: 8px;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.customer-list-setting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--surface);
+  padding: 10px 11px;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.customer-list-setting-row + .customer-list-setting-row {
+  margin-top: 6px;
+}
+
+.customer-list-setting-row.is-selected {
+  border-color: var(--primary-border, var(--border-strong));
+  background: var(--primary-softer, var(--primary-soft));
+  box-shadow: var(--shadow-xs);
+}
+
+.customer-list-setting-toggle {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.customer-list-setting-toggle input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  accent-color: var(--primary);
+}
+
+.customer-list-setting-toggle span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.customer-list-setting-toggle strong {
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.customer-list-setting-toggle small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.customer-list-setting-order {
+  display: flex;
+  gap: 5px;
+}
+
+.icon-button-small {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  font-size: 0.84rem;
+}
+
+.customer-list-settings-note {
+  margin: 12px 0 0;
+}
+
+.customer-list-settings-sort-card {
+  position: sticky;
+  top: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  padding: 18px;
+}
+
+.customer-list-settings-sort-card label {
+  margin: 18px 0 0;
+}
+
+.customer-list-settings-sort-card select {
+  margin-top: 6px;
+}
+
+@media (max-width: 980px) {
+  .customer-list-settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-list-settings-sort-card {
+    position: static;
+  }
+}
+
+@media (max-width: 680px) {
+  .customer-toolbar-actions {
+    width: 100%;
+    justify-content: stretch;
+    margin-left: 0;
+  }
+
+  .customer-toolbar-actions .btn {
+    flex: 1 1 100%;
+  }
+
+  .toolbar-action-separator {
+    display: none;
+  }
+
+  .customer-list-settings-columns {
+    max-height: 48vh;
+  }
+
+  .customer-list-setting-row {
+    gap: 8px;
+    padding: 9px;
+  }
+
+  .customer-list-settings-section-header {
+    align-items: center;
+  }
+}
+

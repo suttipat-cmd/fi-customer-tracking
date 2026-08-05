@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.12.0-customer-excel-report-security-fee";
+  const APP_VERSION = "0.13.0-list-settings-excel-split-manager-review";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -21,6 +21,48 @@
     contract_type: { label: "ประเภทสัญญา", source: "master_options" },
     sales: { label: "เซลล์", source: "master_options" }
   };
+
+  const CUSTOMER_LIST_COLUMN_CATALOG = [
+    { key: "legal_name", label: "ชื่อนิติบุคคล", description: "แสดงชื่อย่อเป็นข้อมูลรองเมื่อมีค่า" },
+    { key: "short_name", label: "ชื่อย่อ", description: "ชื่อย่อแบบคอลัมน์แยก" },
+    { key: "tax_id", label: "เลขประจำตัวผู้เสียภาษี", description: "เลข 13 หลัก" },
+    { key: "fleet_size", label: "จำนวนรถ", description: "จำนวนรถของลูกค้า" },
+    { key: "owner_text", label: "ผู้รับผิดชอบ", description: "ผู้รับผิดชอบทั้งหมดและผู้รับผิดชอบหลัก" },
+    { key: "module_text", label: "โมดูล", description: "โมดูลที่ลูกค้าใช้งาน" },
+    { key: "feature_text", label: "ฟังก์ชัน", description: "ฟังก์ชันที่ลูกค้าใช้งาน" },
+    { key: "contract_text", label: "สัญญา", description: "ประเภทสัญญา" },
+    { key: "sales_text", label: "เซลล์", description: "เซลล์ผู้ดูแลลูกค้า" },
+    { key: "monthly_service_fee", label: "ค่าบริการต่อเดือน", description: "หน่วยบาท" },
+    { key: "customer_user_count", label: "จำนวนผู้ใช้งานลูกค้า", description: "จำนวนผู้ใช้งานที่กรอกไว้" },
+    { key: "saved_account_count", label: "จำนวนบัญชีที่บันทึก", description: "จำนวนบัญชีผู้ใช้งานลูกค้าที่มีในระบบ" },
+    { key: "onsite_training_count", label: "สอนใช้งานนอกสถานที่", description: "จำนวนครั้ง" },
+    { key: "account_status_text", label: "สถานะบัญชี", description: "ใช้งานหรือไม่ใช้งาน" },
+    { key: "onboarding_text", label: "ขั้นตอนเริ่มใช้งาน", description: "สถานะ Onboarding" },
+    { key: "import_text", label: "สถานะการนำเข้าข้อมูล", description: "สถานะ Import" },
+    { key: "engagement_text", label: "ระดับความสนใจ", description: "ระดับ Engagement" },
+    { key: "start_date", label: "วันที่เริ่มใช้งานจริง", description: "วันที่ Go Live" },
+    { key: "billing_date", label: "วันที่เริ่มวางบิล", description: "วันที่เริ่ม Billing" },
+    { key: "updated_at", label: "อัปเดตล่าสุด", description: "วันและเวลาที่แก้ไขล่าสุด" },
+    { key: "updated_by_name", label: "แก้ไขล่าสุดโดย", description: "ชื่อผู้แก้ไขล่าสุด" }
+  ];
+
+  const DEFAULT_CUSTOMER_LIST_COLUMNS = [
+    "legal_name",
+    "fleet_size",
+    "module_text",
+    "contract_text",
+    "sales_text",
+    "monthly_service_fee",
+    "customer_user_count",
+    "onsite_training_count",
+    "import_text",
+    "engagement_text",
+    "updated_at",
+    "updated_by_name"
+  ];
+  const DEFAULT_CUSTOMER_LIST_SORT_COLUMN = "updated_at";
+  const DEFAULT_CUSTOMER_LIST_SORT_DIRECTION = "desc";
+  const CUSTOMER_LIST_COLUMN_KEYS = new Set(CUSTOMER_LIST_COLUMN_CATALOG.map((column) => column.key));
 
   const LABELS = {
     role: { admin: "ผู้ดูแลระบบ", manager: "ผู้จัดการ", user: "ผู้ใช้งาน" },
@@ -69,8 +111,13 @@
       id: 1,
       login_image_path: null,
       favicon_path: null,
+      customer_list_columns: [...DEFAULT_CUSTOMER_LIST_COLUMNS],
+      customer_list_sort_column: DEFAULT_CUSTOMER_LIST_SORT_COLUMN,
+      customer_list_sort_direction: DEFAULT_CUSTOMER_LIST_SORT_DIRECTION,
       updated_at: null
     },
+    customerListSettingsAvailable: true,
+    customerListSettingsDraft: null,
     currentCustomer: null,
     currentCustomerData: null,
     currentDailyReport: null,
@@ -185,6 +232,11 @@
     excelImportDialog: document.getElementById("excel-import-dialog"),
     excelImportDialogContent: document.getElementById("excel-import-dialog-content"),
     excelImportConfirmButton: document.getElementById("excel-import-confirm-button"),
+    customerListSettingsDialog: document.getElementById("customer-list-settings-dialog"),
+    customerListSettingsColumns: document.getElementById("customer-list-settings-columns"),
+    customerListSortColumn: document.getElementById("customer-list-sort-column"),
+    customerListSortDirection: document.getElementById("customer-list-sort-direction"),
+    customerListSettingsSaveButton: document.getElementById("customer-list-settings-save-button"),
     toastRegion: document.getElementById("toast-region"),
     printRoot: document.getElementById("print-root")
   };
@@ -201,6 +253,56 @@
   function nullable(value) {
     const trimmed = String(value ?? "").trim();
     return trimmed === "" ? null : trimmed;
+  }
+
+  function defaultCustomerListSettings() {
+    return {
+      customer_list_columns: [...DEFAULT_CUSTOMER_LIST_COLUMNS],
+      customer_list_sort_column: DEFAULT_CUSTOMER_LIST_SORT_COLUMN,
+      customer_list_sort_direction: DEFAULT_CUSTOMER_LIST_SORT_DIRECTION
+    };
+  }
+
+  function normalizeCustomerListSettings(settings = {}) {
+    const rawColumns = Array.isArray(settings.customer_list_columns)
+      ? settings.customer_list_columns
+      : [];
+    const columns = [...new Set(
+      rawColumns
+        .map((value) => String(value || "").trim())
+        .filter((value) => CUSTOMER_LIST_COLUMN_KEYS.has(value))
+    )];
+    const safeColumns = columns.length ? columns : [...DEFAULT_CUSTOMER_LIST_COLUMNS];
+    const requestedSort = String(settings.customer_list_sort_column || "").trim();
+    const sortColumn = safeColumns.includes(requestedSort)
+      ? requestedSort
+      : (safeColumns.includes(DEFAULT_CUSTOMER_LIST_SORT_COLUMN)
+        ? DEFAULT_CUSTOMER_LIST_SORT_COLUMN
+        : safeColumns[0]);
+    const sortDirection = settings.customer_list_sort_direction === "asc" ? "asc" : "desc";
+    return {
+      customer_list_columns: safeColumns,
+      customer_list_sort_column: sortColumn,
+      customer_list_sort_direction: sortDirection
+    };
+  }
+
+  function currentCustomerListSettings() {
+    return normalizeCustomerListSettings(state.systemSettings || defaultCustomerListSettings());
+  }
+
+  function customerListColumnMeta(key) {
+    return CUSTOMER_LIST_COLUMN_CATALOG.find((column) => column.key === key) || null;
+  }
+
+  function canWriteOwnDailyReport() {
+    return ["admin", "user"].includes(state.profile?.role);
+  }
+
+  function assertCanWriteOwnDailyReport() {
+    if (!canWriteOwnDailyReport()) {
+      throw new Error("Manager cannot write daily reports");
+    }
   }
 
   function createDraftKey() {
@@ -338,6 +440,10 @@
       ["Excel import payload", "รูปแบบข้อมูลนำเข้าจาก Excel ไม่ถูกต้อง"],
       ["Excel import stale", "ข้อมูลในระบบถูกแก้หลังส่งออก กรุณาส่งออก Excel ใหม่"],
       ["Selected report customers must be active", "รายงานมีลูกค้าที่ไม่อยู่ในสถานะใช้งาน กรุณานำออกก่อนส่ง"],
+      ["Manager cannot write daily reports", "บัญชีผู้จัดการมีสิทธิ์ตรวจรายงานเท่านั้น ไม่สามารถเขียนหรือส่งรายงานได้"],
+      ["Customer list settings", "การตั้งค่าตารางลูกค้าไม่ถูกต้อง"],
+      ["Admin permission required", "รายการนี้ทำได้เฉพาะผู้ดูแลระบบ"],
+      ["Migration 011_customer_list_settings_excel_split_manager_review", "ฐานข้อมูลยังไม่ได้ติดตั้ง Migration 011"],
       ["Migration 010_customer_excel_report_security_fee", "ฐานข้อมูลยังไม่ได้ติดตั้ง Migration 010"],
       ["Invalid sales master", "เซลล์ที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน"],
       ["Customer note text is required", "กรุณาระบุรายละเอียดโน้ตลูกค้า"],
@@ -1370,7 +1476,134 @@ function renderDashboardCharts(data = state.dashboardChartData) {
     return state.profiles.find((profile) => profile.id === profileId)?.display_name || "";
   }
 
+  function customerListExcelColumnMap() {
+    return {
+      legal_name: { header: "ชื่อนิติบุคคล", width: 45, value: (row) => row.legal_name || "" },
+      short_name: { header: "ชื่อย่อ", width: 24, value: (row) => row.short_name || "" },
+      tax_id: { header: "เลขประจำตัวผู้เสียภาษี", width: 18, value: (row) => row.tax_id || "" },
+      fleet_size: { header: "จำนวนรถ", width: 14, value: (row) => Number(row.fleet_size || 0) },
+      owner_text: { header: "ผู้รับผิดชอบ", width: 34, value: (row) => row.owner_text === "-" ? "" : row.owner_text },
+      module_text: { header: "โมดูล", width: 30, value: (row) => row.module_text === "-" ? "" : row.module_text },
+      feature_text: { header: "ฟังก์ชัน", width: 30, value: (row) => row.feature_text === "-" ? "" : row.feature_text },
+      contract_text: { header: "สัญญา", width: 18, value: (row) => row.contract_text === "-" ? "" : row.contract_text },
+      sales_text: { header: "เซลล์", width: 24, value: (row) => row.sales_text === "-" ? "" : row.sales_text },
+      monthly_service_fee: { header: "ค่าบริการต่อเดือน (บาท)", width: 24, value: (row) => row.monthly_service_fee ?? "" },
+      customer_user_count: { header: "จำนวนผู้ใช้งานลูกค้า", width: 22, value: (row) => Number(row.customer_user_count || 0) },
+      saved_account_count: { header: "จำนวนบัญชีที่บันทึก", width: 22, value: (row) => Number(row.saved_account_count || 0) },
+      onsite_training_count: { header: "สอนใช้งานนอกสถานที่ (ครั้ง)", width: 28, value: (row) => Number(row.onsite_training_count || 0) },
+      account_status_text: { header: "สถานะบัญชี", width: 16, value: (row) => row.account_status_text || "" },
+      onboarding_text: { header: "ขั้นตอนเริ่มใช้งาน", width: 24, value: (row) => row.onboarding_text === "-" ? "" : row.onboarding_text },
+      import_text: { header: "สถานะการนำเข้าข้อมูล", width: 24, value: (row) => row.import_text === "-" ? "" : row.import_text },
+      engagement_text: { header: "ระดับความสนใจ", width: 20, value: (row) => row.engagement_text === "-" ? "" : row.engagement_text },
+      start_date: { header: "วันที่เริ่มใช้งานจริง", width: 20, value: (row) => row.start_date ? formatDate(row.start_date) : "" },
+      billing_date: { header: "วันที่เริ่มวางบิล", width: 20, value: (row) => row.billing_date ? formatDate(row.billing_date) : "" },
+      updated_at: { header: "อัปเดตล่าสุด", width: 22, value: (row) => formatDateTime(row.updated_at) },
+      updated_by_name: { header: "แก้ไขล่าสุดโดย", width: 24, value: (row) => row.updated_by_name === "-" ? "" : row.updated_by_name }
+    };
+  }
+
+  function currentCustomerListColumnOrder() {
+    const configured = currentCustomerListSettings().customer_list_columns;
+    const columnState = state.grids.customers?.getColumnState?.() || [];
+    const fromGrid = columnState
+      .filter((column) => !column.hide && column.colId !== "actions" && CUSTOMER_LIST_COLUMN_KEYS.has(column.colId))
+      .map((column) => column.colId);
+    return fromGrid.length ? fromGrid : configured;
+  }
+
+  function currentCustomerListSortDescription() {
+    const columnState = state.grids.customers?.getColumnState?.() || [];
+    const sorted = columnState
+      .filter((column) => ["asc", "desc"].includes(column.sort))
+      .sort((a, b) => Number(a.sortIndex || 0) - Number(b.sortIndex || 0));
+    if (!sorted.length) {
+      const settings = currentCustomerListSettings();
+      const meta = customerListColumnMeta(settings.customer_list_sort_column);
+      return `${meta?.label || settings.customer_list_sort_column} (${settings.customer_list_sort_direction === "asc" ? "น้อยไปมาก" : "มากไปน้อย"})`;
+    }
+    return sorted.map((column) => {
+      const meta = customerListColumnMeta(column.colId);
+      return `${meta?.label || column.colId} (${column.sort === "asc" ? "น้อยไปมาก" : "มากไปน้อย"})`;
+    }).join(", ");
+  }
+
+  function currentCustomerRowsForExcel() {
+    const rows = [];
+    state.grids.customers?.forEachNodeAfterFilterAndSort?.((node) => {
+      if (node.data) rows.push(node.data);
+    });
+    if (!state.grids.customers && state.filteredCustomerRows?.length) {
+      rows.push(...state.filteredCustomerRows);
+    }
+    return rows;
+  }
+
+  function customerExcelFilterDescription() {
+    const filters = state.ui.customerFilters;
+    const values = [
+      ["สถานะบัญชี", filters.accountTab === "inactive" ? "ไม่ใช้งาน" : "ใช้งาน"],
+      ["คำค้นหา", filters.search || "ทั้งหมด"],
+      ["ผู้รับผิดชอบ", filters.owner === "unassigned" ? "ยังไม่มีผู้รับผิดชอบ" : (filters.owner ? profileName(filters.owner) : "ทั้งหมด")],
+      ["ขั้นตอนเริ่มใช้งาน", filters.onboarding ? (filters.onboarding === "none" ? "ไม่ระบุ" : label("onboarding_stage", filters.onboarding)) : "ทั้งหมด"],
+      ["สถานะนำเข้าข้อมูล", filters.importStatus ? label("import_status", filters.importStatus) : "ทั้งหมด"],
+      ["ระดับความสนใจ", filters.engagement ? (filters.engagement === "none" ? "ไม่ระบุ" : label("engagement_level", filters.engagement)) : "ทั้งหมด"],
+      ["ประเภทสัญญา", filters.contractType ? label("contract_type", filters.contractType) : "ทั้งหมด"],
+      ["เซลล์", filters.salesCode ? (filters.salesCode === "none" ? "ไม่ระบุ" : label("sales", filters.salesCode)) : "ทั้งหมด"],
+      ["จำนวนรถ", filters.fleetMin || filters.fleetMax ? `${filters.fleetMin || "0"} – ${filters.fleetMax || "ไม่จำกัด"}` : "ทั้งหมด"],
+      ["วันที่เริ่มใช้งานจริง", filters.startFrom || filters.startTo ? `${filters.startFrom ? formatDate(filters.startFrom) : "ไม่จำกัด"} – ${filters.startTo ? formatDate(filters.startTo) : "ไม่จำกัด"}` : "ทั้งหมด"],
+      ["วันที่เริ่มวางบิล", filters.billingFrom || filters.billingTo ? `${filters.billingFrom ? formatDate(filters.billingFrom) : "ไม่จำกัด"} – ${filters.billingTo ? formatDate(filters.billingTo) : "ไม่จำกัด"}` : "ทั้งหมด"]
+    ];
+    return values;
+  }
+
   async function exportCustomersExcel() {
+    if (!window.XLSX?.utils) throw new Error("โหลดเครื่องมือสร้างไฟล์ Excel ไม่สำเร็จ");
+    const rows = currentCustomerRowsForExcel();
+    if (!rows.length) {
+      showToast("ไม่มีข้อมูลตามตัวกรองสำหรับส่งออก", "warning");
+      return;
+    }
+
+    const columnMap = customerListExcelColumnMap();
+    const columnKeys = currentCustomerListColumnOrder().filter((key) => columnMap[key]);
+    if (!columnKeys.length) throw new Error("ไม่พบคอลัมน์สำหรับส่งออก");
+
+    const workbook = window.XLSX.utils.book_new();
+    workbook.Props = {
+      Title: "FI Customer Tracking - Customer List",
+      Subject: "Human-readable customer list export",
+      Author: "FI Customer Tracking",
+      CreatedDate: new Date()
+    };
+
+    appendWorkbookSheet(
+      workbook,
+      "ข้อมูลลูกค้า",
+      rows,
+      columnKeys.map((key) => ({ ...columnMap[key], key }))
+    );
+
+    const metadataRows = [
+      { key: "วันที่ส่งออก", value: formatDateTime(new Date().toISOString()) },
+      { key: "จำนวนรายการ", value: rows.length },
+      { key: "คอลัมน์", value: columnKeys.map((key) => customerListColumnMeta(key)?.label || key).join(", ") },
+      { key: "การเรียงข้อมูล", value: currentCustomerListSortDescription() },
+      ...customerExcelFilterDescription().map(([key, value]) => ({ key, value }))
+    ];
+    appendWorkbookSheet(workbook, "ข้อมูลรายงาน", metadataRows, [
+      { header: "รายการ", value: (row) => row.key, width: 28 },
+      { header: "ค่า", value: (row) => row.value, width: 90 }
+    ]);
+
+    const statusLabel = state.ui.customerFilters.accountTab === "inactive" ? "ไม่ใช้งาน" : "ใช้งาน";
+    window.XLSX.writeFile(
+      workbook,
+      `ข้อมูลลูกค้า-${statusLabel}-${bangkokDate()}.xlsx`,
+      { compression: true, bookType: "xlsx" }
+    );
+  }
+
+  async function exportCustomerUpdateTemplate() {
     if (!window.XLSX?.utils) throw new Error("โหลดเครื่องมือสร้างไฟล์ Excel ไม่สำเร็จ");
     const data = await fetchCustomerWorkbookData();
     if (!data.customers.length) {
@@ -1381,7 +1614,7 @@ function renderDashboardCharts(data = state.dashboardChartData) {
     const workbook = window.XLSX.utils.book_new();
     workbook.Props = {
       Title: "FI Customer Tracking - Customer Data",
-      Subject: "Customer export and admin update template",
+      Subject: "Admin customer update template",
       Author: "FI Customer Tracking",
       CreatedDate: new Date()
     };
@@ -1390,6 +1623,7 @@ function renderDashboardCharts(data = state.dashboardChartData) {
       { key: "template_version", value: CUSTOMER_EXCEL_TEMPLATE_VERSION },
       { key: "application_version", value: APP_VERSION },
       { key: "exported_at", value: new Date().toISOString() },
+      { key: "purpose", value: "Template สำหรับผู้ดูแลระบบใช้แก้ข้อมูลเดิมและนำกลับเข้า FI Customer Tracking เท่านั้น" },
       { key: "scope", value: "ลูกค้าที่ยังไม่ถูก Soft Delete ทั้งสถานะใช้งานและไม่ใช้งาน" },
       { key: "editable_sheets", value: CUSTOMER_EXCEL_EDITABLE_SHEETS.join(", ") },
       { key: "update_rule", value: "Admin อัปเดตข้อมูลเดิมเท่านั้น ห้ามเพิ่มแถวใหม่ ห้ามลบ และต้องเก็บ id/customer_id/updated_at เดิม" },
@@ -1544,7 +1778,7 @@ function renderDashboardCharts(data = state.dashboardChartData) {
 
     window.XLSX.writeFile(
       workbook,
-      `ข้อมูลลูกค้าครบชุด-${bangkokDate()}.xlsx`,
+      `เทมเพลตอัปเดตข้อมูลลูกค้า-${bangkokDate()}.xlsx`,
       { compression: true, bookType: "xlsx" }
     );
   }
@@ -2241,18 +2475,43 @@ function applySystemBranding() {
   async function loadPublicSettings(force = false) {
     if (!state.client || (state.publicSettingsLoaded && !force)) return true;
 
+    const fullColumns = [
+      "id",
+      "login_image_path",
+      "favicon_path",
+      "customer_list_columns",
+      "customer_list_sort_column",
+      "customer_list_sort_direction",
+      "updated_at"
+    ].join(",");
+
     try {
-      const result = await state.client
+      let result = await state.client
         .from("app_settings")
-        .select("id,login_image_path,favicon_path,updated_at")
+        .select(fullColumns)
         .eq("id", 1)
         .maybeSingle();
+
+      const missingCustomerListColumns = result.error
+        && /customer_list_columns|customer_list_sort_column|customer_list_sort_direction/i
+          .test(result.error.message || "");
+
+      if (missingCustomerListColumns) {
+        state.customerListSettingsAvailable = false;
+        result = await state.client
+          .from("app_settings")
+          .select("id,login_image_path,favicon_path,updated_at")
+          .eq("id", 1)
+          .maybeSingle();
+      } else {
+        state.customerListSettingsAvailable = true;
+      }
 
       if (result.error) {
         const missingTable = /relation .*app_settings.*does not exist|Could not find the table/i
           .test(result.error.message || "");
         if (!missingTable) {
-          console.warn("โหลดการตั้งค่าภาพระบบไม่สำเร็จ จึงใช้ค่าเริ่มต้น", result.error);
+          console.warn("โหลดการตั้งค่าระบบไม่สำเร็จ จึงใช้ค่าเริ่มต้น", result.error);
           state.publicSettingsLoaded = false;
         } else {
           state.publicSettingsLoaded = true;
@@ -2261,23 +2520,198 @@ function applySystemBranding() {
         return false;
       }
 
-      state.systemSettings = result.data || {
+      const listSettings = normalizeCustomerListSettings(result.data || {});
+      state.systemSettings = {
         id: 1,
         login_image_path: null,
         favicon_path: null,
-        updated_at: null
+        updated_at: null,
+        ...(result.data || {}),
+        ...listSettings
       };
       state.publicSettingsLoaded = true;
       applySystemBranding();
       return true;
     } catch (error) {
-      console.warn("โหลดการตั้งค่าภาพระบบไม่สำเร็จ จึงใช้ค่าเริ่มต้น", error);
+      console.warn("โหลดการตั้งค่าระบบไม่สำเร็จ จึงใช้ค่าเริ่มต้น", error);
       state.publicSettingsLoaded = false;
+      state.systemSettings = {
+        ...state.systemSettings,
+        ...defaultCustomerListSettings()
+      };
       applySystemBranding();
       return false;
     }
   }
 
+
+  function renderCustomerListSettingsEditor() {
+    const draft = state.customerListSettingsDraft;
+    if (!draft || !el.customerListSettingsColumns) return;
+
+    if (!draft.columns.length) {
+      draft.columns = [...DEFAULT_CUSTOMER_LIST_COLUMNS];
+    }
+    if (!draft.columns.includes(draft.sortColumn)) {
+      draft.sortColumn = draft.columns[0];
+    }
+    draft.sortDirection = draft.sortDirection === "asc" ? "asc" : "desc";
+
+    const selected = new Set(draft.columns);
+    const orderedRows = [
+      ...draft.columns.map(customerListColumnMeta).filter(Boolean),
+      ...CUSTOMER_LIST_COLUMN_CATALOG.filter((column) => !selected.has(column.key))
+    ];
+    const selectedCount = draft.columns.length;
+
+    el.customerListSettingsColumns.innerHTML = orderedRows.map((column) => {
+      const checked = selected.has(column.key);
+      const selectedIndex = draft.columns.indexOf(column.key);
+      return `
+        <div class="customer-list-setting-row ${checked ? "is-selected" : ""}" data-column-key="${h(column.key)}">
+          <label class="customer-list-setting-toggle">
+            <input type="checkbox" data-customer-list-column-toggle="${h(column.key)}" ${checked ? "checked" : ""}>
+            <span>
+              <strong>${h(column.label)}</strong>
+              <small>${h(column.description)}</small>
+            </span>
+          </label>
+          <div class="customer-list-setting-order" aria-label="จัดลำดับ ${h(column.label)}">
+            <button type="button" class="icon-button icon-button-small"
+                    data-action="move-customer-list-column" data-column-key="${h(column.key)}" data-direction="up"
+                    aria-label="เลื่อน ${h(column.label)} ขึ้น"
+                    ${!checked || selectedIndex <= 0 ? "disabled" : ""}>↑</button>
+            <button type="button" class="icon-button icon-button-small"
+                    data-action="move-customer-list-column" data-column-key="${h(column.key)}" data-direction="down"
+                    aria-label="เลื่อน ${h(column.label)} ลง"
+                    ${!checked || selectedIndex < 0 || selectedIndex >= selectedCount - 1 ? "disabled" : ""}>↓</button>
+          </div>
+        </div>`;
+    }).join("");
+
+    if (el.customerListSortColumn) {
+      el.customerListSortColumn.innerHTML = draft.columns.map((key) => {
+        const meta = customerListColumnMeta(key);
+        return `<option value="${h(key)}" ${key === draft.sortColumn ? "selected" : ""}>${h(meta?.label || key)}</option>`;
+      }).join("");
+    }
+    if (el.customerListSortDirection) {
+      el.customerListSortDirection.value = draft.sortDirection;
+    }
+
+    const countNode = document.getElementById("customer-list-settings-count");
+    if (countNode) countNode.textContent = `${selectedCount.toLocaleString("th-TH")} คอลัมน์`;
+  }
+
+  function openCustomerListSettings() {
+    if (state.profile?.role !== "admin") {
+      showToast("เฉพาะผู้ดูแลระบบเท่านั้นที่ตั้งค่าตารางได้", "error");
+      return;
+    }
+    if (!state.customerListSettingsAvailable) {
+      throw new Error("Migration 011_customer_list_settings_excel_split_manager_review is required");
+    }
+
+    const current = currentCustomerListSettings();
+    state.customerListSettingsDraft = {
+      columns: [...current.customer_list_columns],
+      sortColumn: current.customer_list_sort_column,
+      sortDirection: current.customer_list_sort_direction
+    };
+    renderCustomerListSettingsEditor();
+    openDialog(el.customerListSettingsDialog);
+  }
+
+  function setCustomerListColumnEnabled(key, enabled) {
+    const draft = state.customerListSettingsDraft;
+    if (!draft || !CUSTOMER_LIST_COLUMN_KEYS.has(key)) return;
+
+    const exists = draft.columns.includes(key);
+    if (enabled && !exists) {
+      draft.columns.push(key);
+    } else if (!enabled && exists) {
+      if (draft.columns.length <= 1) {
+        showToast("ต้องแสดงอย่างน้อย 1 คอลัมน์", "warning");
+        renderCustomerListSettingsEditor();
+        return;
+      }
+      draft.columns = draft.columns.filter((columnKey) => columnKey !== key);
+      if (draft.sortColumn === key) draft.sortColumn = draft.columns[0];
+    }
+    renderCustomerListSettingsEditor();
+  }
+
+  function moveCustomerListColumn(key, direction) {
+    const draft = state.customerListSettingsDraft;
+    if (!draft) return;
+    const index = draft.columns.indexOf(key);
+    if (index < 0) return;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= draft.columns.length) return;
+    [draft.columns[index], draft.columns[targetIndex]] = [draft.columns[targetIndex], draft.columns[index]];
+    renderCustomerListSettingsEditor();
+  }
+
+  function syncCustomerListSettingsDraftFromControls() {
+    const draft = state.customerListSettingsDraft;
+    if (!draft) return;
+    const sortColumn = el.customerListSortColumn?.value || draft.columns[0];
+    draft.sortColumn = draft.columns.includes(sortColumn) ? sortColumn : draft.columns[0];
+    draft.sortDirection = el.customerListSortDirection?.value === "asc" ? "asc" : "desc";
+  }
+
+  function resetCustomerListSettingsDraft() {
+    state.customerListSettingsDraft = {
+      columns: [...DEFAULT_CUSTOMER_LIST_COLUMNS],
+      sortColumn: DEFAULT_CUSTOMER_LIST_SORT_COLUMN,
+      sortDirection: DEFAULT_CUSTOMER_LIST_SORT_DIRECTION
+    };
+    renderCustomerListSettingsEditor();
+  }
+
+  async function saveCustomerListSettings(button) {
+    if (state.profile?.role !== "admin") {
+      showToast("เฉพาะผู้ดูแลระบบเท่านั้นที่ตั้งค่าตารางได้", "error");
+      return;
+    }
+    syncCustomerListSettingsDraftFromControls();
+    const draft = state.customerListSettingsDraft;
+    if (!draft?.columns?.length) {
+      showToast("ต้องแสดงอย่างน้อย 1 คอลัมน์", "error");
+      return;
+    }
+
+    setButtonBusy(button, true, "กำลังบันทึก...");
+    try {
+      const { data, error } = await state.client.rpc("admin_update_customer_list_settings_v1", {
+        p_columns: draft.columns,
+        p_sort_column: draft.sortColumn,
+        p_sort_direction: draft.sortDirection
+      });
+      if (error) throw error;
+
+      const savedSettings = Array.isArray(data) ? data[0] : data;
+      if (!savedSettings?.id) {
+        throw new Error("ฐานข้อมูลไม่ส่งการตั้งค่าตารางที่บันทึกกลับมา");
+      }
+      const normalized = normalizeCustomerListSettings(savedSettings);
+      state.systemSettings = {
+        ...state.systemSettings,
+        ...savedSettings,
+        ...normalized
+      };
+      state.customerListSettingsDraft = null;
+      closeDialog(el.customerListSettingsDialog);
+      showToast("บันทึกการตั้งค่าตารางสำหรับผู้ใช้ทุกคนแล้ว");
+      if (parseRoute().name === "customers") {
+        await renderCustomersPage();
+      }
+    } catch (error) {
+      showError(error, "บันทึกการตั้งค่าตารางไม่สำเร็จ");
+    } finally {
+      setButtonBusy(button, false);
+    }
+  }
 
   function fileExtension(file) {
     const map = {
@@ -2580,7 +3014,7 @@ function applySystemBranding() {
         .from("app_settings")
         .update({ [column]: nextPath })
         .eq("id", 1)
-        .select("id,login_image_path,favicon_path,updated_at")
+        .select("id,login_image_path,favicon_path,customer_list_columns,customer_list_sort_column,customer_list_sort_direction,updated_at")
         .single();
 
       if (error) {
@@ -2588,7 +3022,10 @@ function applySystemBranding() {
         throw error;
       }
 
-      state.systemSettings = data;
+      state.systemSettings = {
+        ...data,
+        ...normalizeCustomerListSettings(data || {})
+      };
       state.publicSettingsLoaded = true;
       applySystemBranding();
       updateBrandingControls(kind);
@@ -2620,12 +3057,15 @@ function applySystemBranding() {
         .from("app_settings")
         .update({ [column]: null })
         .eq("id", 1)
-        .select("id,login_image_path,favicon_path,updated_at")
+        .select("id,login_image_path,favicon_path,customer_list_columns,customer_list_sort_column,customer_list_sort_direction,updated_at")
         .single();
 
       if (error) throw error;
 
-      state.systemSettings = data;
+      state.systemSettings = {
+        ...data,
+        ...normalizeCustomerListSettings(data || {})
+      };
       state.publicSettingsLoaded = true;
       applySystemBranding();
       updateBrandingControls(kind);
@@ -3241,7 +3681,7 @@ function renderNavigation() {
     {
       label: "รายงาน",
       items: [
-        { route: "daily-report", icon: "report", label: "รายงานประจำวันของฉัน", roles: ["admin", "manager", "user"] },
+        { route: "daily-report", icon: "report", label: "รายงานประจำวันของฉัน", roles: ["admin", "user"] },
         { route: "manager-reports", icon: "team", label: "รายงานของทีม", roles: ["admin", "manager"] }
       ]
     },
@@ -3297,7 +3737,7 @@ function routeAllowed(routeName) {
     customers: ["admin", "manager", "user"],
     customer: ["admin", "manager", "user"],
     profile: ["admin", "manager", "user"],
-    "daily-report": ["admin", "manager", "user"],
+    "daily-report": ["admin", "user"],
     "manager-reports": ["admin", "manager"],
     "admin-users": ["admin"],
     "system-settings": ["admin"],
@@ -3590,15 +4030,18 @@ async function renderDashboard() {
   const updatedAt = formatDateTime(new Date().toISOString());
   const today = bangkokDate();
 
-  const ownResult = await state.client
-    .from("daily_reports")
-    .select("id,status,work_date,user_id,updated_at,last_revision_reason")
-    .eq("user_id", state.profile.id)
-    .eq("work_date", today)
-    .order("updated_at", { ascending: false })
-    .maybeSingle();
-  if (ownResult.error) throw ownResult.error;
-  const ownReport = ownResult.data || null;
+  let ownReport = null;
+  if (canWriteOwnDailyReport()) {
+    const ownResult = await state.client
+      .from("daily_reports")
+      .select("id,status,work_date,user_id,updated_at,last_revision_reason")
+      .eq("user_id", state.profile.id)
+      .eq("work_date", today)
+      .order("updated_at", { ascending: false })
+      .maybeSingle();
+    if (ownResult.error) throw ownResult.error;
+    ownReport = ownResult.data || null;
+  }
 
   let teamReports = [];
   if (["admin", "manager"].includes(state.profile.role)) {
@@ -3630,7 +4073,7 @@ async function renderDashboard() {
 
   state.dashboardChartData = { onboarding, importStatus };
 
-  const ownReportPanel = `
+  const ownReportPanel = canWriteOwnDailyReport() ? `
     <section class="panel">
       <div class="panel-header">
         <div>
@@ -3651,12 +4094,12 @@ async function renderDashboard() {
         ` : `
           <div class="empty-state">
             <strong>ยังไม่มีรายงานสำหรับวันนี้</strong>
-            <span>เริ่มเขียนรายงานได้ทุก Role และ Draft จะเห็นเฉพาะเจ้าของ</span>
+            <span>ผู้ดูแลระบบและผู้ใช้งานสามารถเขียนรายงานได้ และ Draft จะเห็นเฉพาะเจ้าของ</span>
             <a class="btn btn-primary" href="#/daily-report">${icon("plus")} เริ่มเขียนรายงาน</a>
           </div>
         `}
       </div>
-    </section>`;
+    </section>` : "";
 
   const teamPanel = ["admin", "manager"].includes(state.profile.role) ? (() => {
     const pending = teamReports.filter((report) => report.status === "submitted").length;
@@ -3827,14 +4270,23 @@ async function renderDashboard() {
                 `).join("")}
               </select>
             </div>
-            <div class="toolbar-actions">
+            <div class="toolbar-actions customer-toolbar-actions">
               <button class="btn btn-secondary" data-action="reset-customer-filters">
                 ${icon("refresh")} ล้างตัวกรอง
               </button>
-              <button class="btn btn-secondary" data-action="export-customers-excel">
-                ${icon("download")} Excel ครบชุด
+              <button class="btn btn-secondary" data-action="export-customers-excel"
+                      title="ส่งออกข้อมูลตาม Tab ตัวกรอง การเรียง และคอลัมน์ที่แสดง">
+                ${icon("download")} Excel
               </button>
               ${state.profile?.role === "admin" ? `
+                <span class="toolbar-action-separator" aria-hidden="true"></span>
+                <button class="btn btn-secondary" data-action="open-customer-list-settings">
+                  ${icon("settings")} ตั้งค่าตาราง
+                </button>
+                <button class="btn btn-secondary" data-action="download-customer-update-template"
+                        title="ดาวน์โหลด Template สำหรับแก้ไขข้อมูลเดิมและนำกลับเข้าระบบ">
+                  ${icon("download")} ดาวน์โหลดไฟล์สำหรับอัปเดต
+                </button>
                 <button class="btn btn-secondary" data-action="import-customers-excel">
                   ${icon("import")} อัปเดตจาก Excel
                 </button>` : ""}
@@ -3947,7 +4399,7 @@ async function renderDashboard() {
         </div>
         <div class="grid-status-row">
           <span id="customer-grid-count" class="muted">กำลังเตรียมข้อมูล...</span>
-          <span class="muted">ปรับลำดับ ความกว้าง และตัวกรองในหัวตารางได้</span>
+          <span class="muted">คอลัมน์และการเรียงเริ่มต้นเป็นค่ากลางจากผู้ดูแลระบบ ผู้ใช้ยังปรับตารางชั่วคราวได้</span>
         </div>
         <div id="customer-grid" class="ag-grid-shell" aria-label="รายชื่อลูกค้า">
           <div class="chart-loading"><span class="spinner"></span><span>กำลังสร้างตาราง...</span></div>
@@ -3957,6 +4409,220 @@ async function renderDashboard() {
     renderCustomerTable();
     renderDateRangeButtons();
   }
+
+function customerListColumnDefinitions(mobile) {
+  return {
+    legal_name: {
+      colId: "legal_name",
+      headerName: "ชื่อนิติบุคคล",
+      field: "legal_name",
+      minWidth: 260,
+      flex: 1.6,
+      cellRenderer: (params) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "grid-primary-cell";
+        const title = document.createElement("strong");
+        title.textContent = params.value || "-";
+        wrapper.append(title);
+        if (params.data.short_name) {
+          const secondary = document.createElement("span");
+          secondary.className = "grid-secondary";
+          secondary.textContent = params.data.short_name;
+          wrapper.append(secondary);
+        }
+        return wrapper;
+      }
+    },
+    short_name: {
+      colId: "short_name",
+      headerName: "ชื่อย่อ",
+      field: "short_name",
+      minWidth: 170,
+      valueFormatter: (params) => params.value || "-"
+    },
+    tax_id: {
+      colId: "tax_id",
+      headerName: "เลขประจำตัวผู้เสียภาษี",
+      field: "tax_id",
+      minWidth: 185,
+      filter: "agTextColumnFilter"
+    },
+    fleet_size: {
+      colId: "fleet_size",
+      headerName: "จำนวนรถ",
+      field: "fleet_size",
+      minWidth: 110,
+      maxWidth: 125,
+      type: "numericColumn",
+      filter: "agNumberColumnFilter",
+      valueFormatter: (params) => Number(params.value || 0).toLocaleString("th-TH")
+    },
+    owner_text: {
+      colId: "owner_text",
+      headerName: "ผู้รับผิดชอบ",
+      field: "owner_text",
+      minWidth: 200,
+      flex: 1
+    },
+    module_text: {
+      colId: "module_text",
+      headerName: "โมดูล",
+      field: "module_text",
+      minWidth: 190,
+      flex: 1
+    },
+    feature_text: {
+      colId: "feature_text",
+      headerName: "ฟังก์ชัน",
+      field: "feature_text",
+      minWidth: 190,
+      flex: 1
+    },
+    contract_text: {
+      colId: "contract_text",
+      headerName: "สัญญา",
+      field: "contract_text",
+      minWidth: 125
+    },
+    sales_text: {
+      colId: "sales_text",
+      headerName: "เซลล์",
+      field: "sales_text",
+      minWidth: 150
+    },
+    monthly_service_fee: {
+      colId: "monthly_service_fee",
+      headerName: "ค่าบริการต่อเดือน",
+      field: "monthly_service_fee",
+      minWidth: 165,
+      type: "numericColumn",
+      filter: "agNumberColumnFilter",
+      valueFormatter: (params) => formatMoney(params.value)
+    },
+    customer_user_count: {
+      colId: "customer_user_count",
+      headerName: "จำนวนผู้ใช้งานลูกค้า",
+      field: "customer_user_count",
+      minWidth: 175,
+      maxWidth: 195,
+      type: "numericColumn",
+      filter: "agNumberColumnFilter",
+      valueFormatter: (params) => `${Number(params.value || 1).toLocaleString("th-TH")} คน`
+    },
+    saved_account_count: {
+      colId: "saved_account_count",
+      headerName: "จำนวนบัญชีที่บันทึก",
+      field: "saved_account_count",
+      minWidth: 170,
+      maxWidth: 190,
+      type: "numericColumn",
+      filter: "agNumberColumnFilter",
+      valueFormatter: (params) => `${Number(params.value || 0).toLocaleString("th-TH")} บัญชี`
+    },
+    onsite_training_count: {
+      colId: "onsite_training_count",
+      headerName: "สอนใช้งานนอกสถานที่ (ครั้ง)",
+      field: "onsite_training_count",
+      minWidth: 205,
+      maxWidth: 225,
+      type: "numericColumn",
+      filter: "agNumberColumnFilter",
+      valueFormatter: (params) => Number(params.value || 0).toLocaleString("th-TH")
+    },
+    account_status_text: {
+      colId: "account_status_text",
+      headerName: "สถานะบัญชี",
+      field: "account_status_text",
+      minWidth: 140,
+      cellRenderer: (params) => statusBadgeNode(params.value, params.data.account_status)
+    },
+    onboarding_text: {
+      colId: "onboarding_text",
+      headerName: "ขั้นตอนเริ่มใช้งาน",
+      field: "onboarding_text",
+      minWidth: 175
+    },
+    import_text: {
+      colId: "import_text",
+      headerName: "สถานะการนำเข้าข้อมูล",
+      field: "import_text",
+      minWidth: 180,
+      cellRenderer: (params) => statusBadgeNode(params.value, params.data.import_status)
+    },
+    engagement_text: {
+      colId: "engagement_text",
+      headerName: "ระดับความสนใจ",
+      field: "engagement_text",
+      minWidth: 150
+    },
+    start_date: {
+      colId: "start_date",
+      headerName: "วันที่เริ่มใช้งานจริง",
+      field: "start_date",
+      minWidth: 170,
+      valueFormatter: (params) => formatDate(params.value)
+    },
+    billing_date: {
+      colId: "billing_date",
+      headerName: "วันที่เริ่มวางบิล",
+      field: "billing_date",
+      minWidth: 165,
+      valueFormatter: (params) => formatDate(params.value)
+    },
+    updated_at: {
+      colId: "updated_at",
+      headerName: "อัปเดตล่าสุด",
+      field: "updated_at",
+      minWidth: 175,
+      valueFormatter: (params) => formatDateTime(params.value)
+    },
+    updated_by_name: {
+      colId: "updated_by_name",
+      headerName: "แก้ไขล่าสุดโดย",
+      field: "updated_by_name",
+      minWidth: 180
+    }
+  };
+}
+
+function customerListActionsColumn() {
+  return {
+    headerName: "การกระทำ",
+    colId: "actions",
+    pinned: "right",
+    width: 142,
+    minWidth: 142,
+    maxWidth: 142,
+    sortable: false,
+    filter: false,
+    resizable: false,
+    suppressHeaderMenuButton: true,
+    cellRenderer: (params) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "grid-actions grid-actions-compact";
+      wrapper.append(
+        iconActionLinkNode({
+          label: "ดูรายละเอียดลูกค้า",
+          href: `#/customer/${params.data.id}`,
+          iconName: "eye"
+        }),
+        iconActionLinkNode({
+          label: "แก้ไขข้อมูลลูกค้า",
+          href: `#/customer/${params.data.id}/edit`,
+          iconName: "edit"
+        }),
+        iconActionButtonNode({
+          label: "ลบลูกค้า",
+          action: "delete-customer",
+          id: params.data.id,
+          iconName: "delete",
+          variant: "danger"
+        })
+      );
+      return wrapper;
+    }
+  };
+}
 
 function renderCustomerTable() {
   const container = document.getElementById("customer-grid");
@@ -4034,15 +4700,23 @@ function renderCustomerTable() {
         .filter((item) => item.customer_id === customer.id)
         .map((item) => state.modules.find((module) => module.id === item.module_id)?.name)
         .filter(Boolean);
+      const featureNames = state.customerFeatures
+        .filter((item) => item.customer_id === customer.id)
+        .map((item) => state.features.find((feature) => feature.id === item.feature_id)?.name)
+        .filter(Boolean);
       return {
         ...customer,
         owner_text: ownerNames(customer.id).join(", ") || "-",
         sales_text: label("sales", customer.sales_code),
         customer_user_count: Number(customer.customer_user_count || 1),
+        saved_account_count: state.customerAccounts.filter((item) => item.customer_id === customer.id).length,
         monthly_service_fee: customer.monthly_service_fee === null || customer.monthly_service_fee === undefined
           ? null
           : Number(customer.monthly_service_fee),
         module_text: moduleNames.join(", ") || "-",
+        feature_text: featureNames.join(", ") || "-",
+        account_status_text: label("account_status", customer.account_status),
+        onboarding_text: label("onboarding_stage", customer.onboarding_stage),
         import_text: label("import_status", customer.import_status),
         engagement_text: label("engagement_level", customer.engagement_level),
         contract_text: label("contract_type", customer.contract_type),
@@ -4064,142 +4738,23 @@ function renderCustomerTable() {
   }
 
   const mobile = window.innerWidth < 760;
+  const listSettings = currentCustomerListSettings();
+  const availableDefinitions = customerListColumnDefinitions(mobile);
+  const configuredColumns = listSettings.customer_list_columns
+    .filter((key) => availableDefinitions[key])
+    .map((key) => {
+      const definition = { ...availableDefinitions[key] };
+      if (key === listSettings.customer_list_sort_column) {
+        definition.sort = listSettings.customer_list_sort_direction;
+        definition.sortIndex = 0;
+      }
+      return definition;
+    });
+
   createCommunityGrid(container, {
     rowData: rows,
     getRowId: (params) => params.data.id,
-    columnDefs: [
-      {
-        headerName: "ชื่อนิติบุคคล",
-        field: "legal_name",
-        pinned: mobile ? undefined : "left",
-        minWidth: 260,
-        flex: 1.6,
-        cellRenderer: (params) => {
-          const wrapper = document.createElement("div");
-          wrapper.className = "grid-primary-cell";
-          const title = document.createElement("strong");
-          title.textContent = params.value || "-";
-          wrapper.append(title);
-          if (params.data.short_name) {
-            const secondary = document.createElement("span");
-            secondary.className = "grid-secondary";
-            secondary.textContent = params.data.short_name;
-            wrapper.append(secondary);
-          }
-          return wrapper;
-        }
-      },
-      {
-        headerName: "จำนวนรถ",
-        field: "fleet_size",
-        minWidth: 110,
-        maxWidth: 125,
-        type: "numericColumn",
-        filter: "agNumberColumnFilter",
-        valueFormatter: (params) => Number(params.value || 0).toLocaleString("th-TH")
-      },
-      {
-        headerName: "โมดูล",
-        field: "module_text",
-        minWidth: 190,
-        flex: 1
-      },
-      {
-        headerName: "สัญญา",
-        field: "contract_text",
-        minWidth: 125
-      },
-      {
-        headerName: "เซลล์",
-        field: "sales_text",
-        minWidth: 150
-      },
-      {
-        headerName: "ค่าบริการต่อเดือน",
-        field: "monthly_service_fee",
-        minWidth: 165,
-        type: "numericColumn",
-        filter: "agNumberColumnFilter",
-        valueFormatter: (params) => formatMoney(params.value)
-      },
-      {
-        headerName: "จำนวนผู้ใช้งานลูกค้า",
-        field: "customer_user_count",
-        minWidth: 175,
-        maxWidth: 195,
-        type: "numericColumn",
-        filter: "agNumberColumnFilter",
-        valueFormatter: (params) => `${Number(params.value || 1).toLocaleString("th-TH")} คน`
-      },
-      {
-        headerName: "สอนใช้งานนอกสถานที่ (ครั้ง)",
-        field: "onsite_training_count",
-        minWidth: 205,
-        maxWidth: 225,
-        type: "numericColumn",
-        filter: "agNumberColumnFilter",
-        valueFormatter: (params) => Number(params.value || 0).toLocaleString("th-TH")
-      },
-      {
-        headerName: "สถานะการนำเข้าข้อมูล",
-        field: "import_text",
-        minWidth: 180,
-        cellRenderer: (params) => statusBadgeNode(params.value, params.data.import_status)
-      },
-      {
-        headerName: "ระดับความสนใจ",
-        field: "engagement_text",
-        minWidth: 150
-      },
-      {
-        headerName: "อัปเดตล่าสุด",
-        field: "updated_at",
-        minWidth: 175,
-        sort: "desc",
-        valueFormatter: (params) => formatDateTime(params.value)
-      },
-      {
-        headerName: "แก้ไขล่าสุดโดย",
-        field: "updated_by_name",
-        minWidth: 180
-      },
-      {
-        headerName: "การกระทำ",
-        colId: "actions",
-        pinned: "right",
-        width: 142,
-        minWidth: 142,
-        maxWidth: 142,
-        sortable: false,
-        filter: false,
-        resizable: false,
-        suppressHeaderMenuButton: true,
-        cellRenderer: (params) => {
-          const wrapper = document.createElement("div");
-          wrapper.className = "grid-actions grid-actions-compact";
-          wrapper.append(
-            iconActionLinkNode({
-              label: "ดูรายละเอียดลูกค้า",
-              href: `#/customer/${params.data.id}`,
-              iconName: "eye"
-            }),
-            iconActionLinkNode({
-              label: "แก้ไขข้อมูลลูกค้า",
-              href: `#/customer/${params.data.id}/edit`,
-              iconName: "edit"
-            }),
-            iconActionButtonNode({
-              label: "ลบลูกค้า",
-              action: "delete-customer",
-              id: params.data.id,
-              iconName: "delete",
-              variant: "danger"
-            })
-          );
-          return wrapper;
-        }
-      }
-    ]
+    columnDefs: [...configuredColumns, customerListActionsColumn()]
   }, "customers");
 }
 
@@ -6075,6 +6630,7 @@ function syncReportCustomerPicker(toggle) {
 }
 
 async function renderDailyReportPage(workDate = null) {
+  assertCanWriteOwnDailyReport();
   await loadCustomers();
   const selectedDate = workDate || dateValue(document, "daily-report-date") || bangkokDate();
   const { data: report, error } = await state.client
@@ -6275,6 +6831,7 @@ function renderDailySection(section, title, items, locked) {
 }
 
 async function saveDailyReportCustomerGroup(reportId, button) {
+  assertCanWriteOwnDailyReport();
   const section = button.closest(".report-customer-group");
   const customerIds = checkedValues(section, "report_group_customer_id");
   if (!validateSelectedReportCustomers(customerIds)) return;
@@ -6295,6 +6852,7 @@ async function saveDailyReportCustomerGroup(reportId, button) {
   }
 }
   async function createDailyReport(date) {
+  assertCanWriteOwnDailyReport();
     setLoading(true, "กำลังสร้างรายงาน...");
     try {
       const { error } = await state.client.from("daily_reports").insert({
@@ -6312,6 +6870,7 @@ async function saveDailyReportCustomerGroup(reportId, button) {
   }
 
 async function addDailyReportItem(event) {
+  assertCanWriteOwnDailyReport();
   event.preventDefault();
   const form = event.target;
   if (!form.reportValidity() || !state.currentDailyReport) return;
@@ -6346,6 +6905,7 @@ async function addDailyReportItem(event) {
 }
 
 async function saveDailyReportItem(itemId, button) {
+  assertCanWriteOwnDailyReport();
   const editor = button.closest(".report-item-editor");
   const detail = editor.querySelector('[data-field="detail"]').value.trim();
   const useGroup = editor.querySelector('[data-field="use_report_customer_group"]')?.checked || false;
@@ -6382,6 +6942,7 @@ async function saveDailyReportItem(itemId, button) {
   }
 }
 async function submitDailyReport(reportId, button) {
+  assertCanWriteOwnDailyReport();
   const invalidIds = invalidCurrentReportCustomerIds();
   if (invalidIds.length) {
     showToast(
@@ -7141,6 +7702,7 @@ async function deleteContact(contactKey) {
   }
 
   async function deleteDailyItem(itemId) {
+    assertCanWriteOwnDailyReport();
     const ok = await confirmAction("ลบรายการนี้หรือไม่?", "ลบรายการรายงาน", "ลบ");
     if (!ok) return;
     await withGlobalLoading("กำลังลบรายการ...", async () => {
@@ -7312,7 +7874,11 @@ async function deleteContact(contactKey) {
     document.addEventListener("change", async (event) => {
       const target = event.target;
       try {
-        if (target.matches("input[data-customer-multiselect-option]")) {
+        if (target.matches("[data-customer-list-column-toggle]")) {
+          setCustomerListColumnEnabled(target.dataset.customerListColumnToggle, target.checked);
+        } else if (["customer-list-sort-column", "customer-list-sort-direction"].includes(target.id)) {
+          syncCustomerListSettingsDraftFromControls();
+        } else if (target.matches("input[data-customer-multiselect-option]")) {
           updateCustomerMultiSelectSummary(target);
         } else if (target.matches("[data-date-native]")) {
           syncDateControlFromNative(target, true);
@@ -7460,6 +8026,21 @@ async function deleteContact(contactKey) {
           }
           case "export-customers-excel":
             await runExcelExport(target, exportCustomersExcel);
+            break;
+          case "download-customer-update-template":
+            await runExcelExport(target, exportCustomerUpdateTemplate);
+            break;
+          case "open-customer-list-settings":
+            openCustomerListSettings();
+            break;
+          case "move-customer-list-column":
+            moveCustomerListColumn(target.dataset.columnKey, target.dataset.direction);
+            break;
+          case "reset-customer-list-settings":
+            resetCustomerListSettingsDraft();
+            break;
+          case "save-customer-list-settings":
+            await saveCustomerListSettings(target);
             break;
           case "import-customers-excel":
             await openCustomerExcelImport();
