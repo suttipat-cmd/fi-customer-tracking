@@ -558,6 +558,12 @@ textarea:disabled {
     box-shadow 0.15s ease;
 }
 
+.btn svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
 .btn:hover:not(:disabled) {
   transform: translateY(-1px);
 }
@@ -2738,7 +2744,14 @@ tbody tr:last-child td {
   padding: 10px;
 }
 
-.edit-section-nav a {
+.edit-section-nav a,
+.edit-section-nav button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
   border-radius: 8px;
   padding: 9px 11px;
   color: var(--text-secondary);
@@ -2746,7 +2759,9 @@ tbody tr:last-child td {
   font-weight: 650;
 }
 
-.edit-section-nav a:hover {
+.edit-section-nav a:hover,
+.edit-section-nav button:hover,
+.edit-section-nav button:focus-visible {
   background: var(--primary-soft);
   color: var(--primary);
 }
@@ -3143,8 +3158,10 @@ tbody tr:last-child td {
     padding: 8px;
   }
 
-  .edit-section-nav a {
+  .edit-section-nav a,
+  .edit-section-nav button {
     flex: 0 0 auto;
+    width: auto;
   }
 
   .profile-layout,
@@ -5026,7 +5043,8 @@ input[type="radio"] {
 }
 
 .edit-section-nav > strong { padding: 4px 10px 0; font-size: .84rem; }
-.edit-section-nav a span { display: inline-grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; background: var(--surface-muted); font-size: .7rem; }
+.edit-section-nav a span,
+.edit-section-nav button span { display: inline-grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; background: var(--surface-muted); font-size: .7rem; }
 
 .credential-value { display: inline-flex; align-items: center; gap: 6px; }
 .credential-value code { min-width: 72px; }
