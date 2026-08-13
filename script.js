@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.14.0-customer-workflow-mobile-feedback";
+  const APP_VERSION = "0.14.1-routing-responsive-bugfixes";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -171,6 +171,7 @@
       },
       profileDrafts: new Map(),
       customerDraftSaveTimer: null,
+      customerGridMobile: null,
       dateRangeDraft: {
         kind: null,
         from: "",
@@ -1172,7 +1173,6 @@ function dateControlHtml({
       const palette = chartPalette();
       const chart = window.agCharts.AgCharts.create({
         container,
-        autoSize: true,
         background: { fill: getCssVar("--surface", "#ffffff") },
         theme: {
           baseTheme: resolvedThemeMode() === "dark" ? "ag-default-dark" : "ag-default",
@@ -1242,10 +1242,8 @@ function renderDashboardCharts(data = state.dashboardChartData) {
       label: { enabled: true }
     }],
     legend: { enabled: false },
-    axes: [
-      { type: "category", position: "left" },
-      { type: "number", position: "bottom", min: 0, nice: true }
-    ]
+    // AG Charts v14 derives the appropriate axes from a bar series.
+    // Supplying the legacy axes array causes the library to ignore it.
   });
 
   createCommunityChart(document.getElementById("import-chart"), {
@@ -4684,6 +4682,12 @@ function customerListActionsColumn(mobile = false) {
 function renderCustomerTable() {
   const container = document.getElementById("customer-grid");
   if (!container) return;
+  const mobile = window.innerWidth < 760;
+
+  if (state.grids.customers && state.ui.customerGridMobile !== mobile) {
+    try { state.grids.customers.destroy?.(); } catch (error) { console.warn(error); }
+    state.grids.customers = null;
+  }
 
   const filters = state.ui.customerFilters;
   filters.accountTab = filters.accountTab === "inactive" ? "inactive" : "active";
@@ -4795,7 +4799,6 @@ function renderCustomerTable() {
     return;
   }
 
-  const mobile = window.innerWidth < 760;
   const listSettings = currentCustomerListSettings();
   const availableDefinitions = customerListColumnDefinitions(mobile);
   const configuredColumns = (mobile ? ["legal_name", "owner_text", "onboarding_text"] : listSettings.customer_list_columns)
@@ -4814,6 +4817,7 @@ function renderCustomerTable() {
     getRowId: (params) => params.data.id,
     columnDefs: [...configuredColumns, customerListActionsColumn(mobile)]
   }, "customers");
+  state.ui.customerGridMobile = mobile;
 }
 
   function customerCoreFields(customer = null) {
@@ -5087,7 +5091,7 @@ function customerNotesSection(customerId = "") {
     return `<aside class="edit-section-nav" aria-label="ขั้นตอนการกรอกข้อมูล">
       <strong>ขั้นตอนการกรอกข้อมูล</strong>
       <span id="customer-draft-status" class="draft-status" role="status">ยังไม่มีการแก้ไข</span>
-      ${sections.map(([id, label], index) => `<a href="#${id}"><span>${index + 1}</span> ${label}</a>`).join("")}
+      ${sections.map(([id, label], index) => `<button type="button" data-action="scroll-customer-form-section" data-section-id="${h(id)}"><span>${index + 1}</span> ${label}</button>`).join("")}
     </aside>`;
   }
 
@@ -5100,7 +5104,8 @@ async function renderCustomerCreatePage() {
       fleet_size: 0,
       customer_user_count: 1,
       sales_code: null,
-      onsite_training_count: 0
+      onsite_training_count: 0,
+      billing_date: bangkokDate()
     },
     owners: [],
     contacts: [],
@@ -7864,9 +7869,13 @@ async function deleteContact(contactKey) {
         el.sidebar.classList.remove("open");
         document.querySelector(".sidebar-backdrop")?.classList.add("hidden");
       }
+      if (parseRoute().name === "customers" && document.getElementById("customer-grid")) {
+        renderCustomerTable();
+      }
     });
 
     document.addEventListener("keydown", (event) => {
+      if (document.querySelector("dialog[open]")) return;
       const typing = event.target.matches("input, textarea, select, [contenteditable='true']");
       if (typing || event.altKey) return;
       const route = parseRoute().name;
@@ -8121,6 +8130,16 @@ async function deleteContact(contactKey) {
           case "refresh-route":
             await renderRoute();
             break;
+          case "skip-to-main":
+            event.preventDefault();
+            el.mainContent.focus({ preventScroll: false });
+            break;
+          case "scroll-customer-form-section": {
+            event.preventDefault();
+            const section = document.getElementById(target.dataset.sectionId);
+            section?.scrollIntoView({ behavior: "smooth", block: "start" });
+            break;
+          }
           case "open-date-picker": {
             const native = target.closest("[data-date-control]")?.querySelector("[data-date-native]");
             if (!native) break;
