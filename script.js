@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.14.1-routing-responsive-bugfixes";
+  const APP_VERSION = "0.14.2-table-layout-bugfixes";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -3213,7 +3213,9 @@ function masterListHtml(groupKey) {
     );
     if (!rows.length) return '<div class="empty-state compact"><strong>ยังไม่มีรายการ</strong></div>';
     return `
-      <div class="master-compact-list" role="table" aria-label="รายการ ${h(MASTER_GROUPS[groupKey]?.label || "ข้อมูลตัวเลือกกลาง")}">
+      <div class="master-list-scroll" role="region"
+           aria-label="ตารางรายการ ${h(MASTER_GROUPS[groupKey]?.label || "ข้อมูลตัวเลือกกลาง")} — เลื่อนแนวนอนได้">
+        <div class="master-compact-list" role="table" aria-label="รายการ ${h(MASTER_GROUPS[groupKey]?.label || "ข้อมูลตัวเลือกกลาง")}">
         <div class="master-compact-header" role="row">
           <span role="columnheader">รายการ</span>
           <span role="columnheader">รหัส</span>
@@ -3253,6 +3255,7 @@ function masterListHtml(groupKey) {
               </span>
             </div>`;
         }).join("")}
+        </div>
       </div>`;
   }
 
@@ -7567,8 +7570,10 @@ function renderReportReadOnlySection(title, items, itemCustomers = [], groupCust
             wrapper.append(input);
             if (params.data.id === state.profile.id) {
               const tag = document.createElement("span");
-              tag.className = "tag";
-              tag.textContent = "บัญชีของคุณ";
+              tag.className = "grid-self-badge";
+              tag.textContent = "คุณ";
+              tag.title = "บัญชีของคุณ";
+              tag.setAttribute("aria-label", "บัญชีของคุณ");
               wrapper.append(tag);
             }
             return wrapper;
