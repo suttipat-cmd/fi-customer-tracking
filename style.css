@@ -1855,6 +1855,32 @@ tbody tr:last-child td {
 }
 
 .toast.error {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.toast-close {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.toast-close:hover,
+.toast-close:focus-visible {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.toast.error {
   border-left-color: var(--danger);
 }
 
@@ -2209,7 +2235,18 @@ tbody tr:last-child td {
   }
 
   .auth-showcase {
-    min-height: 225px;
+    min-height: 148px;
+    padding: 22px 24px;
+  }
+
+  .auth-showcase h1 {
+    margin-bottom: 0;
+    font-size: 1.45rem;
+  }
+
+  .auth-showcase .eyebrow,
+  .auth-showcase-media {
+    display: none;
   }
 
   .auth-showcase p,
@@ -2230,7 +2267,7 @@ tbody tr:last-child td {
   }
 
   .page-actions .btn,
-  .toolbar-actions .btn {
+  .toolbar-actions:not(.customer-toolbar-actions) .btn {
     width: 100%;
     flex-basis: 100%;
   }
@@ -4930,6 +4967,81 @@ input[type="radio"] {
   justify-content: flex-end;
 }
 
+.toolbar-overflow {
+  position: relative;
+}
+
+.toolbar-overflow > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.toolbar-overflow > summary::-webkit-details-marker { display: none; }
+
+.toolbar-overflow-menu {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  top: calc(100% + 8px);
+  display: grid;
+  min-width: 230px;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.toolbar-overflow-menu .btn { justify-content: flex-start; }
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  empty-cells: show;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  border: 1px solid var(--primary-border, var(--border));
+  border-radius: 999px;
+  background: var(--primary-softer, var(--primary-soft));
+  color: var(--primary);
+  padding: 4px 10px;
+  font-size: .78rem;
+  font-weight: 650;
+}
+
+.filter-chip:hover { filter: brightness(.97); }
+
+.draft-status {
+  display: block;
+  padding: 5px 10px 8px;
+  color: var(--muted);
+  font-size: .75rem;
+}
+
+.edit-section-nav > strong { padding: 4px 10px 0; font-size: .84rem; }
+.edit-section-nav a span { display: inline-grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; background: var(--surface-muted); font-size: .7rem; }
+
+.credential-value { display: inline-flex; align-items: center; gap: 6px; }
+.credential-value code { min-width: 72px; }
+
+.dashboard-actions-panel { margin-bottom: 20px; }
+.quick-guide-panel { margin-bottom: 20px; }
+.quick-guide-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding-left: 24px; }
+.quick-guide-list li { padding: 10px 8px 10px 2px; color: var(--text-secondary); }
+.dashboard-action-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.dashboard-action-card { display: flex; align-items: flex-start; gap: 11px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; color: var(--text); background: var(--surface-subtle); }
+.dashboard-action-card:hover { border-color: var(--primary-border, var(--border-strong)); background: var(--primary-softer, var(--primary-soft)); }
+.dashboard-action-card svg { width: 21px; height: 21px; color: var(--primary); flex: 0 0 auto; }
+.dashboard-action-card span { display: grid; gap: 3px; }
+.dashboard-action-card small { color: var(--muted); }
+
 .toolbar-action-separator {
   width: 1px;
   height: 30px;
@@ -5082,14 +5194,25 @@ input[type="radio"] {
 
 @media (max-width: 680px) {
   .customer-toolbar-actions {
+    display: grid;
     width: 100%;
-    justify-content: stretch;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
     margin-left: 0;
   }
 
   .customer-toolbar-actions .btn {
-    flex: 1 1 100%;
+    min-height: 42px;
+    height: auto;
+    flex: none;
   }
+
+  .toolbar-overflow { width: 100%; }
+  .toolbar-overflow > summary { justify-content: center; }
+  .toolbar-overflow-menu { position: static; width: 100%; margin-top: 6px; box-sizing: border-box; }
+
+  .dashboard-action-grid { grid-template-columns: 1fr; }
+  .quick-guide-list { grid-template-columns: 1fr; gap: 0; }
 
   .toolbar-action-separator {
     display: none;
@@ -5108,4 +5231,3 @@ input[type="radio"] {
     align-items: center;
   }
 }
-

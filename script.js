@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.0-list-settings-excel-split-manager-review";
+  const APP_VERSION = "0.14.0-customer-workflow-mobile-feedback";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -370,6 +370,7 @@
       palette: '<path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 0-4H12a2 2 0 0 1 0-4h4a5 5 0 0 0 0-10z"/><path d="M7.5 10h.01M9 6.5h.01M14 6.5h.01"/>',
       edit: '<path d="m4 20 4.5-1 10-10a2 2 0 0 0-3-3l-10 10z"/><path d="m14.5 7.5 3 3"/>',
       eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+      copy: '<rect x="8" y="8" width="11" height="12" rx="2"/><path d="M5 16H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
       download: '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/>',
       save: '<path d="M5 3h12l2 2v16H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/>',
       delete: '<path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/>',
@@ -490,9 +491,22 @@
   function showToast(message, type = "success") {
     const node = document.createElement("div");
     node.className = `toast ${type}`;
-    node.textContent = message;
+    node.setAttribute("role", type === "error" ? "alert" : "status");
+    node.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    const text = document.createElement("span");
+    text.textContent = message;
+    node.appendChild(text);
+    if (type === "error") {
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "toast-close";
+      close.setAttribute("aria-label", "ปิดข้อความแจ้งข้อผิดพลาด");
+      close.textContent = "×";
+      close.addEventListener("click", () => node.remove());
+      node.appendChild(close);
+    }
     el.toastRegion.appendChild(node);
-    window.setTimeout(() => node.remove(), 4500);
+    if (type !== "error") window.setTimeout(() => node.remove(), 4500);
   }
 
   function showError(error, fallback = "ทำรายการไม่สำเร็จ") {
@@ -1035,6 +1049,8 @@ function dateControlHtml({
       pagination: true,
       paginationPageSize: 20,
       paginationPageSizeSelector: [10, 20, 50, 100],
+      // An empty result should read as an empty state, not as "page 1 of 0".
+      suppressPaginationPanel: Array.isArray(gridOptions?.rowData) && gridOptions.rowData.length === 0,
       suppressCellFocus: false,
       suppressCsvExport: true,
       ensureDomOrder: true,
@@ -4144,6 +4160,11 @@ async function renderDashboard() {
         </div>
       </section>`;
   })() : "";
+  const roleGuide = state.profile.role === "admin"
+    ? ["ตั้งค่าผู้ใช้งานและข้อมูลหลักก่อนเริ่ม", "เพิ่มลูกค้าและกำหนดผู้รับผิดชอบ", "ตรวจรายงานของทีมทุกวัน"]
+    : state.profile.role === "manager"
+      ? ["ตรวจรายงานที่ส่งเข้ามา", "รับทราบหรือส่งกลับพร้อมเหตุผล", "ติดตามสถานะลูกค้าในหน้าข้อมูลลูกค้า"]
+      : ["ค้นหาลูกค้าที่รับผิดชอบ", "บันทึกงานและแผนในรายงานประจำวัน", "อัปเดตข้อมูลลูกค้าเมื่อมีการเปลี่ยนแปลง"];
 
   el.mainContent.innerHTML = `
     ${pageHeader("ภาพรวม", `ข้อมูลล่าสุด ณ ${updatedAt}`)}
@@ -4172,6 +4193,20 @@ async function renderDashboard() {
         <span class="stat-value">${importPending}</span>
         <span class="stat-meta">เฉพาะลูกค้าที่ใช้งาน</span>
       </div>
+    </section>
+
+    <section class="panel dashboard-actions-panel">
+      <div class="panel-header"><div><h2>เริ่มงานได้ทันที</h2><p class="muted">ทางลัดสำหรับงานที่ทำบ่อย</p></div></div>
+      <div class="panel-body dashboard-action-grid">
+        <a class="dashboard-action-card" href="#/customers/new">${icon("plus")}<span><strong>เพิ่มลูกค้า</strong><small>บันทึกข้อมูลและผู้รับผิดชอบ</small></span></a>
+        <a class="dashboard-action-card" href="#/daily-report">${icon("report")}<span><strong>บันทึกรายงานประจำวัน</strong><small>อัปเดตงานวันนี้และแผนพรุ่งนี้</small></span></a>
+        <a class="dashboard-action-card" href="#/customers">${icon("search")}<span><strong>ค้นหาลูกค้า</strong><small>ดูสถานะและข้อมูลล่าสุด</small></span></a>
+      </div>
+    </section>
+
+    <section class="panel quick-guide-panel">
+      <div class="panel-header"><div><h2>เริ่มต้นใช้งาน</h2><p class="muted">คำแนะนำสำหรับบทบาท ${h(label("role", state.profile.role))}</p></div></div>
+      <div class="panel-body"><ol class="quick-guide-list">${roleGuide.map((item) => `<li>${h(item)}</li>`).join("")}</ol></div>
     </section>
 
     <section class="chart-grid chart-grid-2" aria-label="กราฟสรุป">
@@ -4220,6 +4255,33 @@ async function renderDashboard() {
       const countNode = button.querySelector("[data-tab-count]");
       if (countNode) countNode.textContent = count.toLocaleString("th-TH");
     });
+  }
+
+  function customerFilterChips(filters) {
+    const options = [
+      ["search", "ค้นหา", filters.search],
+      ["owner", "ผู้รับผิดชอบ", filters.owner ? (filters.owner === "unassigned" ? "ยังไม่มีผู้รับผิดชอบ" : profileName(filters.owner)) : ""],
+      ["onboarding", "เริ่มใช้งาน", filters.onboarding ? (filters.onboarding === "none" ? "ไม่ระบุ" : label("onboarding_stage", filters.onboarding)) : ""],
+      ["importStatus", "นำเข้าข้อมูล", filters.importStatus ? label("import_status", filters.importStatus) : ""],
+      ["engagement", "ความสนใจ", filters.engagement ? (filters.engagement === "none" ? "ไม่ระบุ" : label("engagement_level", filters.engagement)) : ""],
+      ["contractType", "สัญญา", filters.contractType ? label("contract_type", filters.contractType) : ""],
+      ["salesCode", "เซลล์", filters.salesCode ? (filters.salesCode === "none" ? "ไม่ระบุ" : label("sales", filters.salesCode)) : ""],
+      ["moduleId", "โมดูล", state.modules.find((item) => item.id === filters.moduleId)?.name],
+      ["featureId", "ฟังก์ชัน", state.features.find((item) => item.id === filters.featureId)?.name],
+      ["fleetMin", "รถอย่างน้อย", filters.fleetMin ? `${filters.fleetMin} คัน` : ""],
+      ["fleetMax", "รถไม่เกิน", filters.fleetMax ? `${filters.fleetMax} คัน` : ""],
+      ["startFrom", "เริ่มใช้งานตั้งแต่", filters.startFrom], ["startTo", "เริ่มใช้งานถึง", filters.startTo],
+      ["billingFrom", "ติดต่อจาก", filters.billingFrom], ["billingTo", "ติดต่อถึง", filters.billingTo]
+    ];
+    return options.filter(([, , value]) => value).map(([key, title, value]) => `
+      <button type="button" class="filter-chip" data-action="remove-customer-filter" data-filter-key="${h(key)}" aria-label="ล้างตัวกรอง ${h(title)}">
+        <span>${h(title)}: ${h(value)}</span><span aria-hidden="true">×</span>
+      </button>`).join("");
+  }
+
+  function renderCustomerFilterChips() {
+    const container = document.getElementById("customer-filter-chips");
+    if (container) container.innerHTML = customerFilterChips(state.ui.customerFilters);
   }
 
   async function renderCustomersPage() {
@@ -4279,17 +4341,14 @@ async function renderDashboard() {
                 ${icon("download")} Excel
               </button>
               ${state.profile?.role === "admin" ? `
-                <span class="toolbar-action-separator" aria-hidden="true"></span>
-                <button class="btn btn-secondary" data-action="open-customer-list-settings">
-                  ${icon("settings")} ตั้งค่าตาราง
-                </button>
-                <button class="btn btn-secondary" data-action="download-customer-update-template"
-                        title="ดาวน์โหลด Template สำหรับแก้ไขข้อมูลเดิมและนำกลับเข้าระบบ">
-                  ${icon("download")} ดาวน์โหลดไฟล์สำหรับอัปเดต
-                </button>
-                <button class="btn btn-secondary" data-action="import-customers-excel">
-                  ${icon("import")} อัปเดตจาก Excel
-                </button>` : ""}
+                <details class="toolbar-overflow">
+                  <summary class="btn btn-secondary">${icon("settings")} เครื่องมือผู้ดูแล</summary>
+                  <div class="toolbar-overflow-menu">
+                    <button class="btn btn-secondary" data-action="open-customer-list-settings">${icon("settings")} ตั้งค่าตาราง</button>
+                    <button class="btn btn-secondary" data-action="download-customer-update-template" title="ดาวน์โหลด Template สำหรับแก้ไขข้อมูลเดิมและนำกลับเข้าระบบ">${icon("download")} ดาวน์โหลดไฟล์อัปเดต</button>
+                    <button class="btn btn-secondary" data-action="import-customers-excel">${icon("import")} อัปเดตจาก Excel</button>
+                  </div>
+                </details>` : ""}
             </div>
           </div>
 
@@ -4396,6 +4455,7 @@ async function renderDashboard() {
               </div>
             </div>
           </details>
+          <div id="customer-filter-chips" class="filter-chips" aria-live="polite"></div>
         </div>
         <div class="grid-status-row">
           <span id="customer-grid-count" class="muted">กำลังเตรียมข้อมูล...</span>
@@ -4585,14 +4645,14 @@ function customerListColumnDefinitions(mobile) {
   };
 }
 
-function customerListActionsColumn() {
+function customerListActionsColumn(mobile = false) {
   return {
     headerName: "การกระทำ",
     colId: "actions",
     pinned: "right",
-    width: 142,
-    minWidth: 142,
-    maxWidth: 142,
+    width: mobile ? 58 : 142,
+    minWidth: mobile ? 58 : 142,
+    maxWidth: mobile ? 58 : 142,
     sortable: false,
     filter: false,
     resizable: false,
@@ -4600,25 +4660,22 @@ function customerListActionsColumn() {
     cellRenderer: (params) => {
       const wrapper = document.createElement("div");
       wrapper.className = "grid-actions grid-actions-compact";
-      wrapper.append(
-        iconActionLinkNode({
+      wrapper.append(iconActionLinkNode({
           label: "ดูรายละเอียดลูกค้า",
           href: `#/customer/${params.data.id}`,
           iconName: "eye"
-        }),
-        iconActionLinkNode({
+        }));
+      if (!mobile) wrapper.append(iconActionLinkNode({
           label: "แก้ไขข้อมูลลูกค้า",
           href: `#/customer/${params.data.id}/edit`,
           iconName: "edit"
-        }),
-        iconActionButtonNode({
+        }), iconActionButtonNode({
           label: "ลบลูกค้า",
           action: "delete-customer",
           id: params.data.id,
           iconName: "delete",
           variant: "danger"
-        })
-      );
+        }));
       return wrapper;
     }
   };
@@ -4726,6 +4783,7 @@ function renderCustomerTable() {
 
   state.filteredCustomerRows = rows;
   renderCustomerAccountTabs();
+  renderCustomerFilterChips();
   const countNode = document.getElementById("customer-grid-count");
   if (countNode) {
     const tabLabel = filters.accountTab === "inactive" ? "ไม่ใช้งาน" : "ใช้งาน";
@@ -4740,7 +4798,7 @@ function renderCustomerTable() {
   const mobile = window.innerWidth < 760;
   const listSettings = currentCustomerListSettings();
   const availableDefinitions = customerListColumnDefinitions(mobile);
-  const configuredColumns = listSettings.customer_list_columns
+  const configuredColumns = (mobile ? ["legal_name", "owner_text", "onboarding_text"] : listSettings.customer_list_columns)
     .filter((key) => availableDefinitions[key])
     .map((key) => {
       const definition = { ...availableDefinitions[key] };
@@ -4754,7 +4812,7 @@ function renderCustomerTable() {
   createCommunityGrid(container, {
     rowData: rows,
     getRowId: (params) => params.data.id,
-    columnDefs: [...configuredColumns, customerListActionsColumn()]
+    columnDefs: [...configuredColumns, customerListActionsColumn(mobile)]
   }, "customers");
 }
 
@@ -5019,6 +5077,20 @@ function customerNotesSection(customerId = "") {
     `;
   }
 
+  function customerFormNavigationHtml() {
+    const sections = [
+      ["customer-basic-section", "ข้อมูลพื้นฐาน"], ["customer-status-section", "สถานะและวันที่"],
+      ["customer-owner-section", "ผู้รับผิดชอบ"], ["customer-contact-section", "ผู้ติดต่อและผู้ใช้งาน"],
+      ["customer-module-section", "โมดูลและฟังก์ชัน"], ["customer-contract-section", "สัญญาและการอบรม"],
+      ["customer-notes-section", "โน้ตลูกค้า"]
+    ];
+    return `<aside class="edit-section-nav" aria-label="ขั้นตอนการกรอกข้อมูล">
+      <strong>ขั้นตอนการกรอกข้อมูล</strong>
+      <span id="customer-draft-status" class="draft-status" role="status">ยังไม่มีการแก้ไข</span>
+      ${sections.map(([id, label], index) => `<a href="#${id}"><span>${index + 1}</span> ${label}</a>`).join("")}
+    </aside>`;
+  }
+
 async function renderCustomerCreatePage() {
   await loadCommonData();
   const data = {
@@ -5049,8 +5121,11 @@ async function renderCustomerCreatePage() {
       [{ label: "ข้อมูลลูกค้า", href: "#/customers" }, { label: "เพิ่มลูกค้า" }]
     )}
     <form id="customer-core-form" data-mode="create" class="customer-form-page" novalidate>
-      <div class="edit-sections">
-        ${customerFormSections(data)}
+      <div class="edit-page-layout">
+        ${customerFormNavigationHtml()}
+        <div class="edit-sections">
+          ${customerFormSections(data)}
+        </div>
       </div>
       <div class="sticky-form-actions">
         <a class="btn btn-secondary" href="#/customers" data-action="cancel-customer-edit"
@@ -5101,6 +5176,12 @@ function createCustomerEditDraft(data) {
 
 function markCustomerEditDirty() {
   if (state.customerEditDraft) state.customerEditDraft.dirty = true;
+  updateCustomerDraftStatus("ยังไม่ได้บันทึก · ระบบกำลังเก็บแบบร่าง");
+}
+
+function updateCustomerDraftStatus(message) {
+  const node = document.getElementById("customer-draft-status");
+  if (node) node.textContent = message;
 }
 
 function renderCustomerDraftContacts() {
@@ -5406,8 +5487,10 @@ function persistCustomerDraft() {
   };
   try {
     window.sessionStorage.setItem(customerDraftStorageKey(draft.customerId || "new"), JSON.stringify(payload));
+    updateCustomerDraftStatus(`เก็บแบบร่างแล้ว ${new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}`);
   } catch (error) {
     console.warn("Persist customer draft failed", error);
+    updateCustomerDraftStatus("เก็บแบบร่างไม่สำเร็จ");
   }
 }
 
@@ -5498,8 +5581,11 @@ async function renderCustomerEditPage(customerId) {
     )}
 
     <form id="customer-edit-form" data-customer-id="${h(c.id)}" class="customer-form-page" novalidate>
-      <div class="edit-sections">
-        ${customerFormSections(data)}
+      <div class="edit-page-layout">
+        ${customerFormNavigationHtml()}
+        <div class="edit-sections">
+          ${customerFormSections(data)}
+        </div>
       </div>
       <div class="sticky-form-actions">
         <a class="btn btn-secondary" href="#/customer/${h(c.id)}" data-action="cancel-customer-edit"
@@ -6069,8 +6155,8 @@ async function renderCustomerDetail(customerId) {
                 <article class="list-card customer-user-detail-card">
                   <strong>${h(account.email)}</strong>
                   <dl class="credential-list">
-                    <dt>รหัสผ่าน</dt><dd><code>${h(account.password_text || "-")}</code></dd>
-                    <dt>PIN</dt><dd><code>${h(account.pin_text || "-")}</code></dd>
+                    <dt>รหัสผ่าน</dt><dd>${credentialDetailMarkup(account, "password")}</dd>
+                    <dt>PIN</dt><dd>${credentialDetailMarkup(account, "pin")}</dd>
                     <dt>หมายเหตุ</dt><dd>${h(account.notes || "-")}</dd>
                   </dl>
                 </article>
@@ -6130,6 +6216,35 @@ async function renderCustomerDetail(customerId) {
         </div>
       </section>
     </div>`;
+}
+
+function credentialDetailMarkup(account, kind) {
+  const value = kind === "password" ? account.password_text : account.pin_text;
+  const label = kind === "password" ? "รหัสผ่าน" : "PIN";
+  return `<div class="credential-value">
+    <code data-credential-value="${h(account.id)}:${kind}">${h(maskedSecret(value))}</code>
+    <button type="button" class="icon-button" data-action="toggle-customer-credential" data-account-id="${h(account.id)}" data-credential-kind="${kind}" aria-label="แสดง${label}">${icon("eye")}</button>
+    <button type="button" class="icon-button" data-action="copy-customer-credential" data-account-id="${h(account.id)}" data-credential-kind="${kind}" aria-label="คัดลอก${label}">${icon("copy")}</button>
+  </div>`;
+}
+
+async function copyCustomerCredential(accountId, kind) {
+  const account = state.currentCustomerData?.accounts?.find((item) => item.id === accountId);
+  const value = kind === "password" ? account?.password_text : account?.pin_text;
+  if (!value) throw new Error("ไม่พบข้อมูลที่ต้องการคัดลอก");
+  await navigator.clipboard.writeText(value);
+  showToast("คัดลอกข้อมูลแล้ว");
+}
+
+function toggleCustomerCredential(accountId, kind, button) {
+  const account = state.currentCustomerData?.accounts?.find((item) => item.id === accountId);
+  const value = kind === "password" ? account?.password_text : account?.pin_text;
+  const node = document.querySelector(`[data-credential-value="${CSS.escape(`${accountId}:${kind}`)}"]`);
+  if (!node) return;
+  const revealed = button.dataset.revealed === "true";
+  node.textContent = revealed ? maskedSecret(value) : (value || "-");
+  button.dataset.revealed = String(!revealed);
+  button.setAttribute("aria-label", `${revealed ? "แสดง" : "ซ่อน"}${kind === "password" ? "รหัสผ่าน" : "PIN"}`);
 }
 
 function openContactForm(contact = null, customerId = null) {
@@ -7751,6 +7866,23 @@ async function deleteContact(contactKey) {
       }
     });
 
+    document.addEventListener("keydown", (event) => {
+      const typing = event.target.matches("input, textarea, select, [contenteditable='true']");
+      if (typing || event.altKey) return;
+      const route = parseRoute().name;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k" && route === "customers") {
+        event.preventDefault();
+        document.getElementById("customer-search")?.focus();
+      } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s"
+          && document.querySelector("#customer-core-form, #customer-edit-form")) {
+        event.preventDefault();
+        document.getElementById("customer-save-button")?.click();
+      } else if (event.key.toLowerCase() === "n" && route === "customers") {
+        event.preventDefault();
+        location.hash = "#/customers/new";
+      }
+    });
+
     window.addEventListener("beforeunload", (event) => {
       if (!state.ui.themePreviewDirty && !state.customerEditDraft?.dirty) return;
       event.preventDefault();
@@ -8024,6 +8156,20 @@ async function deleteContact(contactKey) {
             await withGlobalLoading("กำลังล้างตัวกรอง...", () => renderCustomersPage());
             break;
           }
+          case "remove-customer-filter": {
+            const key = target.dataset.filterKey;
+            if (!key || !(key in state.ui.customerFilters)) break;
+            state.ui.customerFilters[key] = "";
+            renderCustomerTable();
+            renderDateRangeButtons();
+            break;
+          }
+          case "toggle-customer-credential":
+            toggleCustomerCredential(target.dataset.accountId, target.dataset.credentialKind, target);
+            break;
+          case "copy-customer-credential":
+            await copyCustomerCredential(target.dataset.accountId, target.dataset.credentialKind);
+            break;
           case "export-customers-excel":
             await runExcelExport(target, exportCustomersExcel);
             break;
