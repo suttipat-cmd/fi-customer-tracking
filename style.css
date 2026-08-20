@@ -6547,3 +6547,98 @@ table tbody tr:hover {
 .nav-group-label {
   padding-bottom: 9px;
 }
+
+
+/* Pixel asset system */
+.pixel-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.nav-icon .pixel-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.btn .pixel-icon,
+.icon-button .pixel-icon,
+.grid-actions .pixel-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.pixel-empty-state .empty-state-illustration {
+  display: block;
+  width: min(100%, 300px);
+  height: auto;
+  max-height: 188px;
+  margin: 0 auto 4px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.pixel-empty-state::before {
+  display: none;
+}
+
+.avatar-preset-section {
+  margin-top: 18px;
+}
+
+.avatar-preset-section .field-help {
+  display: block;
+  margin: 4px 0 9px;
+}
+
+.avatar-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.avatar-preset-button {
+  display: grid;
+  min-width: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  padding: 3px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+}
+
+.avatar-preset-button:hover,
+.avatar-preset-button:focus-visible {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.avatar-preset-button.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.avatar-preset-button img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+@media (max-width: 620px) {
+  .avatar-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .avatar-preset-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
