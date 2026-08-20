@@ -6467,3 +6467,83 @@ table tbody tr:hover {
     transition: none;
   }
 }
+
+
+/* --------------------------------------------------------------------------
+   v0.16.3 Corrective UI polish: login media, semantic required fields,
+   profile readability and sidebar hierarchy
+   -------------------------------------------------------------------------- */
+
+/* Required indicators communicate validation, not a user's chosen accent. */
+.required {
+  color: #d92d3f;
+  font-weight: 850;
+}
+
+:root[data-theme="dark"] .required {
+  color: #ff8792;
+}
+
+/* Keep custom login artwork fully visible and prevent a square media area from
+   stretching the full login card beyond the viewport. */
+.auth-layout {
+  align-items: stretch;
+  min-height: min(720px, calc(100vh - 64px));
+}
+
+.auth-showcase-media {
+  align-self: stretch;
+  aspect-ratio: auto;
+  background-size: contain;
+}
+
+.auth-panel {
+  min-height: 100%;
+}
+
+@media (max-width: 720px) {
+  .auth-showcase-media {
+    min-height: min(48vw, 280px);
+    aspect-ratio: 1;
+  }
+}
+
+/* The dark topbar makes the default identity white; restore accessible text on
+   the light profile hover surface. */
+.profile-trigger:hover .user-copy strong,
+.profile-trigger:focus-visible .user-copy strong {
+  color: var(--text);
+}
+
+.profile-trigger:hover .user-copy .role-badge,
+.profile-trigger:focus-visible .user-copy .role-badge {
+  border-color: var(--primary-border);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+/* Pixel accents should decorate reports only. Applied to every form section,
+   they created a full-height rail that collided with colour-settings fields. */
+.form-section {
+  border-left: 0;
+}
+
+.form-section-heading h3::before {
+  display: none;
+}
+
+/* “เมนูหลัก” was a redundant static heading above the actual menu groups.
+   Keep the meaningful group labels and remove the decorative duplicate marks. */
+.sidebar-heading,
+.sidebar-heading::after,
+.nav-group-label::after {
+  display: none;
+}
+
+.sidebar {
+  padding-top: 24px;
+}
+
+.nav-group-label {
+  padding-bottom: 9px;
+}
