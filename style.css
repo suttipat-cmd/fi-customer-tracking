@@ -5310,6 +5310,7 @@ input[type="radio"] {
   }
 }
 
+
 /* Keep every master-data action reachable when the panel is narrower than its table. */
 .master-list-panel-body {
   overflow: hidden;
