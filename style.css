@@ -4625,74 +4625,6 @@ input[type="radio"] {
   white-space: nowrap;
 }
 
-/* Keep every master-data action reachable when the panel is narrower than its table. */
-.master-list-panel-body {
-  overflow: hidden;
-}
-
-.master-list-scroll {
-  width: 100%;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-gutter: stable;
-}
-
-.master-compact-list {
-  min-width: 860px;
-}
-
-.master-compact-header,
-.master-compact-row {
-  grid-template-columns: minmax(180px, 1.25fr) minmax(150px, 0.8fr) 120px 110px minmax(220px, auto);
-}
-
-@media (max-width: 860px) {
-  .master-compact-header {
-    display: grid;
-  }
-
-  .master-compact-row {
-    grid-template-columns: minmax(180px, 1.25fr) minmax(150px, 0.8fr) 120px 110px minmax(220px, auto);
-    gap: 12px;
-    padding: 11px 16px;
-  }
-
-  .master-compact-name,
-  .master-compact-code,
-  .master-compact-row > span[role="cell"]:not(.master-compact-action),
-  .master-compact-action {
-    grid-column: auto;
-    grid-row: auto;
-  }
-}
-
-/* The current-user marker stays beside the field, so it cannot increase row height. */
-.grid-edit-cell {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.grid-edit-cell .grid-control {
-  width: 100%;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.grid-self-badge {
-  flex: 0 0 auto;
-  border: 1px solid var(--primary-border);
-  border-radius: 999px;
-  background: var(--primary-softer);
-  color: var(--primary-strong);
-  padding: 3px 8px;
-  font-size: 0.72rem;
-  font-weight: 750;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
 /* Report customer multi-select */
 .customer-multiselect {
   position: relative;
@@ -5376,4 +5308,72 @@ input[type="radio"] {
   .customer-list-settings-section-header {
     align-items: center;
   }
+}
+
+/* Keep every master-data action reachable when the panel is narrower than its table. */
+.master-list-panel-body {
+  overflow: hidden;
+}
+
+.master-list-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
+}
+
+.master-compact-list {
+  min-width: 860px;
+}
+
+.master-compact-header,
+.master-compact-row {
+  grid-template-columns: minmax(180px, 1.25fr) minmax(150px, 0.8fr) 120px 110px minmax(220px, auto);
+}
+
+@media (max-width: 860px) {
+  .master-compact-header {
+    display: grid;
+  }
+
+  .master-compact-row {
+    grid-template-columns: minmax(180px, 1.25fr) minmax(150px, 0.8fr) 120px 110px minmax(220px, auto);
+    gap: 12px;
+    padding: 11px 16px;
+  }
+
+  .master-compact-name,
+  .master-compact-code,
+  .master-compact-row > span[role="cell"]:not(.master-compact-action),
+  .master-compact-action {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+/* The current-user marker stays beside the field, so it cannot increase row height. */
+.grid-edit-cell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.grid-edit-cell .grid-control {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.grid-self-badge {
+  flex: 0 0 auto;
+  border: 1px solid var(--primary-border);
+  border-radius: 999px;
+  background: var(--primary-softer);
+  color: var(--primary-strong);
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: nowrap;
 }
