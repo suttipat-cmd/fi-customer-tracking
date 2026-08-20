@@ -5931,3 +5931,260 @@ table tbody tr:hover {
     border-radius: 10px;
   }
 }
+
+
+/* FI Star Office UI reliability and profile-accent integration. */
+:root {
+  --star-night: #151735;
+  --star-night-deep: #0d1026;
+  --star-panel: #22254d;
+  --star-panel-strong: #2d3161;
+  --star-line: rgba(189, 201, 255, 0.20);
+  --star-gold: #ffd66b;
+  --star-gold-deep: #c99531;
+  --star-lilac: #a997f6;
+  --star-sky: #7db7ff;
+  --star-ink: #20213d;
+  --star-accent: var(--primary);
+  --star-accent-hover: var(--primary-hover);
+  --star-accent-strong: var(--primary-strong);
+  --star-accent-soft: var(--primary-soft);
+  --star-accent-softer: var(--primary-softer);
+  --star-accent-border: var(--primary-border);
+}
+
+body {
+  background-image:
+    linear-gradient(rgba(70, 73, 136, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(70, 73, 136, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 82% -10%, var(--primary-glow, rgba(178, 162, 255, 0.14)), transparent 32rem);
+}
+
+/* The dark header is deliberately independent from page-surface variables. */
+.topbar {
+  border-bottom-color: var(--star-accent) !important;
+  background: var(--star-night) !important;
+  color: #fbf9ff;
+}
+
+.topbar::after {
+  background: linear-gradient(90deg, transparent, var(--star-accent), transparent);
+}
+
+.topbar-brand,
+.topbar-brand:hover,
+.topbar-brand-copy strong,
+.topbar-context,
+.user-copy strong {
+  color: #fff;
+}
+
+.topbar-brand-copy small {
+  color: #d8daf3;
+}
+
+.topbar-context {
+  border-color: var(--star-accent);
+  background: var(--star-accent);
+  color: var(--primary-contrast);
+  box-shadow: 0 2px 0 rgba(4, 5, 20, .28);
+}
+
+.topbar .icon-button,
+.topbar .btn-secondary {
+  border-color: var(--star-accent-border);
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+}
+
+.topbar .icon-button:hover:not(:disabled),
+.topbar .btn-secondary:hover:not(:disabled) {
+  border-color: var(--star-accent);
+  background: var(--star-accent);
+  color: var(--primary-contrast);
+}
+
+.topbar .role-badge,
+.role-badge {
+  border-color: var(--star-accent-border);
+  background: var(--star-accent);
+  color: var(--primary-contrast);
+}
+
+.user-avatar {
+  border-color: var(--star-accent);
+  background: var(--star-accent);
+  color: var(--primary-contrast);
+}
+
+/* All prominent accents now resolve from each user's saved primary color. */
+.nav-link.active {
+  border-color: var(--star-accent);
+  background: var(--star-accent);
+  color: var(--primary-contrast);
+  box-shadow: inset 3px 0 0 var(--star-accent-strong), 0 2px 0 rgba(4, 5, 20, .22);
+}
+
+.nav-link.active .nav-icon,
+.nav-link.active svg {
+  color: currentColor;
+}
+
+.nav-link:hover {
+  border-color: var(--star-accent-border);
+  background: var(--star-accent-soft);
+  color: var(--star-accent-strong);
+}
+
+.stat-icon {
+  background: var(--star-accent);
+  color: var(--primary-contrast);
+  box-shadow: 3px 3px 0 var(--primary-shadow);
+}
+
+.stat-card::after {
+  border-color: var(--primary-glow);
+}
+
+.page-header::before {
+  background: var(--star-accent);
+}
+
+.panel-header {
+  background:
+    linear-gradient(90deg, var(--primary-glow), transparent 55%),
+    var(--surface-subtle);
+}
+
+.btn-primary {
+  border-color: var(--star-accent-strong);
+  background: var(--star-accent);
+  color: var(--primary-contrast);
+}
+
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--star-accent-strong);
+  background: var(--star-accent-hover);
+  color: var(--primary-contrast);
+}
+
+.tag,
+.customer-account-tab.active {
+  border-color: var(--star-accent-border);
+  background: var(--star-accent-soft);
+  color: var(--star-accent-strong);
+}
+
+table thead th,
+.table-header,
+.ag-header {
+  background: var(--star-accent-soft);
+  color: var(--star-accent-strong);
+}
+
+table tbody tr:hover {
+  background: var(--star-accent-softer);
+}
+
+.dashboard-action-card:hover {
+  border-color: var(--star-accent-border);
+  background: linear-gradient(135deg, var(--star-accent-softer), var(--warning-soft));
+}
+
+:root[data-theme="dark"] .topbar {
+  background: var(--star-night-deep) !important;
+}
+
+:root[data-theme="dark"] .nav-link:hover {
+  background: var(--primary-glow);
+  color: #fff;
+}
+
+:root[data-theme="dark"] .customer-account-tab.active {
+  background: var(--star-accent-soft);
+  color: var(--text);
+}
+
+/* Keep report actions reachable at common laptop widths. */
+@media (max-width: 1380px) {
+  .manager-report-toolbar-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .manager-report-toolbar-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 860px) {
+  .manager-report-toolbar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-report-toolbar-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .manager-report-toolbar-actions .btn {
+    width: 100%;
+  }
+}
+
+/* Preserve the master-data actions and make horizontal overflow discoverable. */
+.master-list-scroll {
+  padding-bottom: 8px;
+  scrollbar-color: var(--star-accent) var(--surface-muted);
+  scrollbar-width: auto;
+}
+
+.master-list-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.master-list-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: var(--star-accent);
+}
+
+.master-list-scroll::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.master-compact-action {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  min-width: 220px;
+  background: var(--surface);
+  box-shadow: -12px 0 16px -16px rgba(12, 13, 38, .9);
+}
+
+.master-compact-header .master-compact-action {
+  z-index: 3;
+  background: var(--surface-subtle);
+}
+
+@media (max-width: 620px) {
+  body {
+    background-size: 24px 24px, 24px 24px, auto;
+  }
+
+  .topbar-brand-copy small {
+    display: none;
+  }
+
+  .topbar .role-badge {
+    max-width: 118px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .master-compact-action {
+    min-width: 196px;
+  }
+}
