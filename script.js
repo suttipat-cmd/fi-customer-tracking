@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.14.2-table-layout-bugfixes";
+  const APP_VERSION = "0.16.4-pixel-assets-avatar-picker";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -11,6 +11,17 @@
 
   const PUBLIC_MEDIA_BUCKET = "app-public-media";
   const AVATAR_BUCKET = "app-profile-media";
+  const PRESET_AVATAR_PREFIX = "preset/";
+  const PRESET_AVATARS = Array.from({ length: 12 }, (_, index) =>
+    `${PRESET_AVATAR_PREFIX}avatar-${String(index + 1).padStart(2, "0")}.png`
+  );
+  const PIXEL_ICON_FILES = {
+    dashboard: "dashboard", customers: "customers", report: "daily-report",
+    team: "team-report", users: "users", profile: "profile", settings: "system-settings",
+    image: "system-settings", database: "master-data", search: "search", calendar: "calendar",
+    edit: "edit", delete: "delete", save: "save", import: "import-excel",
+    download: "export-excel"
+  };
   const DEFAULT_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f68e6'/%3E%3Cpath d='M17 18h31v9H27v8h17v9H27v13H17z' fill='white'/%3E%3C/svg%3E";
   const MASTER_GROUPS = {
     modules: { label: "โมดูล", source: "modules" },
@@ -349,6 +360,10 @@
   }
 
   function icon(name) {
+    const pixelFile = PIXEL_ICON_FILES[name];
+    if (pixelFile) {
+      return `<img class="pixel-icon" src="assets/navigation-icons/${pixelFile}.png" alt="" aria-hidden="true">`;
+    }
     const paths = {
       dashboard: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M9.5 20v-6h5v6"/>',
       customers: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h4M7 16h6"/>',
@@ -2355,7 +2370,18 @@ async function runExcelExport(button, exporter) {
     return version ? `${url}?v=${encodeURIComponent(version)}` : url;
   }
 
+  function presetAvatarUrl(path) {
+    if (!PRESET_AVATARS.includes(path || "")) return "";
+    return `assets/avatars/${String(path).slice(PRESET_AVATAR_PREFIX.length)}`;
+  }
+
+  function isUploadedAvatarPath(path) {
+    return String(path || "").startsWith("avatars/");
+  }
+
   async function createAvatarSignedUrl(path) {
+    const presetUrl = presetAvatarUrl(path);
+    if (presetUrl) return presetUrl;
     if (!path || !state.client || !state.session) return "";
     const { data, error } = await state.client.storage
       .from(AVATAR_BUCKET)
@@ -2817,6 +2843,12 @@ function applySystemBranding() {
     }
     el.avatarForm.reset();
     el.avatarForm.elements.profile_id.value = profileId;
+    el.avatarForm.elements.preset_avatar_path.value = PRESET_AVATARS.includes(profile.avatar_path) ? profile.avatar_path : "";
+    const presetGrid = document.getElementById("avatar-preset-grid");
+    if (presetGrid) {
+      presetGrid.hidden = profileId !== state.profile?.id;
+      presetGrid.innerHTML = PRESET_AVATARS.map((path) => `<button type="button" class="avatar-preset-button ${path === profile.avatar_path ? "selected" : ""}" data-action="select-avatar-preset" data-path="${path}" aria-label="เลือก avatar ${path.slice(-6, -4)}"><img src="${presetAvatarUrl(path)}" alt=""></button>`).join("");
+    }
     el.avatarDialogTitle.textContent = profileId === state.profile?.id
       ? "เปลี่ยนรูปโปรไฟล์"
       : `เปลี่ยนรูปของ ${profile.display_name}`;
@@ -2831,19 +2863,28 @@ function applySystemBranding() {
     const profile = state.profiles.find((item) => item.id === profileId)
       || (state.profile?.id === profileId ? state.profile : null);
     const file = el.avatarFile.files?.[0];
-    if (!profile || !file) {
-      showToast("กรุณาเลือกไฟล์รูปภาพ", "warning");
+    const presetPath = String(el.avatarForm.elements.preset_avatar_path?.value || "");
+    if (!profile || (!file && !PRESET_AVATARS.includes(presetPath))) {
+      showToast("กรุณาอัปโหลดรูปภาพหรือเลือก avatar", "warning");
+      return;
+    }
+    if (!file && profileId !== state.profile?.id) {
+      showToast("ผู้ใช้แต่ละคนต้องเลือก avatar ของตนเอง", "warning");
       return;
     }
     setButtonBusy(el.avatarSaveButton, true, "กำลังอัปโหลด...");
     try {
-      await validateImageFile(file, {
-        maxBytes: 3 * 1024 * 1024,
-        allowedTypes: ["image/png", "image/jpeg", "image/webp"],
-        requireSquare: false
-      });
-      const nextPath = await uploadMedia(file, `avatars/${profileId}`, AVATAR_BUCKET);
-      const nextSignedUrl = await createAvatarSignedUrl(nextPath);
+      if (file) {
+        await validateImageFile(file, {
+          maxBytes: 3 * 1024 * 1024,
+          allowedTypes: ["image/png", "image/jpeg", "image/webp"],
+          requireSquare: false
+        });
+      }
+      const nextPath = file
+        ? await uploadMedia(file, `avatars/${profileId}`, AVATAR_BUCKET)
+        : presetPath;
+      const nextSignedUrl = presetAvatarUrl(nextPath) || await createAvatarSignedUrl(nextPath);
       const rpcName = profileId === state.profile.id
         ? "update_my_avatar_path"
         : "admin_update_profile_avatar";
@@ -2852,7 +2893,7 @@ function applySystemBranding() {
         : { p_profile_id: profileId, p_avatar_path: nextPath };
       const { data, error } = await state.client.rpc(rpcName, args);
       if (error) {
-        await removeMedia(nextPath, AVATAR_BUCKET);
+        if (file) await removeMedia(nextPath, AVATAR_BUCKET);
         throw error;
       }
       const previousPath = profile.avatar_path;
@@ -2862,7 +2903,7 @@ function applySystemBranding() {
         avatar_signed_url: nextSignedUrl,
         updated_at: updatedAt
       });
-      await removeMedia(previousPath, AVATAR_BUCKET);
+      if (isUploadedAvatarPath(previousPath)) await removeMedia(previousPath, AVATAR_BUCKET);
       closeDialog(el.avatarDialog);
       showToast("บันทึกรูปโปรไฟล์แล้ว");
       if (parseRoute().name === "profile") await renderProfilePage();
@@ -2901,7 +2942,7 @@ function applySystemBranding() {
         avatar_signed_url: "",
         updated_at: data?.updated_at || new Date().toISOString()
       });
-      await removeMedia(previousPath, AVATAR_BUCKET);
+      if (isUploadedAvatarPath(previousPath)) await removeMedia(previousPath, AVATAR_BUCKET);
       closeDialog(el.avatarDialog);
       showToast("ลบรูปโปรไฟล์แล้ว");
       if (parseRoute().name === "profile") await renderProfilePage();
@@ -4109,7 +4150,8 @@ async function renderDashboard() {
             <a class="btn btn-primary" href="#/daily-report">เปิดรายงาน</a>
           </div>
         ` : `
-          <div class="empty-state">
+          <div class="empty-state pixel-empty-state">
+            <img class="empty-state-illustration" src="assets/empty-states/empty-reports.png" alt="" aria-hidden="true">
             <strong>ยังไม่มีรายงานสำหรับวันนี้</strong>
             <span>ผู้ดูแลระบบและผู้ใช้งานสามารถเขียนรายงานได้ และ Draft จะเห็นเฉพาะเจ้าของ</span>
             <a class="btn btn-primary" href="#/daily-report">${icon("plus")} เริ่มเขียนรายงาน</a>
@@ -8347,6 +8389,18 @@ async function deleteContact(contactKey) {
           case "remove-avatar":
             await removeAvatar();
             break;
+          case "select-avatar-preset": {
+            const path = target.dataset.path || "";
+            if (!PRESET_AVATARS.includes(path)) break;
+            const input = el.avatarForm?.elements.preset_avatar_path;
+            if (input) input.value = path;
+            el.avatarFile.value = "";
+            document.querySelectorAll(".avatar-preset-button").forEach((button) =>
+              button.classList.toggle("selected", button.dataset.path === path)
+            );
+            renderAvatarInto(el.avatarPreview, { ...state.profile, avatar_path: path, avatar_signed_url: presetAvatarUrl(path) });
+            break;
+          }
           case "save-branding-image":
             await saveBrandingImage(target.dataset.kind, target);
             break;
