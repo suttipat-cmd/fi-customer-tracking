@@ -4613,7 +4613,8 @@ input[type="radio"] {
   color: var(--primary);
 }
 
-.master-global-indicator svg {
+.master-global-indicator svg,
+.master-global-indicator .pixel-icon {
   width: 17px;
   height: 17px;
 }
