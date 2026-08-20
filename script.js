@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.16.4-pixel-assets-avatar-picker";
+  const APP_VERSION = "0.16.5-ui-layout-regressions";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -20,7 +20,7 @@
     team: "team-report", users: "users", profile: "profile", settings: "system-settings",
     image: "system-settings", database: "master-data", search: "search", calendar: "calendar",
     edit: "edit", delete: "delete", save: "save", import: "import-excel",
-    download: "export-excel"
+    download: "export-excel", menu: "menu"
   };
   const DEFAULT_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f68e6'/%3E%3Cpath d='M17 18h31v9H27v8h17v9H27v13H17z' fill='white'/%3E%3C/svg%3E";
   const MASTER_GROUPS = {
@@ -6448,8 +6448,8 @@ async function saveContact(event) {
                 `).join("")}
               </fieldset>
 
-              <div class="form-section">
-                <div class="form-section-heading"><h3>สีหลัก</h3></div>
+              <section class="theme-accent-section" aria-labelledby="theme-accent-heading">
+                <h3 id="theme-accent-heading">สีหลัก</h3>
                 <div class="theme-color-editor">
                   <label class="native-color-label">
                     <span>เลือกสี</span>
@@ -6475,7 +6475,7 @@ async function saveContact(event) {
                     </button>
                   `).join("")}
                 </div>
-              </div>
+              </section>
             </div>
             <div class="panel-footer-actions">
               <button type="button" class="btn btn-secondary" data-action="reset-theme-preview">
