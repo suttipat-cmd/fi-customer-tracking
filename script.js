@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.16.5-ui-layout-regressions";
+  const APP_VERSION = "0.16.6-pixel-action-icons";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -20,7 +20,9 @@
     team: "team-report", users: "users", profile: "profile", settings: "system-settings",
     image: "system-settings", database: "master-data", search: "search", calendar: "calendar",
     edit: "edit", delete: "delete", save: "save", import: "import-excel",
-    download: "export-excel", menu: "menu"
+    download: "export-excel", menu: "menu", plus: "add", refresh: "refresh",
+    eye: "view", copy: "copy", camera: "camera", clock: "clock", check: "check",
+    building: "building", rocket: "rocket", globe: "globe"
   };
   const DEFAULT_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f68e6'/%3E%3Cpath d='M17 18h31v9H27v8h17v9H27v13H17z' fill='white'/%3E%3C/svg%3E";
   const MASTER_GROUPS = {
@@ -2403,7 +2405,7 @@ async function runExcelExport(button, exporter) {
   }
 
   function avatarUrl(profile) {
-    return profile?.avatar_signed_url || "";
+    return presetAvatarUrl(profile?.avatar_path) || profile?.avatar_signed_url || "";
   }
 
   function avatarMarkup(profile, className = "user-avatar", fallbackName = "") {
