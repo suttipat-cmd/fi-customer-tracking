@@ -6642,3 +6642,127 @@ table tbody tr:hover {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+
+/* --------------------------------------------------------------------------
+   v0.16.5 UI layout corrections: toolbar identity, theme editor and master list
+   -------------------------------------------------------------------------- */
+
+/* Report author is a compact information block, not an inline label + identity. */
+.report-author-toolbar {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  gap: 6px;
+}
+
+.report-author-toolbar > label {
+  display: block;
+  margin: 0;
+}
+
+.report-author-toolbar .profile-identity {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Theme settings must always participate in normal document flow. */
+.theme-mode-group,
+.theme-accent-section,
+.theme-color-editor,
+.theme-color-editor > label {
+  min-width: 0;
+}
+
+.theme-accent-section {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.theme-accent-section > h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.theme-color-editor {
+  grid-template-columns: minmax(130px, 0.65fr) minmax(180px, 0.9fr) minmax(220px, 1.2fr);
+}
+
+.theme-color-editor > label {
+  display: grid;
+  gap: 6px;
+  align-content: end;
+  margin: 0;
+}
+
+.theme-color-editor .field-label,
+.theme-color-editor .native-color-label > span {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.theme-color-editor .native-color-label input[type="color"] {
+  width: 100%;
+}
+
+@media (max-width: 980px) {
+  .theme-mode-group {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-color-editor {
+    grid-template-columns: minmax(130px, 0.7fr) minmax(0, 1fr);
+  }
+
+  .theme-live-preview {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .theme-color-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-live-preview {
+    grid-column: auto;
+  }
+}
+
+/* Keep actions inside the scrolling master-data table; sticky overlays hid rows. */
+.master-list-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.master-compact-action,
+.master-compact-header .master-compact-action {
+  position: static;
+  min-width: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.master-compact-action {
+  justify-self: end;
+}
+
+.master-compact-row .master-compact-action {
+  background: transparent;
+}
+
+/* The topbar control now uses the same supplied Pixel icon set as navigation. */
+.sidebar-toggle {
+  padding: 8px;
+}
+
+.sidebar-toggle .pixel-icon {
+  width: 20px;
+  height: 20px;
+}
