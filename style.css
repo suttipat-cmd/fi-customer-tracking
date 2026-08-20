@@ -6188,3 +6188,282 @@ table tbody tr:hover {
     min-width: 196px;
   }
 }
+
+
+/* CSS-native pixel interaction layer — original UI treatment, no external artwork. */
+:root {
+  --pixel-outline: rgba(9, 11, 34, .28);
+  --pixel-highlight: rgba(255, 255, 255, .40);
+  --pixel-grid: var(--primary-glow);
+}
+
+.topbar {
+  background-image:
+    linear-gradient(90deg, var(--primary-shadow), transparent 44%),
+    linear-gradient(270deg, rgba(255,255,255,.045), transparent 30%) !important;
+}
+
+.sidebar {
+  background-image:
+    linear-gradient(180deg, var(--primary-glow), transparent 38%),
+    linear-gradient(180deg, #1c1f42 0%, #151735 100%);
+}
+
+.sidebar-heading,
+.nav-group-label {
+  position: relative;
+}
+
+.sidebar-heading::after,
+.nav-group-label::after {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 7px;
+  background: var(--star-accent);
+  box-shadow: 2px 2px 0 rgba(0,0,0,.24);
+  content: "";
+  vertical-align: 1px;
+}
+
+.card,
+.panel,
+.stat-card,
+.report-section,
+.form-page-panel,
+.customer-list-settings-sort-card,
+.dialog {
+  border-radius: 4px;
+}
+
+.card,
+.panel,
+.stat-card,
+.report-section,
+.form-page-panel,
+.customer-list-settings-sort-card {
+  border-color: var(--star-accent-border);
+  box-shadow:
+    0 3px 0 var(--pixel-outline),
+    0 12px 24px rgba(32, 30, 72, .09);
+}
+
+.page-header {
+  border-radius: 5px;
+  box-shadow:
+    0 4px 0 var(--pixel-outline),
+    0 14px 28px rgba(32, 30, 72, .10);
+}
+
+.page-header::after {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  width: 7px;
+  height: 7px;
+  background: var(--star-accent);
+  box-shadow: -12px 0 0 var(--star-accent), -24px 0 0 var(--star-accent);
+  content: "";
+  opacity: .55;
+}
+
+.btn {
+  border-radius: 3px;
+  box-shadow: 0 3px 0 var(--pixel-outline);
+  transition: transform .12s steps(2, end), box-shadow .12s steps(2, end), background-color .12s linear;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--pixel-outline);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--pixel-outline);
+}
+
+.icon-button,
+.icon-button-small {
+  border-radius: 3px;
+  box-shadow: 0 2px 0 var(--pixel-outline);
+}
+
+input,
+select,
+textarea {
+  border-radius: 3px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--star-accent);
+  outline-offset: 1px;
+  box-shadow: 3px 3px 0 var(--primary-shadow);
+}
+
+.status-badge,
+.tag,
+.role-badge {
+  border-radius: 3px;
+  letter-spacing: .015em;
+  box-shadow: 1px 1px 0 rgba(12, 14, 42, .10);
+}
+
+.status-badge[data-status="acknowledged"],
+.status-badge[data-status="active"],
+.status-badge[data-status="done"] {
+  border-left-width: 4px;
+}
+
+.status-badge[data-status="revision_required"],
+.status-badge[data-status="inactive"] {
+  border-left-width: 4px;
+}
+
+.status-badge[data-status="submitted"],
+.status-badge[data-status="in_process"] {
+  border-left-width: 4px;
+}
+
+.table-wrap,
+.ag-root-wrapper {
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 2px var(--primary-glow);
+}
+
+table thead th,
+.table-header,
+.ag-header {
+  border-bottom: 2px solid var(--star-accent);
+}
+
+table tbody tr {
+  transition: background-color .12s linear, box-shadow .12s linear;
+}
+
+table tbody tr:hover {
+  box-shadow: inset 3px 0 0 var(--star-accent);
+}
+
+.report-section,
+.form-section {
+  border-left: 4px solid var(--star-accent);
+}
+
+.report-section h2::before,
+.report-section h3::before,
+.form-section-heading h3::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  background: var(--star-accent);
+  box-shadow: 2px 2px 0 var(--primary-shadow);
+  content: "";
+  vertical-align: 1px;
+}
+
+.empty-state {
+  position: relative;
+  overflow: hidden;
+  border: 2px dashed var(--star-accent-border);
+  border-radius: 4px;
+  background:
+    linear-gradient(135deg, var(--primary-glow) 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(135deg, transparent 75%, var(--primary-glow) 75%) 0 0 / 12px 12px,
+    linear-gradient(135deg, var(--surface), var(--surface-subtle));
+}
+
+.empty-state::after {
+  display: block;
+  margin-top: 12px;
+  color: var(--star-accent-strong);
+  content: "พร้อมเริ่มรายการใหม่";
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.loading-card,
+.toast {
+  border-radius: 4px;
+  box-shadow: 4px 4px 0 var(--pixel-outline);
+}
+
+.loading-card {
+  border: 2px solid var(--star-accent);
+}
+
+.spinner {
+  border-radius: 2px;
+  border-top-color: var(--star-accent);
+  border-right-color: var(--star-accent);
+}
+
+.alert {
+  border-left-width: 5px;
+  border-radius: 3px;
+}
+
+.customer-account-tab,
+.customer-account-tab.active {
+  border-radius: 3px 3px 0 0;
+}
+
+.dashboard-action-card {
+  position: relative;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dashboard-action-card::after {
+  position: absolute;
+  right: 9px;
+  bottom: 8px;
+  width: 5px;
+  height: 5px;
+  background: var(--star-accent);
+  box-shadow: -9px 0 0 var(--star-accent);
+  content: "";
+  opacity: .5;
+}
+
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .stat-card,
+:root[data-theme="dark"] .report-section,
+:root[data-theme="dark"] .form-page-panel {
+  box-shadow: 0 3px 0 rgba(0,0,0,.38), 0 14px 28px rgba(0,0,0,.18);
+}
+
+@media (max-width: 620px) {
+  .sidebar-heading::after,
+  .nav-group-label::after {
+    display: none;
+  }
+
+  .page-header::after {
+    right: 12px;
+  }
+
+  .card,
+  .panel,
+  .stat-card,
+  .report-section {
+    border-radius: 3px;
+  }
+
+  .btn {
+    min-height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  table tbody tr {
+    transition: none;
+  }
+}
