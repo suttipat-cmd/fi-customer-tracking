@@ -173,7 +173,8 @@ code {
 
 .required {
   display: inline;
-  color: var(--primary);
+  color: var(--danger);
+  font-weight: 800;
 }
 
 .text-danger {
