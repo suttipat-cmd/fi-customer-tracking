@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.15.0-team-overview";
+  const APP_VERSION = "0.14.2-table-layout-bugfixes";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -3699,7 +3699,6 @@ function renderNavigation() {
       label: "รายงาน",
       items: [
         { route: "daily-report", icon: "report", label: "รายงานประจำวันของฉัน", roles: ["admin", "user"] },
-        { route: "team-overview", icon: "team", label: "ภาพรวมทีม", roles: ["admin", "manager"] },
         { route: "manager-reports", icon: "team", label: "รายงานของทีม", roles: ["admin", "manager"] }
       ]
     },
@@ -3756,7 +3755,6 @@ function routeAllowed(routeName) {
     customer: ["admin", "manager", "user"],
     profile: ["admin", "manager", "user"],
     "daily-report": ["admin", "user"],
-    "team-overview": ["admin", "manager"],
     "manager-reports": ["admin", "manager"],
     "admin-users": ["admin"],
     "system-settings": ["admin"],
@@ -3775,7 +3773,6 @@ function routeAllowed(routeName) {
       customer: route.mode === "edit" ? "แก้ไขลูกค้า" : "รายละเอียดลูกค้า",
       profile: "ข้อมูลส่วนตัวและรูปแบบสี",
       "daily-report": "รายงานประจำวัน",
-      "team-overview": "ภาพรวมทีม",
       "manager-reports": "รายงานของทีม",
       "admin-users": "จัดการผู้ใช้",
       "system-settings": "ตั้งค่าภาพระบบ",
@@ -3830,9 +3827,6 @@ function routeAllowed(routeName) {
           break;
         case "daily-report":
           await renderDailyReportPage();
-          break;
-        case "team-overview":
-          await renderTeamOverviewPage();
           break;
         case "manager-reports":
           await renderManagerReportsPage();
@@ -4242,119 +4236,6 @@ async function renderDashboard() {
 
   window.requestAnimationFrame(() => renderDashboardCharts(state.dashboardChartData));
 }
-
-async function renderTeamOverviewPage() {
-  await Promise.all([loadCommonData(), loadCustomers(true)]);
-  const today = bangkokDate();
-  const recentFrom = bangkokDate(-20);
-  const { data, error } = await state.client
-    .from("daily_reports")
-    .select("id,status,work_date,user_id,updated_at,submitted_at,last_revision_reason")
-    .gte("work_date", recentFrom)
-    .in("status", ["submitted", "acknowledged", "revision_required"])
-    .order("updated_at", { ascending: false })
-    .limit(1000);
-  if (error) throw error;
-
-  const reports = data || [];
-  const writers = state.profiles.filter((profile) => profile.is_active && profile.role !== "manager");
-  const todayReports = reports.filter((report) => report.work_date === today);
-  const latestByUser = new Map();
-  todayReports.forEach((report) => {
-    if (!latestByUser.has(report.user_id)) latestByUser.set(report.user_id, report);
-  });
-
-  const submitted = todayReports.filter((report) => report.status === "submitted").length;
-  const acknowledged = todayReports.filter((report) => report.status === "acknowledged").length;
-  const revision = todayReports.filter((report) => report.status === "revision_required").length;
-  const missing = writers.filter((profile) => !latestByUser.has(profile.id)).length;
-  const ownerCountByProfile = new Map();
-  state.customerOwners.forEach((owner) => {
-    ownerCountByProfile.set(owner.profile_id, (ownerCountByProfile.get(owner.profile_id) || 0) + 1);
-  });
-
-  const attentionCustomers = state.customers
-    .filter((customer) => customer.account_status === "active")
-    .filter((customer) => customer.import_status !== "done" || ["to_do", "pending_data"].includes(customer.onboarding_stage))
-    .sort((a, b) => String(a.updated_at || "").localeCompare(String(b.updated_at || "")))
-    .slice(0, 6);
-  const latestActivity = [...reports]
-    .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")))
-    .slice(0, 7);
-
-  const reportStatusMarkup = (report) => report
-    ? `<span class="status-badge" data-status="${h(report.status)}">${h(label("report_status", report.status))}</span>`
-    : `<span class="team-status-missing">ยังไม่ส่งรายงาน</span>`;
-
-  el.mainContent.innerHTML = `
-    ${pageHeader(
-      "ภาพรวมทีม",
-      `สรุปการทำงานและสิ่งที่ต้องติดตาม ณ ${formatDate(today)}`,
-      `<a class="btn btn-secondary" href="#/manager-reports">${icon("report")} ดูรายงานของทีม</a>`,
-      [{ label: "ภาพรวมทีม" }]
-    )}
-    <section class="team-overview-hero" aria-label="สรุปการส่งรายงานวันนี้">
-      <div class="team-overview-hero-copy">
-        <span class="eyebrow">TEAM PULSE</span>
-        <h2>วันนี้ทีมมีรายงาน ${todayReports.length.toLocaleString("th-TH")} จาก ${writers.length.toLocaleString("th-TH")} บัญชีที่เขียนรายงานได้</h2>
-        <p>ดูสถานะของทีม ลูกค้าที่ต้องติดตาม และกิจกรรมล่าสุดได้ในหน้าเดียว</p>
-      </div>
-      <div class="team-overview-hero-status">
-        <span class="team-pulse-dot" aria-hidden="true"></span>
-        <span>อัปเดตตามข้อมูลล่าสุดในระบบ</span>
-      </div>
-    </section>
-
-    <section class="team-summary-grid" aria-label="สถานะรายงานวันนี้">
-      <article class="team-summary-card team-summary-card-warning"><span>รอรับทราบ</span><strong>${submitted.toLocaleString("th-TH")}</strong><small>รายงานที่ส่งแล้ว</small></article>
-      <article class="team-summary-card team-summary-card-success"><span>รับทราบแล้ว</span><strong>${acknowledged.toLocaleString("th-TH")}</strong><small>รายงานที่ปิดงานแล้ว</small></article>
-      <article class="team-summary-card team-summary-card-danger"><span>ส่งกลับแก้ไข</span><strong>${revision.toLocaleString("th-TH")}</strong><small>ต้องดำเนินการต่อ</small></article>
-      <article class="team-summary-card team-summary-card-neutral"><span>ยังไม่ส่ง</span><strong>${missing.toLocaleString("th-TH")}</strong><small>จากบัญชีที่เขียนรายงานได้</small></article>
-    </section>
-
-    <section class="team-overview-grid">
-      <article class="panel team-members-panel">
-        <div class="panel-header"><div><h2>สถานะสมาชิกวันนี้</h2><p class="muted">รายงานฉบับร่างของผู้อื่นจะไม่ถูกนำมาแสดง</p></div></div>
-        <div class="panel-body team-members-list">
-          ${writers.length ? writers.map((profile) => {
-            const report = latestByUser.get(profile.id);
-            const customerCount = ownerCountByProfile.get(profile.id) || 0;
-            return `<div class="team-member-row">
-              ${profileIdentityMarkup(profile, { avatarClass: "profile-avatar-grid" })}
-              <div class="team-member-meta"><span>ดูแล ${customerCount.toLocaleString("th-TH")} ลูกค้า</span>${report ? `<span>อัปเดต ${h(formatDateTime(report.updated_at))}</span>` : ""}</div>
-              ${reportStatusMarkup(report)}
-            </div>`;
-          }).join("") : `<div class="empty-state compact"><strong>ยังไม่มีบัญชีผู้ใช้งานที่เปิดใช้งาน</strong></div>`}
-        </div>
-      </article>
-
-      <article class="panel team-attention-panel">
-        <div class="panel-header"><div><h2>ลูกค้าที่ควรติดตาม</h2><p class="muted">สถานะนำเข้ายังไม่เสร็จ หรือรอข้อมูล/ต้องดำเนินการ</p></div><a class="btn btn-secondary btn-small" href="#/customers">ดูข้อมูลลูกค้า</a></div>
-        <div class="panel-body team-attention-list">
-          ${attentionCustomers.length ? attentionCustomers.map((customer) => `<a class="team-attention-row" href="#/customer/${h(customer.id)}">
-            <span class="team-attention-icon">${icon("building")}</span>
-            <span class="team-attention-copy"><strong>${h(customer.legal_name || customer.short_name || "ไม่ระบุชื่อลูกค้า")}</strong><small>${h(label("onboarding_stage", customer.onboarding_stage))} · ${h(label("import_status", customer.import_status))}</small></span>
-            <span aria-hidden="true">›</span>
-          </a>`).join("") : `<div class="empty-state compact"><strong>ยังไม่มีลูกค้าที่เข้าเงื่อนไขติดตาม</strong><span>ลูกค้าที่ใช้งานอยู่มีสถานะนำเข้าข้อมูลและ Onboarding พร้อมแล้ว</span></div>`}
-        </div>
-      </article>
-    </section>
-
-    <section class="panel team-activity-panel">
-      <div class="panel-header"><div><h2>กิจกรรมรายงานล่าสุด</h2><p class="muted">รายงานที่ส่งแล้ว รับทราบแล้ว หรือส่งกลับแก้ไข ภายใน 21 วัน</p></div></div>
-      <div class="panel-body team-activity-list">
-        ${latestActivity.length ? latestActivity.map((report) => {
-          const profile = profileById(report.user_id);
-          return `<a class="team-activity-row" href="#/manager-reports">
-            ${avatarMarkup(profile, "profile-avatar-small", profile?.display_name || "-")}
-            <span class="team-activity-copy"><strong>${h(profile?.display_name || "ไม่พบผู้ใช้งาน")}</strong><small>รายงานวันที่ ${h(formatDate(report.work_date))} · อัปเดต ${h(formatDateTime(report.updated_at))}</small></span>
-            ${reportStatusMarkup(report)}
-          </a>`;
-        }).join("") : `<div class="empty-state compact"><strong>ยังไม่มีรายงานที่ส่งแล้วในช่วง 21 วัน</strong></div>`}
-      </div>
-    </section>`;
-}
-
   function customerAccountCounts() {
     return state.customers.reduce((counts, customer) => {
       if (customer.account_status === "inactive") counts.inactive += 1;
