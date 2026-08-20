@@ -6768,3 +6768,39 @@ table tbody tr:hover {
   width: 20px;
   height: 20px;
 }
+
+
+/* --------------------------------------------------------------------------
+   Pixel robot global loader
+   -------------------------------------------------------------------------- */
+.loading-card {
+  min-width: 244px;
+  gap: 8px;
+  padding: 18px 28px;
+}
+
+.pixel-robot-loader {
+  width: 102px;
+  height: 136px;
+  margin: -2px auto 0;
+  background-image: url("assets/loading/fi-robot-loading-sprite.png");
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  background-size: 400% 100%;
+  image-rendering: pixelated;
+  animation: pixel-robot-run 0.96s steps(1, end) infinite;
+}
+
+@keyframes pixel-robot-run {
+  0%, 24.999% { background-position: 0 0; }
+  25%, 49.999% { background-position: 33.333333% 0; }
+  50%, 74.999% { background-position: 66.666667% 0; }
+  75%, 100% { background-position: 100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pixel-robot-loader {
+    animation: none;
+    background-position: 0 0;
+  }
+}
