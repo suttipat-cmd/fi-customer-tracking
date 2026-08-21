@@ -189,6 +189,9 @@
       <div class="dialog-body">
         <input name="id" type="hidden">
         <input name="customer_id" type="hidden">
+        <p id="customer-user-secret-notice" class="alert alert-info" hidden>
+          เพื่อความปลอดภัย รหัสผ่านและ PIN ไม่ถูกเก็บในแบบร่างของเบราว์เซอร์ หากต้องการเปลี่ยน ให้กรอกค่าใหม่
+        </p>
         <div class="form-grid">
           <label class="span-2">
             อีเมล <span class="required">*</span>
@@ -316,7 +319,7 @@
                   <span aria-hidden="true">📅</span>
                 </button>
                 <input id="date-range-from" name="date_range_from" data-date-native
-                       class="native-date-picker" type="date" tabindex="-1" aria-hidden="true">
+                       class="native-date-picker" type="date" tabindex="-1" aria-hidden="true" aria-label="จากวันที่">
               </div>
             </label>
           </div>
@@ -332,7 +335,7 @@
                   <span aria-hidden="true">📅</span>
                 </button>
                 <input id="date-range-to" name="date_range_to" data-date-native
-                       class="native-date-picker" type="date" tabindex="-1" aria-hidden="true">
+                       class="native-date-picker" type="date" tabindex="-1" aria-hidden="true" aria-label="ถึงวันที่">
               </div>
             </label>
           </div>
@@ -439,6 +442,7 @@
   </dialog>
 
   <input id="customer-excel-import-file" class="hidden" type="file"
+         aria-label="เลือกไฟล์ Excel สำหรับอัปเดตข้อมูลลูกค้า"
          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
 
   <dialog id="excel-import-dialog" class="dialog dialog-wide">
@@ -485,10 +489,10 @@
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <section id="print-root" class="print-root" aria-hidden="true"></section>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@36.0.2/dist/ag-grid-community.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/ag-charts-community@14.0.2/dist/umd/ag-charts-community.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-  <script src="script.js?v=0.16.6-pixel-action-icons" defer></script>
+  <script src="script.js?v=0.16.11-audit-hardening" defer></script>
 </body>
 </html>

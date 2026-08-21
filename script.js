@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.16.6-pixel-action-icons";
+  const APP_VERSION = "0.16.11-audit-hardening";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -5192,7 +5192,7 @@ async function renderCustomerCreatePage() {
   renderCustomerDraftAccounts();
   renderCustomerDraftNotes();
   const restored = restoreCustomerDraft(document.getElementById("customer-core-form"));
-  if (restored) showToast("กู้คืนแบบร่างที่ยังไม่ได้บันทึกแล้ว", "warning");
+  if (restored) showToast("กู้คืนแบบร่างแล้ว · รหัสผ่านและ PIN ไม่ถูกเก็บไว้ในเบราว์เซอร์", "warning");
 }
 
 function createCustomerEditDraft(data) {
@@ -5274,10 +5274,12 @@ function renderCustomerDraftAccounts() {
       <div class="list-card-header">
         <div>
           <strong>${h(account.email || "-")}</strong>
-          <div class="customer-secret-summary">
-            <span>รหัสผ่าน <code>${h(maskedSecret(account.password_text))}</code></span>
-            <span>PIN <code>${h(maskedSecret(account.pin_text))}</code></span>
-          </div>
+          ${account._passwordNeedsReentry || account._pinNeedsReentry
+            ? '<div class="muted">รหัสผ่านและ PIN ไม่ถูกเก็บในแบบร่าง · กรอกใหม่เมื่อต้องการเปลี่ยน</div>'
+            : `<div class="customer-secret-summary">
+                <span>รหัสผ่าน <code>${h(maskedSecret(account.password_text))}</code></span>
+                <span>PIN <code>${h(maskedSecret(account.pin_text))}</code></span>
+              </div>`}
           ${account.notes ? `<div class="muted">${h(account.notes)}</div>` : ""}
         </div>
         <div class="list-card-actions">
@@ -5404,9 +5406,11 @@ function openCustomerUserForm(account = null, customerId = "") {
   form.elements.id.value = account?._key || "";
   form.elements.customer_id.value = customerId || state.customerEditDraft?.customerId || "";
   form.elements.email.value = account?.email || "";
-  form.elements.password_text.value = account?.password_text || "";
-  form.elements.pin_text.value = account?.pin_text || "";
+  form.elements.password_text.value = account?._passwordNeedsReentry ? "" : (account?.password_text || "");
+  form.elements.pin_text.value = account?._pinNeedsReentry ? "" : (account?.pin_text || "");
   form.elements.notes.value = account?.notes || "";
+  const secretNotice = document.getElementById("customer-user-secret-notice");
+  if (secretNotice) secretNotice.hidden = !(account?._passwordNeedsReentry || account?._pinNeedsReentry);
   if (el.customerUserDialogTitle) {
     el.customerUserDialogTitle.textContent = account ? "แก้ไขผู้ใช้งานลูกค้า" : "เพิ่มผู้ใช้งานลูกค้า";
   }
@@ -5433,13 +5437,15 @@ function saveCustomerUserDraft(event) {
   }
   form.elements.email.setCustomValidity("");
 
+  const existing = draft.accounts.find((item) => item._key === key);
+  const passwordText = String(data.get("password_text") || "");
+  const pinText = String(data.get("pin_text") || "");
   const next = {
     id: key && !key.startsWith("new-") ? key : null,
-    _key: key || createDraftKey(),
-    _isNew: !key || key.startsWith("new-"),
-    email,
-    password_text: String(data.get("password_text") || ""),
-    pin_text: String(data.get("pin_text") || ""),
+    _key: key || createDraftKey(), _isNew: !key || key.startsWith("new-"), email,
+    password_text: passwordText, pin_text: pinText,
+    _passwordNeedsReentry: Boolean(existing?._passwordNeedsReentry && passwordText === ""),
+    _pinNeedsReentry: Boolean(existing?._pinNeedsReentry && pinText === ""),
     notes: nullable(data.get("notes"))
   };
 
@@ -5531,7 +5537,10 @@ function persistCustomerDraft() {
     savedAt: new Date().toISOString(),
     values: customerFormDraftValues(form),
     contacts: draft.contacts.map(({ _key, _isNew, ...contact }) => ({ ...contact, _key, _isNew })),
-    accounts: draft.accounts.map(({ _key, _isNew, ...account }) => ({ ...account, _key, _isNew })),
+    // Never retain plaintext credentials in browser session storage.
+    accounts: draft.accounts.map(({ _key, _isNew, password_text, pin_text, _passwordNeedsReentry, _pinNeedsReentry, ...account }) => ({
+      ...account, _key, _isNew, _passwordNeedsReentry: true, _pinNeedsReentry: true
+    })),
     notes: draft.notes.map(({ _key, _isNew, ...note }) => ({ ...note, _key, _isNew })),
     deletedContactIds: [...draft.deletedContactIds],
     deletedAccountIds: [...draft.deletedAccountIds],
@@ -5588,8 +5597,11 @@ function restoreCustomerDraft(form) {
       _key: contact._key || contact.id || createDraftKey(),
       _isNew: contact._isNew ?? !contact.id
     }));
-    draft.accounts = (stored.accounts || []).map((account) => ({
+    draft.accounts = (stored.accounts || []).map(({ password_text, pin_text, ...account }) => ({
       ...account,
+      // Older drafts may contain secrets. Deliberately discard them on restore.
+      password_text: "", pin_text: "",
+      _passwordNeedsReentry: true, _pinNeedsReentry: true,
       _key: account._key || account.id || createDraftKey(),
       _isNew: account._isNew ?? !account.id
     }));
@@ -5652,7 +5664,7 @@ async function renderCustomerEditPage(customerId) {
   renderCustomerDraftAccounts();
   renderCustomerDraftNotes();
   const restored = restoreCustomerDraft(document.getElementById("customer-edit-form"));
-  if (restored) showToast("กู้คืนแบบร่างที่ยังไม่ได้บันทึกแล้ว", "warning");
+  if (restored) showToast("กู้คืนแบบร่างแล้ว · รหัสผ่านและ PIN ไม่ถูกเก็บไว้ในเบราว์เซอร์", "warning");
 }
 
   function openCustomerForm(customer = null) {
@@ -5752,13 +5764,16 @@ function collectCustomerFormState(formElement) {
     accounts: draft.accounts.map((account) => ({
       id: account._isNew ? null : account.id,
       email: String(account.email || "").trim().toLowerCase(),
-      password_text: String(account.password_text || ""),
-      pin_text: String(account.pin_text || ""),
+      // A restored draft intentionally omits sensitive values; null tells the RPC
+      // to preserve the existing database value rather than clearing it.
+      password_text: account._passwordNeedsReentry ? null : String(account.password_text || ""),
+      pin_text: account._pinNeedsReentry ? null : String(account.pin_text || ""),
       notes: nullable(account.notes)
     })),
     notes: draft.notes.map((note) => ({
       id: note._isNew ? null : note.id,
-      note_text: String(note.note_text || "").trim()
+      note_text: String(note.note_text || "").trim(),
+      is_dirty: Boolean(note._dirty || note._isNew)
     }))
   };
 }
@@ -5840,187 +5855,33 @@ async function saveCustomerEdit(event) {
   const formElement = event.target;
   const draft = state.customerEditDraft;
   if (!draft || !validateDateControls(formElement) || !formElement.reportValidity()) return;
-
   const collected = collectCustomerFormState(formElement);
   if (!collected) return;
-
   const customerId = formElement.dataset.customerId;
   const button = formElement.querySelector('button[type="submit"]');
   setButtonBusy(button, true, "กำลังบันทึก...");
   setLoading(true, "กำลังบันทึกข้อมูลลูกค้า...");
-  let currentStep = "ข้อมูลพื้นฐาน สถานะ และสัญญา";
-  let completedSteps = 0;
-
   try {
-    let result = await state.client
-      .from("customers")
-      .update(collected.core)
-      .eq("id", customerId)
-      .select()
-      .single();
-    if (result.error) throw result.error;
-    completedSteps += 1;
-
-    currentStep = "ผู้รับผิดชอบ";
-    result = await state.client.rpc("save_customer_owners", {
-      p_customer_id: customerId,
-      p_owner_ids: collected.ownerIds,
-      p_primary_owner_id: collected.primaryOwnerId
+    const { error } = await state.client.rpc("update_customer_complete_v1", {
+      p_customer_id: customerId, p_customer: collected.core, p_owner_ids: collected.ownerIds,
+      p_primary_owner_id: collected.primaryOwnerId, p_module_ids: collected.moduleIds,
+      p_feature_ids: collected.featureIds, p_contacts: collected.contacts,
+      p_customer_accounts: collected.accounts, p_customer_notes: collected.notes,
+      p_deleted_contact_ids: [...draft.deletedContactIds],
+      p_deleted_account_ids: [...draft.deletedAccountIds], p_deleted_note_ids: [...draft.deletedNoteIds]
     });
-    if (result.error) throw result.error;
-    completedSteps += 1;
-
-    currentStep = "โมดูลและฟังก์ชัน";
-    await saveCustomerRelations(
-      "customer_modules",
-      "module_id",
-      customerId,
-      draft.original.moduleIds,
-      collected.moduleIds
-    );
-    await saveCustomerRelations(
-      "customer_features",
-      "feature_id",
-      customerId,
-      draft.original.featureIds,
-      collected.featureIds
-    );
-    draft.original.moduleIds = [...collected.moduleIds];
-    draft.original.featureIds = [...collected.featureIds];
-    completedSteps += 1;
-
-    currentStep = "ผู้ติดต่อ";
-    for (const contactId of [...draft.deletedContactIds]) {
-      result = await state.client
-        .from("customer_contacts")
-        .delete()
-        .eq("id", contactId)
-        .eq("customer_id", customerId);
-      if (result.error) throw result.error;
-      draft.deletedContactIds.delete(contactId);
-    }
-
-    for (const contact of draft.contacts) {
-      result = await state.client.rpc("save_customer_contact", {
-        p_customer_id: customerId,
-        p_contact_id: contact._isNew ? null : contact.id,
-        p_contact_name: String(contact.contact_name || "").trim(),
-        p_position: nullable(contact.position),
-        p_phone: nullable(contact.phone),
-        p_email: nullable(contact.email),
-        p_line_id: nullable(contact.line_id),
-        p_is_primary: Boolean(contact.is_primary),
-        p_is_active: Boolean(contact.is_active)
-      });
-      if (result.error) throw result.error;
-      const savedContact = Array.isArray(result.data) ? result.data[0] : result.data;
-      if (contact._isNew && savedContact?.id) {
-        contact.id = savedContact.id;
-        contact._key = savedContact.id;
-        contact._isNew = false;
-      }
-    }
-    completedSteps += 1;
-
-    currentStep = "ผู้ใช้งานลูกค้า";
-    for (const accountId of [...draft.deletedAccountIds]) {
-      result = await state.client
-        .from("customer_user_accounts")
-        .delete()
-        .eq("id", accountId)
-        .eq("customer_id", customerId);
-      if (result.error) throw result.error;
-      draft.deletedAccountIds.delete(accountId);
-    }
-
-    for (const account of draft.accounts) {
-      const payload = {
-        customer_id: customerId,
-        email: String(account.email || "").trim().toLowerCase(),
-        password_text: String(account.password_text || ""),
-        pin_text: String(account.pin_text || ""),
-        notes: nullable(account.notes)
-      };
-      if (account._isNew) {
-        result = await state.client
-          .from("customer_user_accounts")
-          .insert(payload)
-          .select("id,customer_id,email,password_text,pin_text,notes,created_at,updated_at")
-          .single();
-      } else {
-        result = await state.client
-          .from("customer_user_accounts")
-          .update(payload)
-          .eq("id", account.id)
-          .eq("customer_id", customerId)
-          .select("id,customer_id,email,password_text,pin_text,notes,created_at,updated_at")
-          .single();
-      }
-      if (result.error) throw result.error;
-      if (account._isNew && result.data?.id) {
-        account.id = result.data.id;
-        account._key = result.data.id;
-        account._isNew = false;
-      }
-    }
-    completedSteps += 1;
-
-    currentStep = "โน้ตลูกค้า";
-    for (const noteId of [...draft.deletedNoteIds]) {
-      result = await state.client
-        .from("customer_notes")
-        .delete()
-        .eq("id", noteId)
-        .eq("customer_id", customerId);
-      if (result.error) throw result.error;
-      draft.deletedNoteIds.delete(noteId);
-    }
-
-    for (const note of draft.notes) {
-      if (!note._isNew && !note._dirty) continue;
-      const payload = {
-        customer_id: customerId,
-        note_text: String(note.note_text || "").trim()
-      };
-      if (note._isNew) {
-        result = await state.client
-          .from("customer_notes")
-          .insert(payload)
-          .select("id,customer_id,note_text,created_at,created_by,updated_at,updated_by")
-          .single();
-      } else {
-        result = await state.client
-          .from("customer_notes")
-          .update(payload)
-          .eq("id", note.id)
-          .eq("customer_id", customerId)
-          .select("id,customer_id,note_text,created_at,created_by,updated_at,updated_by")
-          .single();
-      }
-      if (result.error) throw result.error;
-      if (result.data?.id) {
-        Object.assign(note, {
-          ...result.data,
-          _key: result.data.id,
-          _isNew: false,
-          _dirty: false
-        });
-      }
-    }
-    completedSteps += 1;
-
+    if (error) throw error;
     clearCustomerDraftStorage(customerId);
     clearCustomerCaches();
     showToast("บันทึกข้อมูลลูกค้าครบแล้ว");
-    location.hash = `#/customer/${customerId}`;
+    location.hash = "#/customer/" + customerId;
   } catch (error) {
     console.error(error);
     renderCustomerDraftContacts();
     renderCustomerDraftAccounts();
     renderCustomerDraftNotes();
     scheduleCustomerDraftSave();
-    const note = completedSteps > 0 ? " ข้อมูลส่วนก่อนหน้าอาจถูกบันทึกแล้ว" : "";
-    showToast(`บันทึกส่วน “${currentStep}” ไม่สำเร็จ: ${normalizeError(error)}${note}`, "error");
+    showToast("บันทึกข้อมูลลูกค้าไม่สำเร็จ · ไม่มีข้อมูลส่วนใดถูกบันทึก", "error");
   } finally {
     setLoading(false);
     setButtonBusy(button, false);
