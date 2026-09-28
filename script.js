@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.16.11-audit-hardening";
+  const APP_VERSION = "0.16.12-avatar-fallback";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -110,6 +110,7 @@
     session: null,
     profile: null,
     profiles: [],
+    unavailableAvatarPaths: new Set(),
     customers: [],
     customerOwners: [],
     customerModules: [],
@@ -2384,7 +2385,7 @@ async function runExcelExport(button, exporter) {
   async function createAvatarSignedUrl(path) {
     const presetUrl = presetAvatarUrl(path);
     if (presetUrl) return presetUrl;
-    if (!path || !state.client || !state.session) return "";
+    if (!path || state.unavailableAvatarPaths.has(path) || !state.client || !state.session) return "";
     const { data, error } = await state.client.storage
       .from(AVATAR_BUCKET)
       .createSignedUrl(path, 60 * 60);
@@ -2405,14 +2406,16 @@ async function runExcelExport(button, exporter) {
   }
 
   function avatarUrl(profile) {
-    return presetAvatarUrl(profile?.avatar_path) || profile?.avatar_signed_url || "";
+    const path = profile?.avatar_path || "";
+    if (state.unavailableAvatarPaths.has(path)) return "";
+    return presetAvatarUrl(path) || profile?.avatar_signed_url || "";
   }
 
   function avatarMarkup(profile, className = "user-avatar", fallbackName = "") {
     const url = avatarUrl(profile);
     const initials = userInitials(profile?.display_name || fallbackName || "FI");
     if (url) {
-      return `<span class="${h(className)} has-image"><img src="${h(url)}" alt="รูปโปรไฟล์ของ ${h(profile?.display_name || fallbackName || "ผู้ใช้งาน")}"></span>`;
+      return `<span class="${h(className)} has-image"><img src="${h(url)}" data-avatar-fallback="${h(initials)}" data-avatar-path="${h(profile?.avatar_path || "")}" alt="รูปโปรไฟล์ของ ${h(profile?.display_name || fallbackName || "ผู้ใช้งาน")}"></span>`;
     }
     return `<span class="${h(className)}">${h(initials)}</span>`;
   }
@@ -2478,6 +2481,8 @@ function profileIdentityMarkup(profile, options = {}) {
     if (url) {
       const image = document.createElement("img");
       image.src = url;
+      image.dataset.avatarFallback = userInitials(profile?.display_name || fallbackName || "FI");
+      image.dataset.avatarPath = profile?.avatar_path || "";
       image.alt = `รูปโปรไฟล์ของ ${profile?.display_name || fallbackName || "ผู้ใช้งาน"}`;
       node.append(image);
     } else {
@@ -7447,6 +7452,8 @@ function renderReportReadOnlySection(title, items, itemCustomers = [], groupCust
             if (url) {
               const image = document.createElement("img");
               image.src = url;
+              image.dataset.avatarFallback = userInitials(params.data.display_name);
+              image.dataset.avatarPath = params.data.avatar_path || "";
               image.alt = "";
               button.append(image);
             } else {
@@ -7744,6 +7751,19 @@ async function deleteContact(contactKey) {
   }
 
   function bindGlobalEvents() {
+    document.addEventListener("error", (event) => {
+      const image = event.target;
+      if (!(image instanceof HTMLImageElement) || !image.dataset.avatarFallback) return;
+
+      const path = image.dataset.avatarPath || "";
+      if (isUploadedAvatarPath(path)) state.unavailableAvatarPaths.add(path);
+
+      const host = image.parentElement;
+      if (!host) return;
+      host.classList.remove("has-image");
+      host.replaceChildren(document.createTextNode(image.dataset.avatarFallback));
+    }, true);
+
     el.loginForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!el.loginForm.reportValidity() || !state.client) return;
