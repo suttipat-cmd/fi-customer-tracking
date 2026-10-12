@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.16.12-avatar-fallback";
+  const APP_VERSION = "0.16.13-customer-filter-memory";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -76,6 +76,15 @@
   const DEFAULT_CUSTOMER_LIST_SORT_COLUMN = "updated_at";
   const DEFAULT_CUSTOMER_LIST_SORT_DIRECTION = "desc";
   const CUSTOMER_LIST_COLUMN_KEYS = new Set(CUSTOMER_LIST_COLUMN_CATALOG.map((column) => column.key));
+  const CUSTOMER_FILTER_STORAGE_PREFIX = "fi-customer-filters:";
+
+  function defaultCustomerFilters() {
+    return {
+      search: "", accountTab: "active", owner: "", onboarding: "", importStatus: "",
+      engagement: "", contractType: "", salesCode: "", moduleId: "", featureId: "", fleetMin: "", fleetMax: "",
+      startFrom: "", startTo: "", billingFrom: "", billingTo: "", advancedOpen: false
+    };
+  }
 
   const LABELS = {
     role: { admin: "ผู้ดูแลระบบ", manager: "ผู้จัดการ", user: "ผู้ใช้งาน" },
@@ -159,25 +168,7 @@
     ui: {
       themePreviewDirty: false,
       currentRouteName: null,
-      customerFilters: {
-        search: "",
-        accountTab: "active",
-        owner: "",
-        onboarding: "",
-        importStatus: "",
-        engagement: "",
-        contractType: "",
-        salesCode: "",
-        moduleId: "",
-        featureId: "",
-        fleetMin: "",
-        fleetMax: "",
-        startFrom: "",
-        startTo: "",
-        billingFrom: "",
-        billingTo: "",
-        advancedOpen: false
-      },
+      customerFilters: defaultCustomerFilters(),
       managerFilters: {
         date: "",
         userId: "",
@@ -263,6 +254,54 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function customerFilterStorageKey(userId = state.profile?.id || state.session?.user?.id) {
+    return userId ? `${CUSTOMER_FILTER_STORAGE_PREFIX}${userId}` : "";
+  }
+
+  function normalizeCustomerFilters(value) {
+    const defaults = defaultCustomerFilters();
+    const input = value && typeof value === "object" ? value : {};
+    const filters = { ...defaults };
+    for (const key of Object.keys(defaults)) {
+      if (key === "advancedOpen") filters[key] = Boolean(input[key]);
+      else if (typeof input[key] === "string") filters[key] = input[key];
+    }
+    filters.accountTab = filters.accountTab === "inactive" ? "inactive" : "active";
+    return filters;
+  }
+
+  function persistCustomerFilters() {
+    const key = customerFilterStorageKey();
+    if (!key) return;
+    try {
+      window.sessionStorage.setItem(key, JSON.stringify(normalizeCustomerFilters(state.ui.customerFilters)));
+    } catch (error) {
+      console.warn("ไม่สามารถจดจำตัวกรองข้อมูลลูกค้าในแท็บนี้", error);
+    }
+  }
+
+  function restoreCustomerFilters() {
+    const key = customerFilterStorageKey();
+    if (!key) return;
+    try {
+      const saved = window.sessionStorage.getItem(key);
+      state.ui.customerFilters = saved ? normalizeCustomerFilters(JSON.parse(saved)) : defaultCustomerFilters();
+    } catch (error) {
+      console.warn("ไม่สามารถกู้คืนตัวกรองข้อมูลลูกค้า", error);
+      state.ui.customerFilters = defaultCustomerFilters();
+    }
+  }
+
+  function clearPersistedCustomerFilters() {
+    const key = customerFilterStorageKey();
+    if (!key) return;
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch (error) {
+      console.warn("ไม่สามารถล้างตัวกรองข้อมูลลูกค้าในแท็บนี้", error);
+    }
   }
 
   function nullable(value) {
@@ -3697,6 +3736,7 @@ async function handleSession(session) {
       theme_mode: profile.theme_mode || "light",
       theme_accent: normalizeHex(profile.theme_accent || "#2f68e6")
     };
+    restoreCustomerFilters();
     applyThemePreferences(state.profile);
     await loadCommonData(true);
 
@@ -4755,6 +4795,7 @@ function renderCustomerTable() {
   filters.fleetMin = document.getElementById("customer-fleet-min")?.value || "";
   filters.fleetMax = document.getElementById("customer-fleet-max")?.value || "";
   filters.advancedOpen = Boolean(document.getElementById("customer-advanced-filters")?.open);
+  persistCustomerFilters();
 
   const query = filters.search.toLowerCase();
   const minimumFleet = filters.fleetMin === "" ? null : Number(filters.fleetMin);
@@ -8014,6 +8055,7 @@ async function deleteContact(contactKey) {
     document.addEventListener("toggle", (event) => {
       if (event.target.id === "customer-advanced-filters") {
         state.ui.customerFilters.advancedOpen = event.target.open;
+        persistCustomerFilters();
       }
     }, true);
 
@@ -8097,11 +8139,8 @@ async function deleteContact(contactKey) {
             break;
           }
           case "reset-customer-filters": {
-            state.ui.customerFilters = {
-              search: "", accountTab: "active", owner: "", onboarding: "", importStatus: "",
-              engagement: "", contractType: "", salesCode: "", moduleId: "", featureId: "", fleetMin: "", fleetMax: "",
-              startFrom: "", startTo: "", billingFrom: "", billingTo: "", advancedOpen: false
-            };
+            state.ui.customerFilters = defaultCustomerFilters();
+            clearPersistedCustomerFilters();
             await withGlobalLoading("กำลังล้างตัวกรอง...", () => renderCustomersPage());
             break;
           }
