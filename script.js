@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.16.13-customer-filter-memory";
+  const APP_VERSION = "0.16.14-customer-pagination-memory";
   window.FI_APP_VERSION = APP_VERSION;
 
   // Public browser configuration only. Never place a database password,
@@ -82,7 +82,8 @@
     return {
       search: "", accountTab: "active", owner: "", onboarding: "", importStatus: "",
       engagement: "", contractType: "", salesCode: "", moduleId: "", featureId: "", fleetMin: "", fleetMax: "",
-      startFrom: "", startTo: "", billingFrom: "", billingTo: "", advancedOpen: false
+      startFrom: "", startTo: "", billingFrom: "", billingTo: "", advancedOpen: false,
+      page: 0, pageSize: 20
     };
   }
 
@@ -269,6 +270,8 @@
       else if (typeof input[key] === "string") filters[key] = input[key];
     }
     filters.accountTab = filters.accountTab === "inactive" ? "inactive" : "active";
+    filters.page = Number.isInteger(input.page) && input.page >= 0 ? input.page : 0;
+    filters.pageSize = [10, 20, 50, 100].includes(input.pageSize) ? input.pageSize : 20;
     return filters;
   }
 
@@ -4893,6 +4896,8 @@ function renderCustomerTable() {
   }
 
   const listSettings = currentCustomerListSettings();
+  const savedPage = filters.page;
+  let paginationReady = false;
   const availableDefinitions = customerListColumnDefinitions(mobile);
   const configuredColumns = (mobile ? ["legal_name", "owner_text", "onboarding_text"] : listSettings.customer_list_columns)
     .filter((key) => availableDefinitions[key])
@@ -4908,7 +4913,21 @@ function renderCustomerTable() {
   createCommunityGrid(container, {
     rowData: rows,
     getRowId: (params) => params.data.id,
-    columnDefs: [...configuredColumns, customerListActionsColumn(mobile)]
+    columnDefs: [...configuredColumns, customerListActionsColumn(mobile)],
+    paginationPageSize: filters.pageSize,
+    onFirstDataRendered: (event) => {
+      paginationReady = true;
+      event.api.paginationGoToPage(savedPage);
+      filters.page = event.api.paginationGetCurrentPage();
+      filters.pageSize = event.api.paginationGetPageSize();
+      persistCustomerFilters();
+    },
+    onPaginationChanged: (event) => {
+      if (!paginationReady) return;
+      filters.page = event.api.paginationGetCurrentPage();
+      filters.pageSize = event.api.paginationGetPageSize();
+      persistCustomerFilters();
+    }
   }, "customers");
   state.ui.customerGridMobile = mobile;
 }
